@@ -3,6 +3,7 @@ export type RuntimeDiagnostic = {
   label: string;
   path: string;
   found: boolean;
+  version: string | null;
   versionPolicy: string;
   packageType: string;
   sourceUrl: string;
@@ -48,6 +49,18 @@ export type RuntimeInstallResult = {
   checksumVerified: boolean | null;
   wouldExtract: boolean;
   installed: boolean;
+  message: string;
+};
+
+export type AdapterRuntimeRequirementDiagnostic = {
+  serviceId: string;
+  runtime: string;
+  requiredExecutable: string;
+  versionRequirement: string | null;
+  executablePath: string | null;
+  found: boolean;
+  version: string | null;
+  satisfies: boolean | null;
   message: string;
 };
 

@@ -18,6 +18,7 @@ function setupDiagnostics(usbRoot) {
     const knownIds = adapters.map((adapter) => adapter.id);
     const adapterResults = adapters.map((adapter) => (0, adapters_1.validateAdapter)(adapter, knownIds));
     const runtimes = (0, runtimes_1.runtimeDiagnostics)(root);
+    const adapterRuntimeRequirements = (0, runtimes_1.adapterRuntimeRequirementDiagnostics)(root, adapters);
     const readiness = (0, adapters_1.integrationReadiness)(adapters);
     const ports = portDiagnostics(root);
     const paths = pathDiagnostics(root);
@@ -37,6 +38,21 @@ function setupDiagnostics(usbRoot) {
                 command: "node core/node/dist/clawhermes.js runtimes --json",
                 path: runtime.path,
                 docs: runtime.sourceUrl,
+            });
+        }
+    }
+    for (const requirement of adapterRuntimeRequirements) {
+        if (requirement.versionRequirement && requirement.found && requirement.satisfies === false) {
+            messages.push(requirement.message);
+            actions.push({
+                id: `runtime-version:${requirement.serviceId}:${requirement.runtime}`,
+                category: "runtime",
+                severity: "warning",
+                title: `Install ${requirement.runtime} ${requirement.versionRequirement} for ${requirement.serviceId}`,
+                detail: requirement.message,
+                command: "node core/node/dist/clawhermes.js runtimes --json",
+                path: requirement.executablePath ?? undefined,
+                serviceId: requirement.serviceId,
             });
         }
     }
@@ -110,7 +126,7 @@ function setupDiagnostics(usbRoot) {
             path: "data",
         });
     }
-    return { root, adapters: adapterResults, runtimes, readiness, ports, paths, envFiles, dataWritable: writable, messages, actions };
+    return { root, adapters: adapterResults, runtimes, adapterRuntimeRequirements, readiness, ports, paths, envFiles, dataWritable: writable, messages, actions };
 }
 function writeSetupSnapshot(usbRoot, setup = setupDiagnostics(usbRoot)) {
     const root = (0, portable_1.getRoot)(usbRoot);

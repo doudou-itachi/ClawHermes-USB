@@ -1534,3 +1534,37 @@ Validation performed:
 Next steps:
 
 - Add runtime version diagnostics so setup can compare installed portable runtime versions against adapter `versionRequirement` before running real setup commands.
+
+### Runtime Version Diagnostics
+
+Status: `Done`
+
+Summary:
+
+- Setup diagnostics now read installed runtime versions with `<executable> --version`.
+- Added `adapterRuntimeRequirements` to setup JSON output.
+- Added simple `>=x.y.z` comparison for adapter `runtime.versionRequirement`.
+- Runtime version mismatches now produce setup messages and `runtime-version:<service>:<runtime>` recommended actions.
+- Added regression coverage using a temporary USB root with Node 22 installed against the Hermes Web UI `>=23.0.0` requirement.
+
+Changed areas:
+
+- `core/node/src/runtimes.ts`
+- `core/node/src/diagnostics.ts`
+- `core/node/src/types.ts`
+- `core/node/dist/`
+- `tests/test_windows_core.py`
+- `docs/PROGRESS.md`
+- `docs/superpowers/plans/2026-05-01-add-runtime-version-diagnostics.md`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_setup_json_reports_adapter_runtime_version_mismatch -v`
+- `npm test`
+- `git diff --check`
+- UTF-8 smoke check
+
+Next steps:
+
+- Prepare a portable Node >=23 runtime before attempting real `setup-adapter hermes-web-ui --confirm-setup`.

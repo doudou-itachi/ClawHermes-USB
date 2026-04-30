@@ -9,6 +9,7 @@ import urllib.error
 import urllib.request
 import zipfile
 import hashlib
+import shutil
 from pathlib import Path
 
 
@@ -506,6 +507,40 @@ class WindowsCoreTests(unittest.TestCase):
         env_action = next(action for action in actions if action["id"] == "env-file:hermes-agent")
         self.assertIn("init-env", env_action["command"])
         self.assertEqual(env_action["path"].replace("\\", "/"), "config/env/hermes.env")
+
+    def test_setup_json_reports_adapter_runtime_version_mismatch(self):
+        temp_dir, temp_root = make_temp_usb_root()
+        try:
+            defaults = temp_root / "config" / "defaults"
+            defaults.mkdir(parents=True)
+            for config_file in (ROOT / "config" / "defaults").glob("*.json"):
+                (defaults / config_file.name).write_text(config_file.read_text(encoding="utf-8"), encoding="utf-8")
+            for directory in ["apps/openclaw", "apps/hermes-agent", "apps/hermes-web-ui", "data/logs", "data/tmp", "portal"]:
+                (temp_root / directory).mkdir(parents=True, exist_ok=True)
+            node_source = shutil.which("node")
+            self.assertIsNotNone(node_source)
+            node_target = temp_root / "runtimes" / "windows" / "node" / "node.exe"
+            node_target.parent.mkdir(parents=True)
+            shutil.copyfile(node_source, node_target)
+
+            result = run_dispatcher_for_root(temp_root, "setup", "-Json")
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            requirements = {
+                item["serviceId"]: item
+                for item in payload["adapterRuntimeRequirements"]
+                if item["versionRequirement"]
+            }
+            hermes_web = requirements["hermes-web-ui"]
+            self.assertEqual(hermes_web["runtime"], "node")
+            self.assertEqual(hermes_web["versionRequirement"], ">=23.0.0")
+            self.assertFalse(hermes_web["satisfies"])
+            self.assertIn("22.", hermes_web["version"])
+            action_ids = {action["id"] for action in payload["actions"]}
+            self.assertIn("runtime-version:hermes-web-ui:node", action_ids)
+        finally:
+            temp_dir.cleanup()
 
     def test_setup_text_prints_recommended_actions(self):
         result = run_dispatcher("setup")

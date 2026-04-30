@@ -5,7 +5,7 @@ import type { PathDiagnostic, PortDiagnostic, SetupAction } from "./types";
 import { integrationReadiness, loadAdapters, validateAdapter } from "./adapters";
 import { envFileDiagnostics } from "./environment";
 import { dataWritable, getRoot, resolveRelative } from "./portable";
-import { runtimeDiagnostics } from "./runtimes";
+import { adapterRuntimeRequirementDiagnostics, runtimeDiagnostics } from "./runtimes";
 
 export function setupDiagnostics(usbRoot: string) {
   const root = getRoot(usbRoot);
@@ -13,6 +13,7 @@ export function setupDiagnostics(usbRoot: string) {
   const knownIds = adapters.map((adapter) => adapter.id);
   const adapterResults = adapters.map((adapter) => validateAdapter(adapter, knownIds));
   const runtimes = runtimeDiagnostics(root);
+  const adapterRuntimeRequirements = adapterRuntimeRequirementDiagnostics(root, adapters);
   const readiness = integrationReadiness(adapters);
   const ports = portDiagnostics(root);
   const paths = pathDiagnostics(root);
@@ -33,6 +34,21 @@ export function setupDiagnostics(usbRoot: string) {
         command: "node core/node/dist/clawhermes.js runtimes --json",
         path: runtime.path,
         docs: runtime.sourceUrl,
+      });
+    }
+  }
+  for (const requirement of adapterRuntimeRequirements) {
+    if (requirement.versionRequirement && requirement.found && requirement.satisfies === false) {
+      messages.push(requirement.message);
+      actions.push({
+        id: `runtime-version:${requirement.serviceId}:${requirement.runtime}`,
+        category: "runtime",
+        severity: "warning",
+        title: `Install ${requirement.runtime} ${requirement.versionRequirement} for ${requirement.serviceId}`,
+        detail: requirement.message,
+        command: "node core/node/dist/clawhermes.js runtimes --json",
+        path: requirement.executablePath ?? undefined,
+        serviceId: requirement.serviceId,
       });
     }
   }
@@ -106,7 +122,7 @@ export function setupDiagnostics(usbRoot: string) {
     });
   }
 
-  return { root, adapters: adapterResults, runtimes, readiness, ports, paths, envFiles, dataWritable: writable, messages, actions };
+  return { root, adapters: adapterResults, runtimes, adapterRuntimeRequirements, readiness, ports, paths, envFiles, dataWritable: writable, messages, actions };
 }
 
 export function writeSetupSnapshot(usbRoot: string, setup = setupDiagnostics(usbRoot)) {

@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import type { RuntimeDiagnostic, RuntimeInstallResult, RuntimeManifest, RuntimePreparationStep } from "./types";
+import type { AdapterDescriptor, AdapterRuntimeRequirementDiagnostic, RuntimeDiagnostic, RuntimeInstallResult, RuntimeManifest, RuntimePreparationStep } from "./types";
 import { getRoot, resolveRelative } from "./portable";
 
 export function runtimeDiagnostics(usbRoot: string): RuntimeDiagnostic[] {
@@ -11,11 +11,13 @@ export function runtimeDiagnostics(usbRoot: string): RuntimeDiagnostic[] {
   return manifest.runtimes.map((runtime) => {
     const resolvedCandidates = runtime.candidates.map((candidate) => resolveRelative(root, candidate));
     const foundPath = resolvedCandidates.find((candidate) => existsSync(candidate)) ?? resolvedCandidates[0];
+    const found = resolvedCandidates.some((candidate) => existsSync(candidate));
     return {
       name: runtime.name,
       label: runtime.label,
       path: foundPath,
-      found: resolvedCandidates.some((candidate) => existsSync(candidate)),
+      found,
+      version: found ? runtimeVersion(foundPath) : null,
       versionPolicy: runtime.versionPolicy,
       packageType: runtime.packageType,
       sourceUrl: runtime.sourceUrl,
@@ -24,6 +26,33 @@ export function runtimeDiagnostics(usbRoot: string): RuntimeDiagnostic[] {
       notes: runtime.notes,
     };
   });
+}
+
+export function adapterRuntimeRequirementDiagnostics(usbRoot: string, adapters: AdapterDescriptor[]): AdapterRuntimeRequirementDiagnostic[] {
+  const runtimes = new Map(runtimeDiagnostics(usbRoot).map((runtime) => [runtime.name, runtime]));
+  return adapters
+    .filter((adapter) => adapter.runtime)
+    .map((adapter) => {
+      const runtime = adapter.runtime!;
+      const diagnostic = runtimes.get(runtime.kind);
+      const versionRequirement = runtime.versionRequirement ?? null;
+      const satisfies = versionRequirement && diagnostic?.version
+        ? satisfiesVersionRequirement(diagnostic.version, versionRequirement)
+        : versionRequirement
+          ? false
+          : null;
+      return {
+        serviceId: adapter.id,
+        runtime: runtime.kind,
+        requiredExecutable: runtime.requiredExecutable,
+        versionRequirement,
+        executablePath: diagnostic?.path ?? null,
+        found: diagnostic?.found === true,
+        version: diagnostic?.version ?? null,
+        satisfies,
+        message: runtimeRequirementMessage(adapter.id, runtime.kind, diagnostic?.version ?? null, versionRequirement, satisfies),
+      };
+    });
 }
 
 export function loadRuntimeManifest(usbRoot: string): RuntimeManifest {
@@ -132,6 +161,39 @@ function sha256File(file: string): string {
   const hash = createHash("sha256");
   hash.update(readFileSync(file));
   return hash.digest("hex");
+}
+
+function runtimeVersion(executablePath: string): string | null {
+  try {
+    const output = execFileSync(executablePath, ["--version"], { encoding: "utf8", timeout: 5000 }).trim();
+    return output.replace(/^v/i, "");
+  } catch {
+    return null;
+  }
+}
+
+function satisfiesVersionRequirement(version: string, requirement: string): boolean {
+  const match = requirement.trim().match(/^>=\s*(\d+)(?:\.(\d+))?(?:\.(\d+))?/);
+  if (!match) return false;
+  return compareVersions(version, [Number(match[1]), Number(match[2] ?? 0), Number(match[3] ?? 0)]) >= 0;
+}
+
+function compareVersions(version: string, required: [number, number, number]): number {
+  const match = version.match(/(\d+)(?:\.(\d+))?(?:\.(\d+))?/);
+  const actual: [number, number, number] = match
+    ? [Number(match[1]), Number(match[2] ?? 0), Number(match[3] ?? 0)]
+    : [0, 0, 0];
+  for (let index = 0; index < 3; index += 1) {
+    if (actual[index] !== required[index]) return actual[index] - required[index];
+  }
+  return 0;
+}
+
+function runtimeRequirementMessage(serviceId: string, runtime: string, version: string | null, requirement: string | null, satisfies: boolean | null): string {
+  if (!requirement) return `Adapter ${serviceId} does not declare a ${runtime} version requirement.`;
+  if (!version) return `Adapter ${serviceId} requires ${runtime} ${requirement}, but no installed version was detected.`;
+  if (satisfies) return `Adapter ${serviceId} requires ${runtime} ${requirement}; installed version ${version} satisfies it.`;
+  return `Adapter ${serviceId} requires ${runtime} ${requirement}; installed version ${version} does not satisfy it.`;
 }
 
 function copyExtractedRuntime(sourceDir: string, installDir: string): void {
