@@ -121,3 +121,10 @@ export type PortDiagnostic = {
   port: number;
   available: boolean;
 };
+
+export type PathDiagnostic = {
+  path: string;
+  type: "directory" | "file";
+  required: boolean;
+  exists: boolean;
+};

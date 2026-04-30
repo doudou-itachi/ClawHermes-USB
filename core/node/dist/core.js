@@ -12,6 +12,7 @@ exports.installRuntimeFromArchive = installRuntimeFromArchive;
 exports.integrationReadiness = integrationReadiness;
 exports.dataWritable = dataWritable;
 exports.setupDiagnostics = setupDiagnostics;
+exports.pathDiagnostics = pathDiagnostics;
 exports.portDiagnostics = portDiagnostics;
 exports.generatePortal = generatePortal;
 exports.startPortalServer = startPortalServer;
@@ -264,6 +265,7 @@ function setupDiagnostics(usbRoot) {
     const runtimes = runtimeDiagnostics(root);
     const readiness = integrationReadiness(adapters);
     const ports = portDiagnostics(root);
+    const paths = pathDiagnostics(root);
     const writable = dataWritable(root);
     const messages = [];
     for (const runtime of runtimes) {
@@ -282,9 +284,46 @@ function setupDiagnostics(usbRoot) {
         if (!port.available)
             messages.push(`Port ${port.port} is already in use for ${port.name}. Stop the conflicting process or change config/defaults/ports.json.`);
     }
+    for (const path of paths) {
+        if (path.required && !path.exists)
+            messages.push(`Required ${path.type} is missing: ${path.path}.`);
+    }
     if (!writable)
         messages.push("Data directory is not writable.");
-    return { root, adapters: adapterResults, runtimes, readiness, ports, dataWritable: writable, messages };
+    return { root, adapters: adapterResults, runtimes, readiness, ports, paths, dataWritable: writable, messages };
+}
+function pathDiagnostics(usbRoot) {
+    const root = getRoot(usbRoot);
+    const required = [
+        { path: "adapters", type: "directory" },
+        { path: "apps/openclaw", type: "directory" },
+        { path: "apps/hermes-agent", type: "directory" },
+        { path: "apps/hermes-web-ui", type: "directory" },
+        { path: "config/defaults/ports.json", type: "file" },
+        { path: "config/defaults/services.json", type: "file" },
+        { path: "config/defaults/runtimes.json", type: "file" },
+        { path: "data/logs", type: "directory" },
+        { path: "data/tmp", type: "directory" },
+        { path: "portal", type: "directory" },
+    ];
+    return required.map((item) => {
+        const absolute = resolveRelative(root, item.path);
+        const exists = (0, node_fs_1.existsSync)(absolute);
+        return {
+            path: item.path,
+            type: item.type,
+            required: true,
+            exists: exists && (item.type === "file" ? !isDirectory(absolute) : isDirectory(absolute)),
+        };
+    });
+}
+function isDirectory(path) {
+    try {
+        return (0, node_fs_1.statSync)(path).isDirectory();
+    }
+    catch {
+        return false;
+    }
 }
 function portDiagnostics(usbRoot) {
     const root = getRoot(usbRoot);

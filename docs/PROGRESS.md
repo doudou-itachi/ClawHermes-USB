@@ -353,3 +353,31 @@ Validation performed:
 Next steps:
 
 - Add directory/app/config validation to setup so first-time setup explains every missing project requirement in one pass.
+
+### Setup Path Diagnostics
+
+Status: `Done`
+
+Summary:
+
+- Added required path diagnostics to setup JSON.
+- Setup now reports key directories and config files with path, type, required flag, and existence.
+- Missing required paths add actionable setup messages.
+- Added test coverage for app directories, config files, data directories, and portal directory.
+
+Changed areas:
+
+- `core/node/src/core.ts`
+- `core/node/src/types.ts`
+- `core/node/dist/`
+- `docs/PROGRESS.md`
+- `tests/test_windows_core.py`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_setup_json_reports_required_paths -v`
+
+Next steps:
+
+- Add setup diagnostics for user env files versus committed `.env.example` templates.

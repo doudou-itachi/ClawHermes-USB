@@ -168,6 +168,32 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertFalse(portal["available"])
         self.assertIn("Port 17000 is already in use", "\n".join(payload["messages"]))
 
+    def test_setup_json_reports_required_paths(self):
+        result = run_dispatcher("setup", "-Json")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        paths = {item["path"]: item for item in payload["paths"]}
+
+        for required in [
+            "adapters",
+            "apps/openclaw",
+            "apps/hermes-agent",
+            "apps/hermes-web-ui",
+            "config/defaults/ports.json",
+            "config/defaults/services.json",
+            "config/defaults/runtimes.json",
+            "data/logs",
+            "data/tmp",
+            "portal",
+        ]:
+            self.assertIn(required, paths)
+            self.assertTrue(paths[required]["exists"], required)
+            self.assertTrue(paths[required]["required"], required)
+
+        self.assertEqual(paths["config/defaults/ports.json"]["type"], "file")
+        self.assertEqual(paths["data/logs"]["type"], "directory")
+
     def test_setup_json_reports_adapter_integration_readiness(self):
         result = run_dispatcher("setup", "-Json")
 
