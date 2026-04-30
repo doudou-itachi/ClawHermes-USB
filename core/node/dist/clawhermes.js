@@ -10,6 +10,7 @@ function parseArgs(argv) {
     let archive;
     let sha256;
     let dryRun = false;
+    let lines = 50;
     for (let index = 0; index < args.length; index += 1) {
         const arg = args[index];
         if ((arg === "--usb-root" || arg === "-UsbRoot") && args[index + 1]) {
@@ -30,17 +31,21 @@ function parseArgs(argv) {
         else if (arg === "--dry-run") {
             dryRun = true;
         }
+        else if (arg === "--lines" && args[index + 1]) {
+            lines = Number(args[index + 1]);
+            index += 1;
+        }
         else {
             positional.push(arg);
         }
     }
-    return { action, positional, usbRoot, json, archive, sha256, dryRun };
+    return { action, positional, usbRoot, json, archive, sha256, dryRun, lines };
 }
 function printJson(value) {
     process.stdout.write(`${JSON.stringify(value, null, 2)}\n`);
 }
 async function main() {
-    const { action, positional, usbRoot, json, archive, sha256, dryRun } = parseArgs(process.argv.slice(2));
+    const { action, positional, usbRoot, json, archive, sha256, dryRun, lines } = parseArgs(process.argv.slice(2));
     const root = (0, core_1.getRoot)(usbRoot);
     switch (action) {
         case "env-json":
@@ -100,6 +105,27 @@ async function main() {
                     console.log(`- ${file.path}: ${file.loaded ? "loaded" : file.exists ? "parse issues" : "missing"}`);
                 }
                 console.log(`Variables: ${result.variables.join(", ")}`);
+            }
+            return;
+        }
+        case "logs": {
+            const target = positional[0];
+            if (!target)
+                throw new Error("Log target is required. Example: logs launcher --lines 50");
+            const result = (0, core_1.readLogTail)(root, target, lines);
+            if (json) {
+                printJson(result);
+            }
+            else {
+                console.log(`ClawHermes-USB logs: ${result.target}`);
+                console.log(`Path: ${result.path}`);
+                if (!result.exists) {
+                    console.log("Log file does not exist yet.");
+                }
+                else {
+                    for (const line of result.lines)
+                        console.log(line);
+                }
             }
             return;
         }

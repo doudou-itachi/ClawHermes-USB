@@ -847,6 +847,30 @@ class WindowsCoreTests(unittest.TestCase):
         finally:
             temp_dir.cleanup()
 
+    def test_logs_json_tails_known_service_log(self):
+        try:
+            start = run_dispatcher("start", "-Json")
+            self.assertEqual(start.returncode, 0, start.stderr)
+
+            result = run_dispatcher("logs", "openclaw", "--lines", "1", "-Json")
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["target"], "openclaw")
+            self.assertTrue(payload["exists"])
+            self.assertEqual(payload["requestedLines"], 1)
+            self.assertTrue(payload["path"].endswith(str(Path("data") / "logs" / "openclaw.log")))
+            self.assertEqual(len(payload["lines"]), 1)
+            self.assertIn("Placeholder service started", payload["lines"][0])
+        finally:
+            run_dispatcher("stop", "-Json")
+
+    def test_logs_unknown_target_fails_with_actionable_message(self):
+        result = run_dispatcher("logs", "missing-service", "-Json")
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Unknown log target: missing-service", result.stderr)
+
     def test_status_reports_http_adapter_ready_when_endpoint_responds(self):
         temp_dir, temp_root, port = make_temp_http_usb_root()
         try:

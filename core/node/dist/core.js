@@ -16,6 +16,7 @@ exports.envFileDiagnostics = envFileDiagnostics;
 exports.initializeEnvFiles = initializeEnvFiles;
 exports.resolveServiceEnvironment = resolveServiceEnvironment;
 exports.serviceEnvironmentDiagnostic = serviceEnvironmentDiagnostic;
+exports.readLogTail = readLogTail;
 exports.pathDiagnostics = pathDiagnostics;
 exports.portDiagnostics = portDiagnostics;
 exports.generatePortal = generatePortal;
@@ -419,6 +420,32 @@ function serviceEnvironmentDiagnostic(usbRoot, serviceId) {
         variables: Object.keys(resolved.env).sort(),
         messages: resolved.messages,
     };
+}
+function readLogTail(usbRoot, target, requestedLines) {
+    const root = getRoot(usbRoot);
+    const lineCount = Math.max(1, Math.min(Number.isFinite(requestedLines) ? Math.floor(requestedLines) : 50, 200));
+    const logPath = resolveLogTarget(root, target);
+    const exists = (0, node_fs_1.existsSync)(logPath);
+    const lines = exists
+        ? (0, node_fs_1.readFileSync)(logPath, "utf8").split(/\r?\n/).filter((line) => line.length > 0).slice(-lineCount)
+        : [];
+    return {
+        root,
+        target,
+        path: logPath,
+        exists,
+        requestedLines: lineCount,
+        lines,
+    };
+}
+function resolveLogTarget(usbRoot, target) {
+    const root = getRoot(usbRoot);
+    if (target === "launcher")
+        return (0, node_path_1.join)(root, "data", "logs", "launcher.log");
+    const adapter = loadAdapters(root).find((item) => item.id === target);
+    if (!adapter)
+        throw new Error(`Unknown log target: ${target}`);
+    return resolveRelative(root, adapter.logFile);
 }
 function parseEnvFile(file) {
     const variables = {};

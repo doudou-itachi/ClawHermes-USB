@@ -705,3 +705,35 @@ Validation performed:
 Next steps:
 
 - Add log tail helpers so portal/status output can point users to the newest launcher and service log snippets without opening files manually.
+
+### Log Tail Helper
+
+Status: `Done`
+
+Summary:
+
+- Added a controlled `logs` CLI action for recent log lines.
+- Log targets are constrained to `launcher` or known adapter service IDs.
+- `--lines` is supported and capped to avoid large reads.
+- The PowerShell dispatcher remains thin and only adds `logs` to the allowed action list.
+- Added regression coverage for known service logs and unknown target rejection.
+
+Changed areas:
+
+- `core/node/src/core.ts`
+- `core/node/src/clawhermes.ts`
+- `core/node/dist/`
+- `core/windows/clawhermes.ps1`
+- `docs/PROGRESS.md`
+- `docs/superpowers/plans/2026-05-01-log-tail-helper.md`
+- `tests/test_windows_core.py`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_logs_json_tails_known_service_log tests.test_windows_core.WindowsCoreTests.test_logs_unknown_target_fails_with_actionable_message -v`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File core\windows\clawhermes.ps1 logs launcher --lines 1 -UsbRoot . -Json`
+
+Next steps:
+
+- Split the growing TypeScript core into smaller modules once the current orchestration behavior stabilizes.
