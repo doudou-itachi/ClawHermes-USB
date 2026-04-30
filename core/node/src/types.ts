@@ -160,3 +160,27 @@ export type EnvInitResult = {
   skipped: EnvInitSkipped[];
   messages: string[];
 };
+
+export type ServiceEnvFileResult = {
+  path: string;
+  exists: boolean;
+  loaded: boolean;
+  variables: string[];
+  errors: string[];
+};
+
+export type ServiceEnvironment = {
+  root: string;
+  serviceId: string;
+  env: Record<string, string>;
+  files: ServiceEnvFileResult[];
+  messages: string[];
+};
+
+export type ServiceEnvironmentDiagnostic = {
+  root: string;
+  serviceId: string;
+  files: ServiceEnvFileResult[];
+  variables: string[];
+  messages: string[];
+};

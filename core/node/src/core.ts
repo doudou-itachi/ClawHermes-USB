@@ -4,7 +4,7 @@ import { appendFileSync, copyFileSync, existsSync, mkdirSync, readFileSync, read
 import { dirname, isAbsolute, join, resolve, sep } from "node:path";
 import { get } from "node:http";
 import { createHash } from "node:crypto";
-import type { AdapterDescriptor, AdapterValidation, EnvFileDiagnostic, EnvInitResult, IntegrationReadiness, PathDiagnostic, PortDiagnostic, RuntimeDiagnostic, RuntimeInstallResult, RuntimeManifest, RuntimePreparationStep, ServiceStatus } from "./types";
+import type { AdapterDescriptor, AdapterValidation, EnvFileDiagnostic, EnvInitResult, IntegrationReadiness, PathDiagnostic, PortDiagnostic, RuntimeDiagnostic, RuntimeInstallResult, RuntimeManifest, RuntimePreparationStep, ServiceEnvironment, ServiceEnvironmentDiagnostic, ServiceEnvFileResult, ServiceStatus } from "./types";
 
 export const PORTAL_URL = "http://127.0.0.1:17000/";
 
@@ -357,6 +357,92 @@ export function initializeEnvFiles(usbRoot: string, dryRun: boolean): EnvInitRes
   return result;
 }
 
+export function resolveServiceEnvironment(usbRoot: string, serviceId: string): ServiceEnvironment {
+  const root = getRoot(usbRoot);
+  const adapter = loadAdapters(root).find((item) => item.id === serviceId);
+  if (!adapter) {
+    throw new Error(`Unknown service: ${serviceId}`);
+  }
+
+  const env: Record<string, string> = { ...portableEnv(root) };
+  const files: ServiceEnvFileResult[] = [];
+  const messages: string[] = [];
+
+  for (const envPath of adapter.env?.files ?? []) {
+    const absolutePath = resolveRelative(root, envPath);
+    if (!existsSync(absolutePath)) {
+      files.push({ path: envPath, exists: false, loaded: false, variables: [], errors: [] });
+      messages.push(`Env file missing: ${envPath}.`);
+      continue;
+    }
+
+    const parsed = parseEnvFile(absolutePath);
+    Object.assign(env, parsed.variables);
+    files.push({
+      path: envPath,
+      exists: true,
+      loaded: parsed.errors.length === 0,
+      variables: Object.keys(parsed.variables).sort(),
+      errors: parsed.errors,
+    });
+    if (parsed.errors.length === 0) {
+      messages.push(`Loaded env file: ${envPath}.`);
+    } else {
+      messages.push(`Loaded env file with ${parsed.errors.length} parse issue(s): ${envPath}.`);
+    }
+  }
+
+  for (const [name, value] of Object.entries(adapter.env?.variables ?? {})) {
+    env[name] = expandEnvTemplate(value, env);
+  }
+
+  return { root, serviceId: adapter.id, env, files, messages };
+}
+
+export function serviceEnvironmentDiagnostic(usbRoot: string, serviceId: string): ServiceEnvironmentDiagnostic {
+  const resolved = resolveServiceEnvironment(usbRoot, serviceId);
+  return {
+    root: resolved.root,
+    serviceId: resolved.serviceId,
+    files: resolved.files,
+    variables: Object.keys(resolved.env).sort(),
+    messages: resolved.messages,
+  };
+}
+
+function parseEnvFile(file: string): { variables: Record<string, string>; errors: string[] } {
+  const variables: Record<string, string> = {};
+  const errors: string[] = [];
+  const lines = readFileSync(file, "utf8").split(/\r?\n/);
+  for (let index = 0; index < lines.length; index += 1) {
+    const rawLine = lines[index];
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#")) continue;
+    const match = /^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/.exec(line);
+    if (!match) {
+      errors.push(`Line ${index + 1}: expected KEY=value.`);
+      continue;
+    }
+    variables[match[1]] = unquoteEnvValue(match[2].trim());
+  }
+  return { variables, errors };
+}
+
+function unquoteEnvValue(value: string): string {
+  if (value.length >= 2) {
+    const first = value[0];
+    const last = value[value.length - 1];
+    if ((first === '"' && last === '"') || (first === "'" && last === "'")) {
+      return value.slice(1, -1);
+    }
+  }
+  return value;
+}
+
+function expandEnvTemplate(value: string, env: Record<string, string>): string {
+  return value.replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g, (match, name: string) => env[name] ?? match);
+}
+
 export function pathDiagnostics(usbRoot: string): PathDiagnostic[] {
   const root = getRoot(usbRoot);
   const required: Array<{ path: string; type: "directory" | "file" }> = [
@@ -693,6 +779,7 @@ export async function startSkeleton(usbRoot: string) {
   for (const adapter of serviceOrder(root, "start").filter((item) => item.enabled)) {
     const pidFile = resolveRelative(root, adapter.pidFile);
     const logFile = resolveRelative(root, adapter.logFile);
+    const serviceEnv = resolveServiceEnvironment(root, adapter.id);
     mkdirSync(dirname(pidFile), { recursive: true });
     mkdirSync(dirname(logFile), { recursive: true });
     const metadata = {
@@ -703,6 +790,10 @@ export async function startSkeleton(usbRoot: string) {
       command: adapter.commands.start ?? null,
       workingDirectory: resolveRelative(root, adapter.appDir),
       logFile,
+      environment: {
+        files: serviceEnv.files,
+        variables: Object.keys(serviceEnv.env).sort(),
+      },
       placeholder: true,
     };
     writeFileSync(pidFile, JSON.stringify(metadata, null, 2), "utf8");

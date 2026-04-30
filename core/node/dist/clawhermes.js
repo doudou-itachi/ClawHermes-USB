@@ -86,6 +86,23 @@ async function main() {
             }
             return;
         }
+        case "service-env": {
+            const serviceId = positional[0];
+            if (!serviceId)
+                throw new Error("Service id is required. Example: service-env hermes-agent");
+            const result = (0, core_1.serviceEnvironmentDiagnostic)(root, serviceId);
+            if (json) {
+                printJson(result);
+            }
+            else {
+                console.log(`ClawHermes-USB service environment: ${result.serviceId}`);
+                for (const file of result.files) {
+                    console.log(`- ${file.path}: ${file.loaded ? "loaded" : file.exists ? "parse issues" : "missing"}`);
+                }
+                console.log(`Variables: ${result.variables.join(", ")}`);
+            }
+            return;
+        }
         case "install-runtime": {
             const runtimeName = positional[0];
             if (!runtimeName)

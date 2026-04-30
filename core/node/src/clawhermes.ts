@@ -1,4 +1,4 @@
-import { getRoot, getStatus, initializeEnvFiles, installRuntimeFromArchive, portableEnv, runtimePreparationPlan, setupDiagnostics, startSkeleton, stopSkeleton } from "./core";
+import { getRoot, getStatus, initializeEnvFiles, installRuntimeFromArchive, portableEnv, runtimePreparationPlan, serviceEnvironmentDiagnostic, setupDiagnostics, startSkeleton, stopSkeleton } from "./core";
 
 type ParsedArgs = {
   action: string;
@@ -83,6 +83,21 @@ async function main(): Promise<void> {
       } else {
         console.log(dryRun ? "ClawHermes-USB env initialization plan" : "ClawHermes-USB env initialization");
         for (const message of result.messages) console.log(`- ${message}`);
+      }
+      return;
+    }
+    case "service-env": {
+      const serviceId = positional[0];
+      if (!serviceId) throw new Error("Service id is required. Example: service-env hermes-agent");
+      const result = serviceEnvironmentDiagnostic(root, serviceId);
+      if (json) {
+        printJson(result);
+      } else {
+        console.log(`ClawHermes-USB service environment: ${result.serviceId}`);
+        for (const file of result.files) {
+          console.log(`- ${file.path}: ${file.loaded ? "loaded" : file.exists ? "parse issues" : "missing"}`);
+        }
+        console.log(`Variables: ${result.variables.join(", ")}`);
       }
       return;
     }

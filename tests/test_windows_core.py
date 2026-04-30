@@ -288,6 +288,64 @@ class WindowsCoreTests(unittest.TestCase):
         finally:
             temp_dir.cleanup()
 
+    def test_service_env_json_reports_loaded_variables_without_secret_values(self):
+        temp_dir, temp_root = make_temp_usb_root()
+        try:
+            env_file = temp_root / "config" / "env" / "hermes.env"
+            env_file.write_text(
+                "\n".join(
+                    [
+                        "# local secret values must not be printed",
+                        "HERMES_API_KEY=secret-value",
+                        "QUOTED_VALUE=\"hello world\"",
+                        "export EXPORTED_VALUE=from-export",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = run_dispatcher_for_root(temp_root, "service-env", "hermes-agent", "-Json")
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertNotIn("secret-value", result.stdout)
+            self.assertNotIn("hello world", result.stdout)
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["serviceId"], "hermes-agent")
+
+            files = {item["path"]: item for item in payload["files"]}
+            hermes_env = files["config/env/hermes.env"]
+            self.assertTrue(hermes_env["exists"])
+            self.assertTrue(hermes_env["loaded"])
+            self.assertEqual(
+                hermes_env["variables"],
+                ["EXPORTED_VALUE", "HERMES_API_KEY", "QUOTED_VALUE"],
+            )
+            self.assertEqual(hermes_env["errors"], [])
+
+            for variable in [
+                "USB_ROOT",
+                "HOME",
+                "USERPROFILE",
+                "HERMES_HOME",
+                "HERMES_API_KEY",
+                "QUOTED_VALUE",
+                "EXPORTED_VALUE",
+            ]:
+                self.assertIn(variable, payload["variables"])
+        finally:
+            temp_dir.cleanup()
+
+    def test_service_env_unknown_service_fails_with_actionable_message(self):
+        temp_dir, temp_root = make_temp_usb_root()
+        try:
+            result = run_dispatcher_for_root(temp_root, "service-env", "missing-service", "-Json")
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Unknown service: missing-service", result.stderr)
+        finally:
+            temp_dir.cleanup()
+
     def test_setup_json_reports_adapter_integration_readiness(self):
         result = run_dispatcher("setup", "-Json")
 
@@ -418,6 +476,11 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertEqual(metadata["serviceId"], service_id)
             self.assertEqual(metadata["status"], "placeholder-started")
             self.assertTrue(Path(metadata["logFile"]).is_absolute())
+            self.assertIn("environment", metadata)
+            self.assertIn("variables", metadata["environment"])
+            self.assertIn("files", metadata["environment"])
+            self.assertIn("USB_ROOT", metadata["environment"]["variables"])
+            self.assertNotIn(str(ROOT), json.dumps(metadata["environment"]))
 
         launcher_log = ROOT / "data" / "logs" / "launcher.log"
         self.assertTrue(launcher_log.exists())

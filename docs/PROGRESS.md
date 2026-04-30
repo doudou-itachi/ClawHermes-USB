@@ -440,3 +440,35 @@ Validation performed:
 Next steps:
 
 - Load adapter env files into the portable service environment before replacing placeholders with real upstream process launches.
+
+### Service Environment Resolution
+
+Status: `Done`
+
+Summary:
+
+- Added `.env` parsing for adapter-declared env files.
+- Merged portable defaults, env file variables, and adapter inline variables into an internal per-service environment.
+- Added a redacted `service-env` diagnostic command that reports loaded env files and variable names without printing secret values.
+- Placeholder `start` metadata now records env file status and variable names, but not variable values.
+- Added regression coverage for secret redaction, unknown service errors, and placeholder metadata environment summaries.
+
+Changed areas:
+
+- `core/node/src/core.ts`
+- `core/node/src/types.ts`
+- `core/node/src/clawhermes.ts`
+- `core/node/dist/`
+- `core/windows/clawhermes.ps1`
+- `docs/PROGRESS.md`
+- `docs/superpowers/plans/2026-04-30-service-env.md`
+- `tests/test_windows_core.py`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_start_status_stop_manage_placeholder_pid_metadata tests.test_windows_core.WindowsCoreTests.test_service_env_json_reports_loaded_variables_without_secret_values tests.test_windows_core.WindowsCoreTests.test_service_env_unknown_service_fails_with_actionable_message -v`
+
+Next steps:
+
+- Replace placeholder service metadata writes with real supervised process launch for services whose adapters have verified native Windows commands.
