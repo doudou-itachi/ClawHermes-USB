@@ -908,6 +908,9 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertIn("data/logs/openclaw.log", html)
             self.assertIn("data/logs/hermes-agent.log", html)
             self.assertIn("data/logs/hermes-web-ui.log", html)
+            self.assertIn("<th>Health</th>", html)
+            self.assertIn("Not ready", html)
+            self.assertIn("Placeholder metadata is present", html)
         finally:
             run_dispatcher("stop", "-Json")
 

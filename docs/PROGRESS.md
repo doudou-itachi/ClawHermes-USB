@@ -590,3 +590,31 @@ Validation performed:
 Next steps:
 
 - Surface health readiness in the generated portal so users can see stopped, placeholder, process-running, and endpoint-ready states at a glance.
+
+### Portal Health Summary
+
+Status: `Done`
+
+Summary:
+
+- Added a `Health` column to the generated portal service table.
+- Portal rows now show Ready/Not ready, health type, and health reason.
+- Placeholder services visibly report not-ready health in the portal instead of appearing equivalent to managed running services.
+- Existing portal generation and localhost serving behavior remains intact.
+
+Changed areas:
+
+- `core/node/src/core.ts`
+- `core/node/dist/`
+- `docs/PROGRESS.md`
+- `docs/superpowers/plans/2026-05-01-portal-health-summary.md`
+- `tests/test_windows_core.py`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_start_generates_portal_from_adapter_metadata tests.test_windows_core.WindowsCoreTests.test_start_serves_portal_over_localhost_and_stop_shuts_it_down -v`
+
+Next steps:
+
+- Add a machine-readable status snapshot file under `data/tmp/status.json` so external tools and future portal refresh logic can reuse the latest status without rerunning all probes.

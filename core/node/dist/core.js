@@ -554,7 +554,9 @@ function generatePortal(usbRoot) {
             ? service.logFile.slice(root.length).replace(new RegExp(`^\\${node_path_1.sep}`), "").replaceAll("\\", "/")
             : service.logFile;
         const url = service.portalUrl ? `<a href="${escapeHtml(service.portalUrl)}">${escapeHtml(service.portalUrl)}</a>` : "<span>Pending upstream URL</span>";
-        return `<tr><td>${escapeHtml(service.displayName)}</td><td>${escapeHtml(service.id)}</td><td>${escapeHtml(service.status)}</td><td>${url}</td><td><code>${escapeHtml(logPath)}</code></td></tr>`;
+        const healthLabel = service.health.ready ? "Ready" : "Not ready";
+        const health = `${escapeHtml(healthLabel)} <span>(${escapeHtml(service.health.type)})</span><br><small>${escapeHtml(service.health.reason)}</small>`;
+        return `<tr><td>${escapeHtml(service.displayName)}</td><td>${escapeHtml(service.id)}</td><td>${escapeHtml(service.status)}</td><td>${health}</td><td>${url}</td><td><code>${escapeHtml(logPath)}</code></td></tr>`;
     }).join("\n          ");
     const html = `<!doctype html>
 <html lang="en">
@@ -584,7 +586,7 @@ function generatePortal(usbRoot) {
     <section>
       <h2>Services</h2>
       <table>
-        <thead><tr><th>Service</th><th>ID</th><th>Status</th><th>URL</th><th>Log</th></tr></thead>
+        <thead><tr><th>Service</th><th>ID</th><th>Status</th><th>Health</th><th>URL</th><th>Log</th></tr></thead>
         <tbody>
           ${rows}
         </tbody>
