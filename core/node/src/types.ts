@@ -119,6 +119,8 @@ export type ServiceStatus = {
     type: string;
     ready: boolean;
     reason: string;
+    url?: string | null;
+    statusCode?: number | null;
   };
 };
 

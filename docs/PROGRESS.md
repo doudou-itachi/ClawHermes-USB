@@ -559,3 +559,34 @@ Validation performed:
 Next steps:
 
 - Add lightweight health-check execution for HTTP adapters so status can distinguish process running from endpoint ready.
+
+### HTTP Health Checks
+
+Status: `Done`
+
+Summary:
+
+- Added lightweight HTTP health probing for adapters with `health.type = "http"`.
+- `status -Json` now reports HTTP `url`, `statusCode`, readiness, and reason for HTTP adapters.
+- HTTP adapters only report ready when the endpoint returns a 2xx or 3xx response.
+- Existing process and placeholder health behavior remains unchanged.
+- Added regression coverage for reachable and unreachable HTTP health endpoints.
+
+Changed areas:
+
+- `core/node/src/core.ts`
+- `core/node/src/types.ts`
+- `core/node/dist/`
+- `docs/PROGRESS.md`
+- `docs/superpowers/plans/2026-05-01-http-health-checks.md`
+- `tests/test_windows_core.py`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_status_reports_http_adapter_ready_when_endpoint_responds tests.test_windows_core.WindowsCoreTests.test_status_reports_http_adapter_not_ready_when_endpoint_is_unreachable -v`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_start_status_stop_manage_placeholder_pid_metadata tests.test_windows_core.WindowsCoreTests.test_start_runs_production_ready_adapter_process_and_stop_kills_it tests.test_windows_core.WindowsCoreTests.test_status_removes_stale_managed_adapter_pid_file -v`
+
+Next steps:
+
+- Surface health readiness in the generated portal so users can see stopped, placeholder, process-running, and endpoint-ready states at a glance.

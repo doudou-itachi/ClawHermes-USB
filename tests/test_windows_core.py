@@ -189,6 +189,116 @@ def make_temp_process_usb_root():
     return temp_dir, temp_root
 
 
+def free_tcp_port():
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
+        listener.bind(("127.0.0.1", 0))
+        return listener.getsockname()[1]
+
+
+def make_temp_http_usb_root(health_port=None):
+    temp_dir = tempfile.TemporaryDirectory()
+    temp_root = Path(temp_dir.name)
+    port = health_port or free_tcp_port()
+    for directory in [
+        temp_root / "adapters" / "http-service",
+        temp_root / "apps" / "http-service",
+        temp_root / "config" / "defaults",
+        temp_root / "config" / "env",
+        temp_root / "core" / "node" / "dist",
+        temp_root / "data" / "logs",
+        temp_root / "data" / "tmp",
+        temp_root / "portal",
+    ]:
+        directory.mkdir(parents=True, exist_ok=True)
+
+    adapter = {
+        "id": "http-service",
+        "displayName": "HTTP Service",
+        "description": "Temporary HTTP service used by tests.",
+        "type": "node-service",
+        "enabled": True,
+        "appDir": "apps/http-service",
+        "runtime": {
+            "kind": "node",
+            "platform": "windows",
+            "requiredExecutable": "node.exe",
+        },
+        "commands": {
+            "setup": None,
+            "start": "node service.js",
+            "stop": None,
+        },
+        "env": {
+            "files": [],
+            "variables": {
+                "HTTP_HEALTH_PORT": str(port),
+            },
+        },
+        "dataDir": "data/http-service",
+        "logFile": "data/logs/http-service.log",
+        "pidFile": "data/tmp/pids/http-service.pid",
+        "health": {
+            "type": "http",
+            "url": f"http://127.0.0.1:{port}/health",
+            "timeoutSeconds": 2,
+        },
+        "portal": {
+            "label": "HTTP Service",
+            "url": f"http://127.0.0.1:{port}",
+            "group": "Tests",
+        },
+        "integration": {
+            "status": "verified",
+            "productionReady": True,
+            "verifiedAt": "2026-05-01",
+            "summary": "Test-only HTTP adapter.",
+            "sources": [],
+        },
+        "dependsOn": [],
+    }
+    (temp_root / "adapters" / "http-service" / "adapter.json").write_text(
+        json.dumps(adapter, indent=2),
+        encoding="utf-8",
+    )
+    (temp_root / "config" / "defaults" / "services.json").write_text(
+        json.dumps({"startOrder": ["http-service"], "stopOrder": ["http-service"]}, indent=2),
+        encoding="utf-8",
+    )
+    (temp_root / "config" / "defaults" / "ports.json").write_text(
+        json.dumps({"portal": 17000}, indent=2),
+        encoding="utf-8",
+    )
+    (temp_root / "config" / "defaults" / "runtimes.json").write_text(
+        json.dumps({"platform": "windows", "runtimes": []}, indent=2),
+        encoding="utf-8",
+    )
+    (temp_root / "core" / "node" / "dist" / "portal-server.js").write_text(
+        (ROOT / "core" / "node" / "dist" / "portal-server.js").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    (temp_root / "apps" / "http-service" / "service.js").write_text(
+        "\n".join(
+            [
+                "const http = require('node:http');",
+                "const port = Number(process.env.HTTP_HEALTH_PORT);",
+                "const server = http.createServer((req, res) => {",
+                "  if (req.url === '/health') {",
+                "    res.writeHead(200, {'content-type': 'text/plain'});",
+                "    res.end('ok');",
+                "    return;",
+                "  }",
+                "  res.writeHead(404, {'content-type': 'text/plain'});",
+                "  res.end('missing');",
+                "});",
+                "server.listen(port, '127.0.0.1');",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    return temp_dir, temp_root, port
+
+
 def wait_for_file(path):
     deadline = time.time() + 5
     while time.time() < deadline:
@@ -196,6 +306,20 @@ def wait_for_file(path):
             return
         time.sleep(0.1)
     raise AssertionError(f"Timed out waiting for {path}")
+
+
+def wait_for_url(url):
+    deadline = time.time() + 5
+    last_error = None
+    while time.time() < deadline:
+        try:
+            with urllib.request.urlopen(url, timeout=0.3) as response:
+                if response.status == 200:
+                    return
+        except (OSError, urllib.error.URLError) as exc:
+            last_error = exc
+            time.sleep(0.1)
+    raise AssertionError(f"Timed out waiting for {url}: {last_error}")
 
 
 def process_exists(pid):
@@ -707,6 +831,62 @@ class WindowsCoreTests(unittest.TestCase):
             statuses = {service["id"]: service["status"] for service in status_payload["services"]}
             self.assertEqual(statuses["fake-service"], "stopped")
             self.assertFalse(pid_file.exists())
+        finally:
+            temp_dir.cleanup()
+
+    def test_status_reports_http_adapter_ready_when_endpoint_responds(self):
+        temp_dir, temp_root, port = make_temp_http_usb_root()
+        try:
+            start = run_dispatcher_for_root(temp_root, "start", "-Json")
+
+            self.assertEqual(start.returncode, 0, start.stderr)
+            wait_for_url(f"http://127.0.0.1:{port}/health")
+
+            status = run_dispatcher_for_root(temp_root, "status", "-Json")
+
+            self.assertEqual(status.returncode, 0, status.stderr)
+            services = {service["id"]: service for service in json.loads(status.stdout)["services"]}
+            health = services["http-service"]["health"]
+            self.assertEqual(services["http-service"]["status"], "running")
+            self.assertEqual(health["type"], "http")
+            self.assertTrue(health["ready"])
+            self.assertEqual(health["url"], f"http://127.0.0.1:{port}/health")
+            self.assertEqual(health["statusCode"], 200)
+        finally:
+            run_dispatcher_for_root(temp_root, "stop", "-Json")
+            temp_dir.cleanup()
+
+    def test_status_reports_http_adapter_not_ready_when_endpoint_is_unreachable(self):
+        temp_dir, temp_root, port = make_temp_http_usb_root(health_port=free_tcp_port())
+        try:
+            pid_dir = temp_root / "data" / "tmp" / "pids"
+            pid_dir.mkdir(parents=True, exist_ok=True)
+            pid_file = pid_dir / "http-service.pid"
+            pid_file.write_text(
+                json.dumps(
+                    {
+                        "serviceId": "http-service",
+                        "displayName": "HTTP Service",
+                        "status": "running",
+                        "processId": os.getpid(),
+                        "placeholder": False,
+                        "logFile": str(temp_root / "data" / "logs" / "http-service.log"),
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            status = run_dispatcher_for_root(temp_root, "status", "-Json")
+
+            self.assertEqual(status.returncode, 0, status.stderr)
+            services = {service["id"]: service for service in json.loads(status.stdout)["services"]}
+            health = services["http-service"]["health"]
+            self.assertEqual(services["http-service"]["status"], "running")
+            self.assertEqual(health["type"], "http")
+            self.assertFalse(health["ready"])
+            self.assertEqual(health["url"], f"http://127.0.0.1:{port}/health")
+            self.assertIsNone(health["statusCode"])
+            self.assertIn("unreachable", health["reason"].lower())
         finally:
             temp_dir.cleanup()
 
