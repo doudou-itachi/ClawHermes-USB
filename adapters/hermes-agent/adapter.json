@@ -1,0 +1,42 @@
+{
+  "id": "hermes-agent",
+  "displayName": "Hermes Agent",
+  "description": "Hermes Agent gateway/API runtime.",
+  "type": "python-service",
+  "enabled": true,
+  "appDir": "apps/hermes-agent",
+  "runtime": {
+    "kind": "python",
+    "platform": "windows",
+    "requiredExecutable": "python.exe"
+  },
+  "commands": {
+    "setup": "python -m pip install -e .",
+    "start": "hermes gateway",
+    "stop": null
+  },
+  "env": {
+    "files": [
+      "config/env/hermes.env"
+    ],
+    "variables": {
+      "HERMES_HOME": "${USB_ROOT}/data/hermes",
+      "HOME": "${USB_ROOT}/data/home",
+      "USERPROFILE": "${USB_ROOT}/data/home"
+    }
+  },
+  "dataDir": "data/hermes",
+  "logFile": "data/logs/hermes-agent.log",
+  "pidFile": "data/tmp/pids/hermes-agent.pid",
+  "health": {
+    "type": "http",
+    "url": "http://127.0.0.1:8642/health",
+    "timeoutSeconds": 30
+  },
+  "portal": {
+    "label": "Hermes Agent API",
+    "url": "http://127.0.0.1:8642",
+    "group": "Hermes"
+  },
+  "dependsOn": []
+}

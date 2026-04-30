@@ -1,0 +1,366 @@
+# Adapter Contract
+
+## 1. Purpose
+
+Adapters are the boundary between ClawHermes-USB core orchestration and external services.
+
+The core should know how to start a service from a descriptor. It should not know the internal details of OpenClaw, Hermes Agent, Hermes Web UI, or any future integration.
+
+Each adapter answers these questions:
+
+- What is this service called?
+- Where is the app installed?
+- Which portable runtime does it need?
+- Which command starts it?
+- Which env files configure it?
+- Where should its data live?
+- How do we know it is healthy?
+- Which URL should the portal show?
+- Which other services must start first?
+
+## 2. Required Files
+
+Each adapter directory should contain:
+
+```text
+adapters/<service-id>/
+  adapter.json
+  README.md
+```
+
+Optional files:
+
+```text
+  setup.ps1
+  start.ps1
+  stop.ps1
+  health.ps1
+  templates/
+```
+
+Optional scripts exist for services that need custom behavior beyond the generic process manager.
+
+## 3. Descriptor Schema
+
+Example:
+
+```json
+{
+  "id": "hermes-web-ui",
+  "displayName": "Hermes Web UI",
+  "description": "EKKOLearnAI Hermes Web UI dashboard.",
+  "type": "node-service",
+  "enabled": true,
+  "appDir": "apps/hermes-web-ui",
+  "runtime": {
+    "kind": "node",
+    "platform": "windows",
+    "requiredExecutable": "node.exe"
+  },
+  "commands": {
+    "setup": "npm install",
+    "start": "npm run start",
+    "stop": null
+  },
+  "env": {
+    "files": [
+      "config/env/hermes-web-ui.env"
+    ],
+    "variables": {
+      "HERMES_HOME": "${USB_ROOT}/data/hermes",
+      "HERMES_WEB_UI_DATA_DIR": "${USB_ROOT}/data/hermes-web-ui"
+    }
+  },
+  "dataDir": "data/hermes-web-ui",
+  "logFile": "data/logs/hermes-web-ui.log",
+  "pidFile": "data/tmp/pids/hermes-web-ui.pid",
+  "health": {
+    "type": "http",
+    "url": "http://127.0.0.1:8648",
+    "timeoutSeconds": 30
+  },
+  "portal": {
+    "label": "Hermes Web UI",
+    "url": "http://127.0.0.1:8648",
+    "group": "Hermes"
+  },
+  "dependsOn": [
+    "hermes-agent"
+  ]
+}
+```
+
+## 4. Field Reference
+
+### `id`
+
+Stable machine-readable service id.
+
+Rules:
+
+- lowercase
+- kebab-case
+- unique across adapters
+
+Examples:
+
+- `openclaw`
+- `hermes-agent`
+- `hermes-web-ui`
+
+### `displayName`
+
+Human-readable service name shown in logs and portal.
+
+### `description`
+
+Short description for developers and portal metadata.
+
+### `type`
+
+General service category.
+
+Initial supported values:
+
+- `node-service`
+- `python-service`
+- `binary-service`
+- `static-portal`
+- `custom`
+
+### `enabled`
+
+Whether the service is enabled by default.
+
+Disabled services should be ignored by `Start.bat` unless explicitly requested.
+
+### `appDir`
+
+Relative path from project root to the upstream application directory.
+
+Example:
+
+```text
+apps/hermes-web-ui
+```
+
+Adapters must not use absolute paths.
+
+### `runtime`
+
+Runtime requirement.
+
+Fields:
+
+- `kind`: `node`, `python`, `git`, `binary`, or `none`
+- `platform`: `windows`, `macos`, or `any`
+- `requiredExecutable`: executable name expected under the runtime path
+
+### `commands`
+
+Commands used by setup/start/stop flows.
+
+Rules:
+
+- Commands run from `appDir` unless overridden.
+- Commands may use `${USB_ROOT}` placeholders.
+- `stop` may be null if the generic process manager handles stop by PID.
+
+### `env.files`
+
+List of env files to load before starting the service.
+
+Files should be relative to project root.
+
+Example files should be committed with `.example` suffix. Real env files should be local and ignored.
+
+### `env.variables`
+
+Inline environment variables to set for this service.
+
+Placeholders:
+
+- `${USB_ROOT}`
+- `${DATA_DIR}`
+- `${APP_DIR}`
+- `${PORT}`
+- `${SERVICE_ID}`
+
+### `dataDir`
+
+Relative path to the service's portable data directory.
+
+### `logFile`
+
+Relative path to the service log file.
+
+### `pidFile`
+
+Relative path to the PID metadata file.
+
+### `health`
+
+Health check descriptor.
+
+Supported MVP types:
+
+#### HTTP
+
+```json
+{
+  "type": "http",
+  "url": "http://127.0.0.1:8648",
+  "timeoutSeconds": 30
+}
+```
+
+#### TCP
+
+```json
+{
+  "type": "tcp",
+  "host": "127.0.0.1",
+  "port": 8642,
+  "timeoutSeconds": 30
+}
+```
+
+#### Process
+
+```json
+{
+  "type": "process",
+  "timeoutSeconds": 10
+}
+```
+
+### `portal`
+
+Portal metadata.
+
+Fields:
+
+- `label`: visible button label
+- `url`: service URL
+- `group`: visual grouping
+
+### `dependsOn`
+
+List of service ids that must start before this service.
+
+The orchestrator must topologically sort services. Cycles are invalid.
+
+## 5. Adapter Responsibilities
+
+Adapters should:
+
+- keep service-specific assumptions local
+- document upstream version expectations
+- define health checks
+- define data directories
+- define env files
+- avoid host-specific absolute paths
+
+Adapters should not:
+
+- permanently modify the host machine
+- install global packages on the host
+- write secrets into committed files
+- reach into another adapter's private directory
+- duplicate core process management logic unless necessary
+
+## 6. Initial Service Adapters
+
+### 6.1 OpenClaw
+
+Purpose:
+
+- Run official OpenClaw.
+- Expose Control UI and WebChat.
+- Store OpenClaw state under `data/openclaw`.
+
+Open questions:
+
+- Official portable Windows startup mode.
+- Exact supported environment variables for data/home paths.
+- Default ports and how to remap them.
+
+### 6.2 Hermes Agent
+
+Purpose:
+
+- Run Hermes Agent gateway/API.
+- Set `HERMES_HOME` to `data/hermes`.
+- Provide backend for Hermes Web UI.
+
+Expected default port:
+
+- `8642`
+
+### 6.3 Hermes Web UI
+
+Purpose:
+
+- Run EKKOLearnAI/hermes-web-ui.
+- Connect to Hermes Agent.
+- Store UI state under `data/hermes-web-ui`.
+
+Expected default port:
+
+- `8648`
+
+## 7. Versioning
+
+Each adapter should eventually record upstream version metadata.
+
+Suggested file:
+
+```text
+adapters/<service-id>/version.json
+```
+
+Example:
+
+```json
+{
+  "upstream": "EKKOLearnAI/hermes-web-ui",
+  "version": "unknown",
+  "source": "manual",
+  "installedAt": null
+}
+```
+
+## 8. Validation Rules
+
+The adapter validator should fail if:
+
+- `id` is missing
+- `appDir` is absolute
+- `dataDir` is absolute
+- `logFile` is outside `data/logs`
+- `pidFile` is outside `data/tmp`
+- `dependsOn` references an unknown service
+- health check is missing
+- portal URL is missing for user-facing services
+
+Warnings should be emitted if:
+
+- service is enabled but app directory is empty
+- runtime executable is missing
+- env file is missing
+- default port is occupied
+
+## 9. Contributor Workflow
+
+To add a new service:
+
+1. Create `adapters/<new-service>/`.
+2. Add `adapter.json`.
+3. Add `README.md`.
+4. Add env examples under `config/env/`.
+5. Add app placeholder under `apps/<new-service>/`.
+6. Add data directory under `data/<new-service>/`.
+7. Run adapter validation.
+8. Update portal metadata if needed.
+
+No core code should be changed unless the service needs a new generic capability.

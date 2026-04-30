@@ -1,0 +1,10 @@
+{
+  "portal": 17000,
+  "hermesAgent": 8642,
+  "hermesWebUi": 8648,
+  "openclaw": {
+    "gateway": null,
+    "controlUi": null,
+    "webChat": null
+  }
+}

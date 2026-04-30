@@ -1,0 +1,42 @@
+{
+  "id": "openclaw",
+  "displayName": "OpenClaw",
+  "description": "Official OpenClaw runtime, Control UI, and WebChat integration.",
+  "type": "custom",
+  "enabled": true,
+  "appDir": "apps/openclaw",
+  "runtime": {
+    "kind": "node",
+    "platform": "windows",
+    "requiredExecutable": "node.exe"
+  },
+  "commands": {
+    "setup": null,
+    "start": null,
+    "stop": null
+  },
+  "env": {
+    "files": [
+      "config/env/openclaw.env"
+    ],
+    "variables": {
+      "HOME": "${USB_ROOT}/data/home",
+      "USERPROFILE": "${USB_ROOT}/data/home",
+      "OPENCLAW_HOME": "${USB_ROOT}/data/openclaw",
+      "OPENCLAW_DATA_DIR": "${USB_ROOT}/data/openclaw"
+    }
+  },
+  "dataDir": "data/openclaw",
+  "logFile": "data/logs/openclaw.log",
+  "pidFile": "data/tmp/pids/openclaw.pid",
+  "health": {
+    "type": "process",
+    "timeoutSeconds": 30
+  },
+  "portal": {
+    "label": "OpenClaw",
+    "url": null,
+    "group": "OpenClaw"
+  },
+  "dependsOn": []
+}

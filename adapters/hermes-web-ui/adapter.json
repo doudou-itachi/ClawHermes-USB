@@ -1,0 +1,45 @@
+{
+  "id": "hermes-web-ui",
+  "displayName": "Hermes Web UI",
+  "description": "EKKOLearnAI/hermes-web-ui dashboard for Hermes Agent.",
+  "type": "node-service",
+  "enabled": true,
+  "appDir": "apps/hermes-web-ui",
+  "runtime": {
+    "kind": "node",
+    "platform": "windows",
+    "requiredExecutable": "node.exe"
+  },
+  "commands": {
+    "setup": "npm install",
+    "start": "npm run start",
+    "stop": null
+  },
+  "env": {
+    "files": [
+      "config/env/hermes-web-ui.env"
+    ],
+    "variables": {
+      "HERMES_HOME": "${USB_ROOT}/data/hermes",
+      "HERMES_WEB_UI_DATA_DIR": "${USB_ROOT}/data/hermes-web-ui",
+      "HOME": "${USB_ROOT}/data/home",
+      "USERPROFILE": "${USB_ROOT}/data/home"
+    }
+  },
+  "dataDir": "data/hermes-web-ui",
+  "logFile": "data/logs/hermes-web-ui.log",
+  "pidFile": "data/tmp/pids/hermes-web-ui.pid",
+  "health": {
+    "type": "http",
+    "url": "http://127.0.0.1:8648",
+    "timeoutSeconds": 30
+  },
+  "portal": {
+    "label": "Hermes Web UI",
+    "url": "http://127.0.0.1:8648",
+    "group": "Hermes"
+  },
+  "dependsOn": [
+    "hermes-agent"
+  ]
+}

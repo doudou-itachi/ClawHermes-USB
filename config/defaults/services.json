@@ -1,0 +1,20 @@
+{
+  "services": [
+    "openclaw",
+    "hermes-agent",
+    "hermes-web-ui",
+    "portal"
+  ],
+  "startOrder": [
+    "openclaw",
+    "hermes-agent",
+    "hermes-web-ui",
+    "portal"
+  ],
+  "stopOrder": [
+    "portal",
+    "hermes-web-ui",
+    "hermes-agent",
+    "openclaw"
+  ]
+}

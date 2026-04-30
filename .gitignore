@@ -1,0 +1,39 @@
+# Secrets
+config/env/*.env
+!config/env/*.env.example
+
+# Runtime payloads
+runtimes/windows/node/*
+runtimes/windows/python/*
+runtimes/windows/git/*
+runtimes/macos/node/*
+runtimes/macos/python/*
+runtimes/macos/git/*
+
+# Upstream application payloads
+apps/openclaw/*
+apps/hermes-agent/*
+apps/hermes-web-ui/*
+
+# Keep placeholders
+!apps/openclaw/.gitkeep
+!apps/hermes-agent/.gitkeep
+!apps/hermes-web-ui/.gitkeep
+!runtimes/windows/node/.gitkeep
+!runtimes/windows/python/.gitkeep
+!runtimes/windows/git/.gitkeep
+!runtimes/macos/node/.gitkeep
+!runtimes/macos/python/.gitkeep
+!runtimes/macos/git/.gitkeep
+
+# Portable data
+data/**
+!data/
+!data/**/
+!data/**/.gitkeep
+
+# OS/editor
+Thumbs.db
+.DS_Store
+.vscode/
+.idea/
