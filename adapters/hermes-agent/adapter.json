@@ -16,7 +16,7 @@
     "installDocs": "https://hermes-agent.org/",
     "checkoutRef": "main",
     "installMode": "source-checkout",
-    "notes": "Native Windows portable startup remains blocked until Hermes confirms support and HERMES_HOME behavior."
+    "notes": "Official README says native Windows is not supported and Windows users should run Hermes Agent in WSL2."
   },
   "commands": {
     "setup": "python -m pip install -e .",
@@ -49,11 +49,11 @@
   "integration": {
     "status": "blocked",
     "productionReady": false,
-    "verifiedAt": "2026-04-30",
-    "summary": "Official Hermes Agent install support is Linux, macOS, and Windows through WSL2. Native Windows portable startup remains blocked until Hermes confirms native Windows support and HERMES_HOME behavior.",
+    "verifiedAt": "2026-05-01",
+    "summary": "Official README says native Windows is not supported and Windows users should install WSL2. Official site also describes native Windows as experimental, so the bare-Windows portable adapter remains blocked.",
     "sources": [
       "https://hermes-agent.org/",
-      "https://github.com/NousResearch/hermes-agent/blob/main/hermes_cli/gateway.py"
+      "https://github.com/NousResearch/hermes-agent"
     ]
   },
   "dependsOn": []

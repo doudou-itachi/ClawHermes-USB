@@ -24,14 +24,16 @@ Adapter status: `blocked`
 Sources:
 
 - <https://hermes-agent.org/>
-- <https://github.com/NousResearch/hermes-agent/blob/main/hermes_cli/gateway.py>
+- <https://github.com/NousResearch/hermes-agent>
 
 Current conclusion:
 
-- Official public docs list Linux, macOS, and WSL2 as the supported install path; native Windows is experimental.
+- Official GitHub README says the installer works on Linux, macOS, WSL2, and Android via Termux.
+- The same README says native Windows is not supported and Windows users should install WSL2.
+- The official site says native Windows support is experimental.
 - The Hermes gateway command suite handles `run`, `start`, `stop`, `restart`, `status`, `install`, `uninstall`, and `setup`.
 - For a portable process manager, foreground `hermes gateway run` is a better candidate than daemonizing `hermes gateway start`.
-- The adapter now records `hermes gateway run` as the candidate command, but production startup remains blocked until native Windows/WSL2 strategy and `HERMES_HOME` behavior are verified locally.
+- The adapter records `hermes gateway run` as a candidate command for future WSL2/container work, but bare-Windows production startup remains blocked.
 
 Adapter status: `blocked`
 

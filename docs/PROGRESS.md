@@ -1707,3 +1707,32 @@ Validation performed:
 Next steps:
 
 - Continue upstream integration with Hermes Agent or OpenClaw, using the same guarded checkout/setup/start/verify flow before promoting their metadata.
+
+### Hermes Agent Blocker Refresh
+
+Status: `Done`
+
+Summary:
+
+- Rechecked current official Hermes Agent sources on 2026-05-01.
+- GitHub README states native Windows is not supported and Windows users should install WSL2.
+- Official site describes native Windows support as experimental.
+- Kept Hermes Agent adapter blocked for bare-Windows portable startup.
+- Updated adapter metadata and upstream integration notes so later work does not spend C-drive or setup time trying an unsupported native Windows path.
+
+Changed areas:
+
+- `adapters/hermes-agent/adapter.json`
+- `docs/upstream-integration.md`
+- `docs/PROGRESS.md`
+
+Validation performed:
+
+- Official source review: <https://github.com/NousResearch/hermes-agent>
+- Official source review: <https://hermes-agent.org/>
+- `git diff --check`
+- UTF-8 smoke check
+
+Next steps:
+
+- Continue with OpenClaw evidence refresh, or design a future WSL2/container adapter path instead of a bare-Windows Hermes Agent adapter.
