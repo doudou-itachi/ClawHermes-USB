@@ -792,3 +792,30 @@ Validation performed:
 Next steps:
 
 - Split runtime manifest diagnostics and runtime archive installation into a runtime-focused TypeScript module.
+
+### Runtime Utilities Split
+
+Status: `Done`
+
+Summary:
+
+- Extracted runtime manifest loading, runtime diagnostics, preparation planning, SHA256 verification, and archive extraction into `core/node/src/runtimes.ts`.
+- `core.ts` now imports runtime helpers and re-exports the public runtime functions for compatibility.
+- Runtime installation behavior remains unchanged while the main core module becomes smaller.
+
+Changed areas:
+
+- `core/node/src/runtimes.ts`
+- `core/node/src/core.ts`
+- `core/node/dist/`
+- `docs/PROGRESS.md`
+- `docs/superpowers/plans/2026-05-01-split-runtime-utils.md`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_setup_json_reports_runtime_diagnostics_and_valid_adapters tests.test_windows_core.WindowsCoreTests.test_runtimes_json_outputs_preparation_steps_from_manifest tests.test_windows_core.WindowsCoreTests.test_install_runtime_dry_run_reports_archive_plan tests.test_windows_core.WindowsCoreTests.test_install_runtime_extracts_local_archive_and_setup_detects_it tests.test_windows_core.WindowsCoreTests.test_install_runtime_can_verify_explicit_sha256 tests.test_windows_core.WindowsCoreTests.test_install_runtime_rejects_wrong_sha256 -v`
+
+Next steps:
+
+- Split environment file diagnostics, initialization, and service environment resolution into an environment-focused TypeScript module.
