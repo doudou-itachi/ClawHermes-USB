@@ -1,16 +1,22 @@
-import { getRoot, getStatus, portableEnv, runtimePreparationPlan, setupDiagnostics, startSkeleton, stopSkeleton } from "./core";
+import { getRoot, getStatus, installRuntimeFromArchive, portableEnv, runtimePreparationPlan, setupDiagnostics, startSkeleton, stopSkeleton } from "./core";
 
 type ParsedArgs = {
   action: string;
+  positional: string[];
   usbRoot: string;
   json: boolean;
+  archive?: string;
+  dryRun: boolean;
 };
 
 function parseArgs(argv: string[]): ParsedArgs {
   const args = [...argv];
   const action = args.shift() ?? "setup";
+  const positional: string[] = [];
   let usbRoot = process.cwd();
   let json = false;
+  let archive: string | undefined;
+  let dryRun = false;
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
     if ((arg === "--usb-root" || arg === "-UsbRoot") && args[index + 1]) {
@@ -18,9 +24,16 @@ function parseArgs(argv: string[]): ParsedArgs {
       index += 1;
     } else if (arg === "--json" || arg === "-Json") {
       json = true;
+    } else if (arg === "--archive" && args[index + 1]) {
+      archive = args[index + 1];
+      index += 1;
+    } else if (arg === "--dry-run") {
+      dryRun = true;
+    } else {
+      positional.push(arg);
     }
   }
-  return { action, usbRoot, json };
+  return { action, positional, usbRoot, json, archive, dryRun };
 }
 
 function printJson(value: unknown): void {
@@ -28,7 +41,7 @@ function printJson(value: unknown): void {
 }
 
 async function main(): Promise<void> {
-  const { action, usbRoot, json } = parseArgs(process.argv.slice(2));
+  const { action, positional, usbRoot, json, archive, dryRun } = parseArgs(process.argv.slice(2));
   const root = getRoot(usbRoot);
 
   switch (action) {
@@ -55,6 +68,19 @@ async function main(): Promise<void> {
         console.log("ClawHermes-USB runtime preparation plan");
         console.log(`Root: ${result.root}`);
         for (const message of result.messages) console.log(`- ${message}`);
+      }
+      return;
+    }
+    case "install-runtime": {
+      const runtimeName = positional[0];
+      if (!runtimeName) throw new Error("Runtime name is required. Example: install-runtime node --archive path.zip");
+      if (!archive) throw new Error("--archive is required for install-runtime.");
+      const result = installRuntimeFromArchive(root, runtimeName, archive, dryRun);
+      if (json) {
+        printJson(result);
+      } else {
+        console.log(result.message);
+        for (const exe of result.expectedExecutables) console.log(`- expected: ${exe}`);
       }
       return;
     }

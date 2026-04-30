@@ -36,6 +36,20 @@ powershell -NoProfile -ExecutionPolicy Bypass -File core\windows\clawhermes.ps1 
 
 该命令不会下载二进制文件。它会读取 `config/defaults/runtimes.json`，告诉用户应该下载哪个包、解压到哪里，以及哪些可执行文件路径会被接受。
 
+如果已经手动下载了本地 zip archive，可以用以下命令安装：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File core\windows\clawhermes.ps1 install-runtime node --archive D:\downloads\node.zip -UsbRoot .
+```
+
+只预览、不解压：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File core\windows\clawhermes.ps1 install-runtime node --archive D:\downloads\node.zip --dry-run -UsbRoot . -Json
+```
+
+`install-runtime` 当前支持 `.zip` archive。若 archive 内只有一个顶层目录，它会去掉这一层再复制内容，因此官方 `node-v*-win-x64.zip` 这类包可以干净地解压到 manifest 指定目录。
+
 ## 预期可执行文件
 
 ```text

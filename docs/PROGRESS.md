@@ -261,3 +261,36 @@ Next steps:
 
 - Add a setup subcommand that validates a supplied local archive path and unpacks it into the manifest install directory.
 - Keep daily startup free of silent downloads.
+
+### Local Runtime Archive Installation
+
+Status: `Done`
+
+Summary:
+
+- Added `install-runtime <name> --archive <zip>` to install a runtime from a local archive.
+- Added `--dry-run` support for previewing the extraction target and expected executables.
+- The command strips a single top-level directory from zip archives before copying into the manifest install directory.
+- Added tests for dry-run output and local archive extraction.
+- Kept runtime installation explicit and offline; the command does not download binaries.
+
+Changed areas:
+
+- `core/node/src/`
+- `core/node/dist/`
+- `core/windows/clawhermes.ps1`
+- `docs/windows-runtime.md`
+- `docs/windows-runtime.zh-CN.md`
+- `docs/PROGRESS.md`
+- `tests/test_windows_core.py`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_install_runtime_dry_run_reports_archive_plan -v`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_install_runtime_extracts_local_archive_and_setup_detects_it -v`
+
+Next steps:
+
+- Add checksum metadata support before automated downloads are considered.
+- Extend archive install tests for Python and Git package layouts.

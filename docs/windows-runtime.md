@@ -36,6 +36,20 @@ powershell -NoProfile -ExecutionPolicy Bypass -File core\windows\clawhermes.ps1 
 
 The command does not download binaries. It reads `config/defaults/runtimes.json` and tells the user which package to download, where to extract it, and which executable paths will be accepted.
 
+To install from a local zip archive that has already been downloaded:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File core\windows\clawhermes.ps1 install-runtime node --archive D:\downloads\node.zip -UsbRoot .
+```
+
+Preview without extracting:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File core\windows\clawhermes.ps1 install-runtime node --archive D:\downloads\node.zip --dry-run -UsbRoot . -Json
+```
+
+`install-runtime` currently supports `.zip` archives. It strips a single top-level directory when present, so official packages such as `node-v*-win-x64.zip` can be extracted into the manifest install directory cleanly.
+
 ## Expected Executables
 
 ```text

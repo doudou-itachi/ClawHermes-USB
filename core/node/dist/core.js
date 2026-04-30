@@ -8,6 +8,7 @@ exports.validateAdapter = validateAdapter;
 exports.runtimeDiagnostics = runtimeDiagnostics;
 exports.loadRuntimeManifest = loadRuntimeManifest;
 exports.runtimePreparationPlan = runtimePreparationPlan;
+exports.installRuntimeFromArchive = installRuntimeFromArchive;
 exports.integrationReadiness = integrationReadiness;
 exports.dataWritable = dataWritable;
 exports.setupDiagnostics = setupDiagnostics;
@@ -142,6 +143,82 @@ function runtimePreparationPlan(usbRoot) {
         steps,
         messages,
     };
+}
+function installRuntimeFromArchive(usbRoot, runtimeName, archivePath, dryRun) {
+    const root = getRoot(usbRoot);
+    const manifest = loadRuntimeManifest(root);
+    const runtime = manifest.runtimes.find((item) => item.name === runtimeName);
+    if (!runtime) {
+        throw new Error(`Unknown runtime: ${runtimeName}`);
+    }
+    const archive = (0, node_path_1.resolve)(archivePath);
+    if (!(0, node_fs_1.existsSync)(archive)) {
+        throw new Error(`Runtime archive not found: ${archive}`);
+    }
+    if (!archive.toLowerCase().endsWith(".zip")) {
+        throw new Error(`Only .zip runtime archives are supported right now: ${archive}`);
+    }
+    const installDir = resolveRelative(root, runtime.installDir);
+    const expectedExecutables = runtime.candidates.map((candidate) => resolveRelative(root, candidate));
+    if (!dryRun) {
+        (0, node_fs_1.mkdirSync)(installDir, { recursive: true });
+        const tempDir = (0, node_path_1.join)(root, "data", "tmp", "runtime-extract", `${runtime.name}-${Date.now()}`);
+        (0, node_fs_1.rmSync)(tempDir, { recursive: true, force: true });
+        (0, node_fs_1.mkdirSync)(tempDir, { recursive: true });
+        try {
+            (0, node_child_process_1.execFileSync)("powershell", [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                "Expand-Archive",
+                "-LiteralPath",
+                archive,
+                "-DestinationPath",
+                tempDir,
+                "-Force",
+            ], { stdio: "ignore" });
+            copyExtractedRuntime(tempDir, installDir);
+        }
+        finally {
+            (0, node_fs_1.rmSync)(tempDir, { recursive: true, force: true });
+        }
+    }
+    const installed = expectedExecutables.some((candidate) => (0, node_fs_1.existsSync)(candidate));
+    return {
+        runtime: runtime.name,
+        dryRun,
+        archive,
+        installDir,
+        expectedExecutables,
+        wouldExtract: true,
+        installed,
+        message: dryRun
+            ? `Would extract ${archive} into ${installDir}.`
+            : installed
+                ? `Installed ${runtime.label} into ${installDir}.`
+                : `Extracted ${archive}, but no expected executable was found under ${installDir}.`,
+    };
+}
+function copyExtractedRuntime(sourceDir, installDir) {
+    const entries = (0, node_fs_1.readdirSync)(sourceDir, { withFileTypes: true });
+    const contentRoot = entries.length === 1 && entries[0]?.isDirectory()
+        ? (0, node_path_1.join)(sourceDir, entries[0].name)
+        : sourceDir;
+    copyDirectoryContents(contentRoot, installDir);
+}
+function copyDirectoryContents(sourceDir, targetDir) {
+    (0, node_fs_1.mkdirSync)(targetDir, { recursive: true });
+    for (const entry of (0, node_fs_1.readdirSync)(sourceDir, { withFileTypes: true })) {
+        const source = (0, node_path_1.join)(sourceDir, entry.name);
+        const target = (0, node_path_1.join)(targetDir, entry.name);
+        if (entry.isDirectory()) {
+            copyDirectoryContents(source, target);
+        }
+        else if (entry.isFile()) {
+            (0, node_fs_1.writeFileSync)(target, (0, node_fs_1.readFileSync)(source));
+        }
+    }
 }
 function integrationReadiness(adapters) {
     return adapters.map((adapter) => ({

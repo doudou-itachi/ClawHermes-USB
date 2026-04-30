@@ -1,7 +1,10 @@
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("env-json", "setup", "runtimes", "start", "status", "stop")]
+    [ValidateSet("env-json", "setup", "runtimes", "install-runtime", "start", "status", "stop")]
     [string]$Action = "setup",
+
+    [Parameter(ValueFromRemainingArguments = $true)]
+    [string[]]$RemainingArgs,
 
     [string]$UsbRoot = (Resolve-Path -LiteralPath (Join-Path -Path $PSScriptRoot -ChildPath "..\..")).Path,
 
@@ -25,7 +28,11 @@ if (-not (Test-Path -LiteralPath $cli -PathType Leaf)) {
     throw "TypeScript core is not built. Run npm run build."
 }
 
-$nodeArgs = @($cli, $Action, "--usb-root", $root)
+$nodeArgs = @($cli, $Action)
+if ($RemainingArgs) {
+    $nodeArgs += $RemainingArgs
+}
+$nodeArgs += @("--usb-root", $root)
 if ($Json) {
     $nodeArgs += "--json"
 }

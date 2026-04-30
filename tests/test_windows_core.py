@@ -6,6 +6,7 @@ import time
 import unittest
 import urllib.error
 import urllib.request
+import zipfile
 from pathlib import Path
 
 
@@ -179,6 +180,55 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertEqual("official-windows-embeddable", steps["python"]["packageType"])
         self.assertIn("thumbdrive", steps["git"]["notes"])
         self.assertTrue(any(message.startswith("Download Portable Node.js") for message in payload["messages"]))
+
+    def test_install_runtime_dry_run_reports_archive_plan(self):
+        archive = ROOT / "data" / "tmp" / "node-runtime-test.zip"
+        archive.parent.mkdir(parents=True, exist_ok=True)
+        with zipfile.ZipFile(archive, "w") as package:
+            package.writestr("node-v22.0.0-win-x64/node.exe", "")
+
+        result = run_dispatcher("install-runtime", "node", "--archive", str(archive), "--dry-run", "-Json")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["runtime"], "node")
+        self.assertTrue(payload["dryRun"])
+        self.assertEqual(payload["archive"], str(archive))
+        self.assertTrue(payload["installDir"].endswith(str(Path("runtimes") / "windows" / "node")))
+        self.assertTrue(payload["wouldExtract"])
+        self.assertFalse(payload["installed"])
+        self.assertTrue(any(path.endswith("node.exe") for path in payload["expectedExecutables"]))
+
+    def test_install_runtime_extracts_local_archive_and_setup_detects_it(self):
+        archive = ROOT / "data" / "tmp" / "node-runtime-test.zip"
+        install_dir = ROOT / "runtimes" / "windows" / "node"
+        try:
+            self._remove_runtime_test_files(install_dir)
+            archive.parent.mkdir(parents=True, exist_ok=True)
+            with zipfile.ZipFile(archive, "w") as package:
+                package.writestr("node-v22.0.0-win-x64/node.exe", "")
+                package.writestr("node-v22.0.0-win-x64/npm.cmd", "")
+
+            result = run_dispatcher("install-runtime", "node", "--archive", str(archive), "-Json")
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertTrue(payload["installed"])
+            self.assertTrue((install_dir / "node.exe").exists())
+
+            setup = run_dispatcher("setup", "-Json")
+            self.assertEqual(setup.returncode, 0, setup.stderr)
+            setup_payload = json.loads(setup.stdout)
+            node_runtime = next(runtime for runtime in setup_payload["runtimes"] if runtime["name"] == "node")
+            self.assertTrue(node_runtime["found"])
+        finally:
+            self._remove_runtime_test_files(install_dir)
+
+    def _remove_runtime_test_files(self, install_dir):
+        for filename in ("node.exe", "npm.cmd"):
+            path = install_dir / filename
+            if path.exists():
+                path.unlink()
 
     def test_start_status_stop_manage_placeholder_pid_metadata(self):
         start = run_dispatcher("start", "-Json")

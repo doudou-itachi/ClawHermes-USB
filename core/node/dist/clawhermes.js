@@ -4,8 +4,11 @@ const core_1 = require("./core");
 function parseArgs(argv) {
     const args = [...argv];
     const action = args.shift() ?? "setup";
+    const positional = [];
     let usbRoot = process.cwd();
     let json = false;
+    let archive;
+    let dryRun = false;
     for (let index = 0; index < args.length; index += 1) {
         const arg = args[index];
         if ((arg === "--usb-root" || arg === "-UsbRoot") && args[index + 1]) {
@@ -15,14 +18,24 @@ function parseArgs(argv) {
         else if (arg === "--json" || arg === "-Json") {
             json = true;
         }
+        else if (arg === "--archive" && args[index + 1]) {
+            archive = args[index + 1];
+            index += 1;
+        }
+        else if (arg === "--dry-run") {
+            dryRun = true;
+        }
+        else {
+            positional.push(arg);
+        }
     }
-    return { action, usbRoot, json };
+    return { action, positional, usbRoot, json, archive, dryRun };
 }
 function printJson(value) {
     process.stdout.write(`${JSON.stringify(value, null, 2)}\n`);
 }
 async function main() {
-    const { action, usbRoot, json } = parseArgs(process.argv.slice(2));
+    const { action, positional, usbRoot, json, archive, dryRun } = parseArgs(process.argv.slice(2));
     const root = (0, core_1.getRoot)(usbRoot);
     switch (action) {
         case "env-json":
@@ -53,6 +66,23 @@ async function main() {
                 console.log(`Root: ${result.root}`);
                 for (const message of result.messages)
                     console.log(`- ${message}`);
+            }
+            return;
+        }
+        case "install-runtime": {
+            const runtimeName = positional[0];
+            if (!runtimeName)
+                throw new Error("Runtime name is required. Example: install-runtime node --archive path.zip");
+            if (!archive)
+                throw new Error("--archive is required for install-runtime.");
+            const result = (0, core_1.installRuntimeFromArchive)(root, runtimeName, archive, dryRun);
+            if (json) {
+                printJson(result);
+            }
+            else {
+                console.log(result.message);
+                for (const exe of result.expectedExecutables)
+                    console.log(`- expected: ${exe}`);
             }
             return;
         }

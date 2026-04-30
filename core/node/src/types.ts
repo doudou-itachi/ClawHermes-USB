@@ -38,6 +38,17 @@ export type RuntimePreparationStep = {
   found: boolean;
 };
 
+export type RuntimeInstallResult = {
+  runtime: string;
+  dryRun: boolean;
+  archive: string;
+  installDir: string;
+  expectedExecutables: string[];
+  wouldExtract: boolean;
+  installed: boolean;
+  message: string;
+};
+
 export type AdapterDescriptor = {
   id: string;
   displayName: string;

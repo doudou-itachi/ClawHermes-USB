@@ -3,7 +3,7 @@ import { createServer } from "node:net";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve, sep } from "node:path";
 import { get } from "node:http";
-import type { AdapterDescriptor, AdapterValidation, IntegrationReadiness, RuntimeDiagnostic, RuntimeManifest, RuntimePreparationStep, ServiceStatus } from "./types";
+import type { AdapterDescriptor, AdapterValidation, IntegrationReadiness, RuntimeDiagnostic, RuntimeInstallResult, RuntimeManifest, RuntimePreparationStep, ServiceStatus } from "./types";
 
 export const PORTAL_URL = "http://127.0.0.1:17000/";
 
@@ -125,6 +125,85 @@ export function runtimePreparationPlan(usbRoot: string) {
     steps,
     messages,
   };
+}
+
+export function installRuntimeFromArchive(usbRoot: string, runtimeName: string, archivePath: string, dryRun: boolean): RuntimeInstallResult {
+  const root = getRoot(usbRoot);
+  const manifest = loadRuntimeManifest(root);
+  const runtime = manifest.runtimes.find((item) => item.name === runtimeName);
+  if (!runtime) {
+    throw new Error(`Unknown runtime: ${runtimeName}`);
+  }
+  const archive = resolve(archivePath);
+  if (!existsSync(archive)) {
+    throw new Error(`Runtime archive not found: ${archive}`);
+  }
+  if (!archive.toLowerCase().endsWith(".zip")) {
+    throw new Error(`Only .zip runtime archives are supported right now: ${archive}`);
+  }
+  const installDir = resolveRelative(root, runtime.installDir);
+  const expectedExecutables = runtime.candidates.map((candidate) => resolveRelative(root, candidate));
+
+  if (!dryRun) {
+    mkdirSync(installDir, { recursive: true });
+    const tempDir = join(root, "data", "tmp", "runtime-extract", `${runtime.name}-${Date.now()}`);
+    rmSync(tempDir, { recursive: true, force: true });
+    mkdirSync(tempDir, { recursive: true });
+    try {
+      execFileSync("powershell", [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        "Expand-Archive",
+        "-LiteralPath",
+        archive,
+        "-DestinationPath",
+        tempDir,
+        "-Force",
+      ], { stdio: "ignore" });
+      copyExtractedRuntime(tempDir, installDir);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  const installed = expectedExecutables.some((candidate) => existsSync(candidate));
+  return {
+    runtime: runtime.name,
+    dryRun,
+    archive,
+    installDir,
+    expectedExecutables,
+    wouldExtract: true,
+    installed,
+    message: dryRun
+      ? `Would extract ${archive} into ${installDir}.`
+      : installed
+        ? `Installed ${runtime.label} into ${installDir}.`
+        : `Extracted ${archive}, but no expected executable was found under ${installDir}.`,
+  };
+}
+
+function copyExtractedRuntime(sourceDir: string, installDir: string): void {
+  const entries = readdirSync(sourceDir, { withFileTypes: true });
+  const contentRoot = entries.length === 1 && entries[0]?.isDirectory()
+    ? join(sourceDir, entries[0].name)
+    : sourceDir;
+  copyDirectoryContents(contentRoot, installDir);
+}
+
+function copyDirectoryContents(sourceDir: string, targetDir: string): void {
+  mkdirSync(targetDir, { recursive: true });
+  for (const entry of readdirSync(sourceDir, { withFileTypes: true })) {
+    const source = join(sourceDir, entry.name);
+    const target = join(targetDir, entry.name);
+    if (entry.isDirectory()) {
+      copyDirectoryContents(source, target);
+    } else if (entry.isFile()) {
+      writeFileSync(target, readFileSync(source));
+    }
+  }
 }
 
 export function integrationReadiness(adapters: AdapterDescriptor[]): IntegrationReadiness[] {
