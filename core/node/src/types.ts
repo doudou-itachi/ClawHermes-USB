@@ -113,6 +113,13 @@ export type ServiceStatus = {
   pidFile: string;
   logFile: string;
   portalUrl: string | null;
+  processId: number | null;
+  placeholder: boolean | null;
+  health: {
+    type: string;
+    ready: boolean;
+    reason: string;
+  };
 };
 
 export type PortDiagnostic = {

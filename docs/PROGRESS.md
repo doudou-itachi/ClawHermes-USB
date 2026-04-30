@@ -529,3 +529,33 @@ Validation performed:
 Next steps:
 
 - Add a structured service health summary so `status` can report process metadata, portal URL, and health-check readiness in one JSON shape.
+
+### Structured Status Health
+
+Status: `Done`
+
+Summary:
+
+- Enriched `status -Json` service entries with `processId`, `placeholder`, and structured `health` fields.
+- Placeholder services now report health as not ready even when placeholder metadata exists.
+- Managed process services report process health as ready when the recorded process is running.
+- Portal status now includes HTTP health readiness and process metadata.
+- Existing status and portal fields remain compatible.
+
+Changed areas:
+
+- `core/node/src/core.ts`
+- `core/node/src/types.ts`
+- `core/node/dist/`
+- `docs/PROGRESS.md`
+- `docs/superpowers/plans/2026-04-30-structured-status-health.md`
+- `tests/test_windows_core.py`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_start_status_stop_manage_placeholder_pid_metadata tests.test_windows_core.WindowsCoreTests.test_start_runs_production_ready_adapter_process_and_stop_kills_it -v`
+
+Next steps:
+
+- Add lightweight health-check execution for HTTP adapters so status can distinguish process running from endpoint ready.

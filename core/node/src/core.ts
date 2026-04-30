@@ -717,18 +717,22 @@ export function getPortalStatus(usbRoot: string): ServiceStatus {
   const root = getRoot(usbRoot);
   const pidFile = portalPidFile(root);
   let status = "stopped";
+  let processId: number | null = null;
   if (existsSync(pidFile)) {
     const metadata = JSON.parse(readFileSync(pidFile, "utf8")) as { processId?: number };
     if (metadata.processId && portalProcessById(root, metadata.processId)) {
       status = "running";
+      processId = metadata.processId;
     } else if (portalProcesses(root).length > 0) {
       status = "running";
+      processId = portalProcesses(root)[0]?.ProcessId ?? null;
     } else {
       rmSync(pidFile, { force: true });
       status = "stopped";
     }
   } else if (portalProcesses(root).length > 0) {
     status = "running";
+    processId = portalProcesses(root)[0]?.ProcessId ?? null;
   }
   return {
     id: "portal",
@@ -737,6 +741,13 @@ export function getPortalStatus(usbRoot: string): ServiceStatus {
     pidFile,
     logFile: join(root, "data", "logs", "portal.log"),
     portalUrl: PORTAL_URL,
+    processId,
+    placeholder: false,
+    health: {
+      type: "http",
+      ready: status === "running",
+      reason: status === "running" ? "Portal HTTP server is running." : "Portal HTTP server is stopped.",
+    },
   };
 }
 
@@ -858,6 +869,8 @@ export function getStatus(usbRoot: string) {
   const services: ServiceStatus[] = serviceOrder(root, "start").map((adapter) => {
     const pidFile = resolveRelative(root, adapter.pidFile);
     let status = "stopped";
+    let processId: number | null = null;
+    let placeholder: boolean | null = null;
     if (existsSync(pidFile)) {
       const metadata = JSON.parse(readFileSync(pidFile, "utf8")) as { status?: string; placeholder?: boolean; processId?: number };
       if (metadata.placeholder === false && metadata.processId && !processExists(metadata.processId)) {
@@ -865,6 +878,8 @@ export function getStatus(usbRoot: string) {
         status = "stopped";
       } else {
         status = metadata.status ?? "unknown";
+        processId = metadata.placeholder === false ? metadata.processId ?? null : null;
+        placeholder = metadata.placeholder ?? null;
       }
     }
     return {
@@ -874,10 +889,31 @@ export function getStatus(usbRoot: string) {
       pidFile,
       logFile: resolveRelative(root, adapter.logFile),
       portalUrl: adapter.portal?.url ?? null,
+      processId,
+      placeholder,
+      health: adapterHealth(adapter, status, placeholder),
     };
   });
   services.push(getPortalStatus(root));
   return { root, services };
+}
+
+function adapterHealth(adapter: AdapterDescriptor, status: string, placeholder: boolean | null) {
+  const type = typeof adapter.health?.type === "string" ? adapter.health.type : "unknown";
+  if (status === "stopped") {
+    return { type, ready: false, reason: "Service is stopped." };
+  }
+  if (placeholder === true) {
+    return { type, ready: false, reason: "Placeholder metadata is present, but no real process was launched." };
+  }
+  if (type === "process" && status === "running") {
+    return { type, ready: true, reason: "Managed process is running." };
+  }
+  return {
+    type,
+    ready: status === "running",
+    reason: status === "running" ? "Service reports running." : `Service status is ${status}.`,
+  };
 }
 
 function processExists(pid: number): boolean {

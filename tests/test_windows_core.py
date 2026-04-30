@@ -617,10 +617,14 @@ class WindowsCoreTests(unittest.TestCase):
         status = run_dispatcher("status", "-Json")
         self.assertEqual(status.returncode, 0, status.stderr)
         status_payload = json.loads(status.stdout)
-        statuses = {service["id"]: service["status"] for service in status_payload["services"]}
-        self.assertEqual(statuses["openclaw"], "placeholder-started")
-        self.assertEqual(statuses["hermes-agent"], "placeholder-started")
-        self.assertEqual(statuses["hermes-web-ui"], "placeholder-started")
+        services = {service["id"]: service for service in status_payload["services"]}
+        self.assertEqual(services["openclaw"]["status"], "placeholder-started")
+        self.assertEqual(services["hermes-agent"]["status"], "placeholder-started")
+        self.assertEqual(services["hermes-web-ui"]["status"], "placeholder-started")
+        self.assertTrue(services["openclaw"]["placeholder"])
+        self.assertIsNone(services["openclaw"]["processId"])
+        self.assertFalse(services["openclaw"]["health"]["ready"])
+        self.assertEqual(services["openclaw"]["health"]["type"], "process")
 
         stop = run_dispatcher("stop", "-Json")
         self.assertEqual(stop.returncode, 0, stop.stderr)
@@ -657,6 +661,15 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertEqual(child_env["FAKE_SECRET"], "from-env-file")
             self.assertEqual(Path(child_env["FAKE_INLINE"]).resolve(), (temp_root / "data" / "fake-service").resolve())
             self.assertEqual(Path(child_env["USB_ROOT"]).resolve(), temp_root.resolve())
+
+            status = run_dispatcher_for_root(temp_root, "status", "-Json")
+            self.assertEqual(status.returncode, 0, status.stderr)
+            services = {service["id"]: service for service in json.loads(status.stdout)["services"]}
+            self.assertEqual(services["fake-service"]["status"], "running")
+            self.assertEqual(services["fake-service"]["processId"], metadata["processId"])
+            self.assertFalse(services["fake-service"]["placeholder"])
+            self.assertTrue(services["fake-service"]["health"]["ready"])
+            self.assertEqual(services["fake-service"]["health"]["type"], "process")
 
             stop = run_dispatcher_for_root(temp_root, "stop", "-Json")
             self.assertEqual(stop.returncode, 0, stop.stderr)
