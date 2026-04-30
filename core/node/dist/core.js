@@ -13,6 +13,7 @@ exports.integrationReadiness = integrationReadiness;
 exports.dataWritable = dataWritable;
 exports.setupDiagnostics = setupDiagnostics;
 exports.envFileDiagnostics = envFileDiagnostics;
+exports.initializeEnvFiles = initializeEnvFiles;
 exports.pathDiagnostics = pathDiagnostics;
 exports.portDiagnostics = portDiagnostics;
 exports.generatePortal = generatePortal;
@@ -319,7 +320,55 @@ function envFileDiagnostics(usbRoot, adapters) {
             });
         }
     }
-    return diagnostics.sort((a, b) => a.path.localeCompare(b.path));
+    return diagnostics.sort((a, b) => a.serviceId.localeCompare(b.serviceId) || a.path.localeCompare(b.path));
+}
+function initializeEnvFiles(usbRoot, dryRun) {
+    const root = getRoot(usbRoot);
+    const diagnostics = envFileDiagnostics(root, loadAdapters(root));
+    const result = {
+        root,
+        dryRun,
+        files: [],
+        created: [],
+        skipped: [],
+        messages: [],
+    };
+    for (const envFile of diagnostics) {
+        if (envFile.exists) {
+            result.files.push({ ...envFile, action: "skipped", reason: "exists" });
+            result.skipped.push({
+                serviceId: envFile.serviceId,
+                path: envFile.path,
+                examplePath: envFile.examplePath,
+                reason: "exists",
+            });
+            result.messages.push(`Skipped existing env file: ${envFile.path}.`);
+            continue;
+        }
+        if (!envFile.exampleExists) {
+            result.files.push({ ...envFile, action: "skipped", reason: "missing-example" });
+            result.skipped.push({
+                serviceId: envFile.serviceId,
+                path: envFile.path,
+                examplePath: envFile.examplePath,
+                reason: "missing-example",
+            });
+            result.messages.push(`Cannot create ${envFile.path}; template is missing: ${envFile.examplePath}.`);
+            continue;
+        }
+        result.created.push(envFile.path);
+        if (dryRun) {
+            result.files.push({ ...envFile, action: "would-create", reason: null });
+            result.messages.push(`Would create ${envFile.path} from ${envFile.examplePath}.`);
+            continue;
+        }
+        const target = resolveRelative(root, envFile.path);
+        (0, node_fs_1.mkdirSync)((0, node_path_1.dirname)(target), { recursive: true });
+        (0, node_fs_1.copyFileSync)(resolveRelative(root, envFile.examplePath), target);
+        result.files.push({ ...envFile, action: "created", reason: null });
+        result.messages.push(`Created ${envFile.path} from ${envFile.examplePath}.`);
+    }
+    return result;
 }
 function pathDiagnostics(usbRoot) {
     const root = getRoot(usbRoot);

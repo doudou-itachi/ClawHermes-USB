@@ -1,4 +1,4 @@
-import { getRoot, getStatus, installRuntimeFromArchive, portableEnv, runtimePreparationPlan, setupDiagnostics, startSkeleton, stopSkeleton } from "./core";
+import { getRoot, getStatus, initializeEnvFiles, installRuntimeFromArchive, portableEnv, runtimePreparationPlan, setupDiagnostics, startSkeleton, stopSkeleton } from "./core";
 
 type ParsedArgs = {
   action: string;
@@ -72,6 +72,16 @@ async function main(): Promise<void> {
       } else {
         console.log("ClawHermes-USB runtime preparation plan");
         console.log(`Root: ${result.root}`);
+        for (const message of result.messages) console.log(`- ${message}`);
+      }
+      return;
+    }
+    case "init-env": {
+      const result = initializeEnvFiles(root, dryRun);
+      if (json) {
+        printJson(result);
+      } else {
+        console.log(dryRun ? "ClawHermes-USB env initialization plan" : "ClawHermes-USB env initialization");
         for (const message of result.messages) console.log(`- ${message}`);
       }
       return;

@@ -409,3 +409,34 @@ Validation performed:
 Next steps:
 
 - Add optional helper command to create local env files from examples without overwriting existing secrets.
+
+### Env Initialization Command
+
+Status: `Done`
+
+Summary:
+
+- Added a safe `init-env` command to create adapter-declared local env files from committed `.env.example` templates.
+- Existing env files are skipped so local secrets are not overwritten.
+- `--dry-run` reports the env files that would be created without writing them.
+- The PowerShell dispatcher remains a thin wrapper and only adds `init-env` to the allowed action set.
+
+Changed areas:
+
+- `core/node/src/core.ts`
+- `core/node/src/types.ts`
+- `core/node/src/clawhermes.ts`
+- `core/node/dist/`
+- `core/windows/clawhermes.ps1`
+- `docs/PROGRESS.md`
+- `docs/superpowers/plans/2026-04-30-init-env.md`
+- `tests/test_windows_core.py`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_init_env_json_creates_missing_env_files_without_overwriting_existing_values tests.test_windows_core.WindowsCoreTests.test_init_env_dry_run_reports_missing_env_files_without_writing -v`
+
+Next steps:
+
+- Load adapter env files into the portable service environment before replacing placeholders with real upstream process launches.

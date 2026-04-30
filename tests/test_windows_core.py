@@ -2,6 +2,7 @@ import json
 import os
 import socket
 import subprocess
+import tempfile
 import time
 import unittest
 import urllib.error
@@ -18,12 +19,16 @@ PORTAL_URL = "http://127.0.0.1:17000/"
 
 
 def run_dispatcher(*args):
+    return run_dispatcher_for_root(ROOT, *args)
+
+
+def run_dispatcher_for_root(usb_root, *args):
     command = [
         "node",
         str(NODE_CLI),
         *args,
         "--usb-root",
-        str(ROOT),
+        str(usb_root),
     ]
     return subprocess.run(
         command,
@@ -60,6 +65,25 @@ def assert_portal_unreachable(testcase):
             return
         time.sleep(0.1)
     testcase.fail("Portal was still reachable after stop")
+
+
+def make_temp_usb_root():
+    temp_dir = tempfile.TemporaryDirectory()
+    temp_root = Path(temp_dir.name)
+    adapters_root = temp_root / "adapters"
+    env_root = temp_root / "config" / "env"
+    adapters_root.mkdir(parents=True)
+    env_root.mkdir(parents=True)
+
+    for adapter_file in (ROOT / "adapters").glob("*/adapter.json"):
+        target = adapters_root / adapter_file.parent.name
+        target.mkdir(parents=True)
+        (target / "adapter.json").write_text(adapter_file.read_text(encoding="utf-8"), encoding="utf-8")
+
+    for example_file in (ROOT / "config" / "env").glob("*.env.example"):
+        (env_root / example_file.name).write_text(example_file.read_text(encoding="utf-8"), encoding="utf-8")
+
+    return temp_dir, temp_root
 
 
 class WindowsCoreTests(unittest.TestCase):
@@ -214,6 +238,55 @@ class WindowsCoreTests(unittest.TestCase):
         messages = "\n".join(payload["messages"])
         self.assertIn("Env file missing: config/env/hermes.env", messages)
         self.assertIn("copy config/env/hermes.env.example", messages)
+
+    def test_init_env_json_creates_missing_env_files_without_overwriting_existing_values(self):
+        temp_dir, temp_root = make_temp_usb_root()
+        try:
+            existing = temp_root / "config" / "env" / "hermes.env"
+            existing.write_text("SECRET_TOKEN=keep-me\n", encoding="utf-8")
+
+            result = run_dispatcher_for_root(temp_root, "init-env", "-Json")
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertFalse(payload["dryRun"])
+            self.assertEqual(
+                payload["created"],
+                ["config/env/hermes-web-ui.env", "config/env/openclaw.env"],
+            )
+            skipped = {item["path"]: item for item in payload["skipped"]}
+            self.assertEqual(skipped["config/env/hermes.env"]["reason"], "exists")
+            self.assertEqual(existing.read_text(encoding="utf-8"), "SECRET_TOKEN=keep-me\n")
+
+            for env_file in payload["created"]:
+                target = temp_root / env_file
+                example = temp_root / f"{env_file}.example"
+                self.assertTrue(target.exists(), env_file)
+                self.assertEqual(target.read_text(encoding="utf-8"), example.read_text(encoding="utf-8"))
+        finally:
+            temp_dir.cleanup()
+
+    def test_init_env_dry_run_reports_missing_env_files_without_writing(self):
+        temp_dir, temp_root = make_temp_usb_root()
+        try:
+            result = run_dispatcher_for_root(temp_root, "init-env", "--dry-run", "-Json")
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertTrue(payload["dryRun"])
+            self.assertEqual(
+                payload["created"],
+                [
+                    "config/env/hermes.env",
+                    "config/env/hermes-web-ui.env",
+                    "config/env/openclaw.env",
+                ],
+            )
+
+            for env_file in payload["created"]:
+                self.assertFalse((temp_root / env_file).exists(), env_file)
+        finally:
+            temp_dir.cleanup()
 
     def test_setup_json_reports_adapter_integration_readiness(self):
         result = run_dispatcher("setup", "-Json")

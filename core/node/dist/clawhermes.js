@@ -74,6 +74,18 @@ async function main() {
             }
             return;
         }
+        case "init-env": {
+            const result = (0, core_1.initializeEnvFiles)(root, dryRun);
+            if (json) {
+                printJson(result);
+            }
+            else {
+                console.log(dryRun ? "ClawHermes-USB env initialization plan" : "ClawHermes-USB env initialization");
+                for (const message of result.messages)
+                    console.log(`- ${message}`);
+            }
+            return;
+        }
         case "install-runtime": {
             const runtimeName = positional[0];
             if (!runtimeName)

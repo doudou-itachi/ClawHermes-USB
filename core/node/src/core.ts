@@ -1,10 +1,10 @@
 import { execFileSync, spawn } from "node:child_process";
 import { createServer } from "node:net";
-import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { appendFileSync, copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve, sep } from "node:path";
 import { get } from "node:http";
 import { createHash } from "node:crypto";
-import type { AdapterDescriptor, AdapterValidation, EnvFileDiagnostic, IntegrationReadiness, PathDiagnostic, PortDiagnostic, RuntimeDiagnostic, RuntimeInstallResult, RuntimeManifest, RuntimePreparationStep, ServiceStatus } from "./types";
+import type { AdapterDescriptor, AdapterValidation, EnvFileDiagnostic, EnvInitResult, IntegrationReadiness, PathDiagnostic, PortDiagnostic, RuntimeDiagnostic, RuntimeInstallResult, RuntimeManifest, RuntimePreparationStep, ServiceStatus } from "./types";
 
 export const PORTAL_URL = "http://127.0.0.1:17000/";
 
@@ -300,7 +300,61 @@ export function envFileDiagnostics(usbRoot: string, adapters: AdapterDescriptor[
       });
     }
   }
-  return diagnostics.sort((a, b) => a.path.localeCompare(b.path));
+  return diagnostics.sort((a, b) => a.serviceId.localeCompare(b.serviceId) || a.path.localeCompare(b.path));
+}
+
+export function initializeEnvFiles(usbRoot: string, dryRun: boolean): EnvInitResult {
+  const root = getRoot(usbRoot);
+  const diagnostics = envFileDiagnostics(root, loadAdapters(root));
+  const result: EnvInitResult = {
+    root,
+    dryRun,
+    files: [],
+    created: [],
+    skipped: [],
+    messages: [],
+  };
+
+  for (const envFile of diagnostics) {
+    if (envFile.exists) {
+      result.files.push({ ...envFile, action: "skipped", reason: "exists" });
+      result.skipped.push({
+        serviceId: envFile.serviceId,
+        path: envFile.path,
+        examplePath: envFile.examplePath,
+        reason: "exists",
+      });
+      result.messages.push(`Skipped existing env file: ${envFile.path}.`);
+      continue;
+    }
+
+    if (!envFile.exampleExists) {
+      result.files.push({ ...envFile, action: "skipped", reason: "missing-example" });
+      result.skipped.push({
+        serviceId: envFile.serviceId,
+        path: envFile.path,
+        examplePath: envFile.examplePath,
+        reason: "missing-example",
+      });
+      result.messages.push(`Cannot create ${envFile.path}; template is missing: ${envFile.examplePath}.`);
+      continue;
+    }
+
+    result.created.push(envFile.path);
+    if (dryRun) {
+      result.files.push({ ...envFile, action: "would-create", reason: null });
+      result.messages.push(`Would create ${envFile.path} from ${envFile.examplePath}.`);
+      continue;
+    }
+
+    const target = resolveRelative(root, envFile.path);
+    mkdirSync(dirname(target), { recursive: true });
+    copyFileSync(resolveRelative(root, envFile.examplePath), target);
+    result.files.push({ ...envFile, action: "created", reason: null });
+    result.messages.push(`Created ${envFile.path} from ${envFile.examplePath}.`);
+  }
+
+  return result;
 }
 
 export function pathDiagnostics(usbRoot: string): PathDiagnostic[] {

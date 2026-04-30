@@ -136,3 +136,27 @@ export type EnvFileDiagnostic = {
   examplePath: string;
   exampleExists: boolean;
 };
+
+export type EnvInitSkipped = {
+  serviceId: string;
+  path: string;
+  examplePath: string;
+  reason: "exists" | "missing-example";
+};
+
+export type EnvInitFileResult = {
+  serviceId: string;
+  path: string;
+  examplePath: string;
+  action: "created" | "would-create" | "skipped";
+  reason: "exists" | "missing-example" | null;
+};
+
+export type EnvInitResult = {
+  root: string;
+  dryRun: boolean;
+  files: EnvInitFileResult[];
+  created: string[];
+  skipped: EnvInitSkipped[];
+  messages: string[];
+};
