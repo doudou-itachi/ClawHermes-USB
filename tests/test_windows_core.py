@@ -924,6 +924,11 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertIn("<th>Health</th>", html)
             self.assertIn("Not ready", html)
             self.assertIn("Placeholder metadata is present", html)
+            self.assertIn('data-service-id="openclaw"', html)
+            self.assertIn("data-status-cell", html)
+            self.assertIn("data-health-label", html)
+            self.assertIn("data-health-reason", html)
+            self.assertIn("fetch('/status.json'", html)
         finally:
             run_dispatcher("stop", "-Json")
 

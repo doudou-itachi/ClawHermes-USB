@@ -677,3 +677,31 @@ Validation performed:
 Next steps:
 
 - Add a small portal-side refresh script that fetches `/status.json` and updates health cells without reloading the page.
+
+### Portal Refresh Script
+
+Status: `Done`
+
+Summary:
+
+- Added stable `data-service-id` and cell markers to generated portal service rows.
+- Added a small inline refresh script that fetches `/status.json` and updates status and health cells.
+- The portal remains static and dependency-free while gaining refresh-ready behavior.
+- Existing portal generation and localhost lifecycle tests remain green.
+
+Changed areas:
+
+- `core/node/src/core.ts`
+- `core/node/dist/`
+- `docs/PROGRESS.md`
+- `docs/superpowers/plans/2026-05-01-portal-refresh-script.md`
+- `tests/test_windows_core.py`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_start_generates_portal_from_adapter_metadata tests.test_windows_core.WindowsCoreTests.test_start_serves_portal_over_localhost_and_stop_shuts_it_down -v`
+
+Next steps:
+
+- Add log tail helpers so portal/status output can point users to the newest launcher and service log snippets without opening files manually.

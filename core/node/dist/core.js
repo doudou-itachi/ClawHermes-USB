@@ -556,8 +556,8 @@ function generatePortal(usbRoot) {
             : service.logFile;
         const url = service.portalUrl ? `<a href="${escapeHtml(service.portalUrl)}">${escapeHtml(service.portalUrl)}</a>` : "<span>Pending upstream URL</span>";
         const healthLabel = service.health.ready ? "Ready" : "Not ready";
-        const health = `${escapeHtml(healthLabel)} <span>(${escapeHtml(service.health.type)})</span><br><small>${escapeHtml(service.health.reason)}</small>`;
-        return `<tr><td>${escapeHtml(service.displayName)}</td><td>${escapeHtml(service.id)}</td><td>${escapeHtml(service.status)}</td><td>${health}</td><td>${url}</td><td><code>${escapeHtml(logPath)}</code></td></tr>`;
+        const health = `<span data-health-label>${escapeHtml(healthLabel)}</span> <span data-health-type>(${escapeHtml(service.health.type)})</span><br><small data-health-reason>${escapeHtml(service.health.reason)}</small>`;
+        return `<tr data-service-id="${escapeHtml(service.id)}"><td>${escapeHtml(service.displayName)}</td><td>${escapeHtml(service.id)}</td><td data-status-cell>${escapeHtml(service.status)}</td><td>${health}</td><td>${url}</td><td><code>${escapeHtml(logPath)}</code></td></tr>`;
     }).join("\n          ");
     const html = `<!doctype html>
 <html lang="en">
@@ -598,6 +598,31 @@ function generatePortal(usbRoot) {
       <p>Use <code>launcher/windows/Status.bat</code> to refresh service state and <code>launcher/windows/Stop.bat</code> to stop placeholder services.</p>
     </section>
   </main>
+  <script>
+    async function refreshStatus() {
+      try {
+        const response = await fetch('/status.json', { cache: 'no-store' });
+        if (!response.ok) return;
+        const payload = await response.json();
+        for (const service of payload.services || []) {
+          const row = document.querySelector('[data-service-id="' + service.id + '"]');
+          if (!row) continue;
+          const statusCell = row.querySelector('[data-status-cell]');
+          const healthLabel = row.querySelector('[data-health-label]');
+          const healthType = row.querySelector('[data-health-type]');
+          const healthReason = row.querySelector('[data-health-reason]');
+          if (statusCell) statusCell.textContent = service.status || 'unknown';
+          if (healthLabel) healthLabel.textContent = service.health && service.health.ready ? 'Ready' : 'Not ready';
+          if (healthType) healthType.textContent = '(' + ((service.health && service.health.type) || 'unknown') + ')';
+          if (healthReason) healthReason.textContent = (service.health && service.health.reason) || '';
+        }
+      } catch {
+        // Keep the last rendered status visible when refresh fails.
+      }
+    }
+    refreshStatus();
+    window.setInterval(refreshStatus, 5000);
+  </script>
 </body>
 </html>
 `;
