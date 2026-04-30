@@ -859,8 +859,13 @@ export function getStatus(usbRoot: string) {
     const pidFile = resolveRelative(root, adapter.pidFile);
     let status = "stopped";
     if (existsSync(pidFile)) {
-      const metadata = JSON.parse(readFileSync(pidFile, "utf8")) as { status?: string };
-      status = metadata.status ?? "unknown";
+      const metadata = JSON.parse(readFileSync(pidFile, "utf8")) as { status?: string; placeholder?: boolean; processId?: number };
+      if (metadata.placeholder === false && metadata.processId && !processExists(metadata.processId)) {
+        rmSync(pidFile, { force: true });
+        status = "stopped";
+      } else {
+        status = metadata.status ?? "unknown";
+      }
     }
     return {
       id: adapter.id,
@@ -873,6 +878,17 @@ export function getStatus(usbRoot: string) {
   });
   services.push(getPortalStatus(root));
   return { root, services };
+}
+
+function processExists(pid: number): boolean {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error: unknown) {
+    const code = (error as { code?: string }).code;
+    return code === "EPERM";
+  }
 }
 
 export function stopSkeleton(usbRoot: string) {

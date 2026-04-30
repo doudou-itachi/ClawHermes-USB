@@ -667,6 +667,36 @@ class WindowsCoreTests(unittest.TestCase):
             run_dispatcher_for_root(temp_root, "stop", "-Json")
             temp_dir.cleanup()
 
+    def test_status_removes_stale_managed_adapter_pid_file(self):
+        temp_dir, temp_root = make_temp_process_usb_root()
+        try:
+            pid_dir = temp_root / "data" / "tmp" / "pids"
+            pid_dir.mkdir(parents=True, exist_ok=True)
+            pid_file = pid_dir / "fake-service.pid"
+            pid_file.write_text(
+                json.dumps(
+                    {
+                        "serviceId": "fake-service",
+                        "displayName": "Fake Service",
+                        "status": "running",
+                        "processId": 99999999,
+                        "placeholder": False,
+                        "logFile": str(temp_root / "data" / "logs" / "fake-service.log"),
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            status = run_dispatcher_for_root(temp_root, "status", "-Json")
+
+            self.assertEqual(status.returncode, 0, status.stderr)
+            status_payload = json.loads(status.stdout)
+            statuses = {service["id"]: service["status"] for service in status_payload["services"]}
+            self.assertEqual(statuses["fake-service"], "stopped")
+            self.assertFalse(pid_file.exists())
+        finally:
+            temp_dir.cleanup()
+
     def test_start_generates_portal_from_adapter_metadata(self):
         try:
             start = run_dispatcher("start", "-Json")

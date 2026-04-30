@@ -501,3 +501,31 @@ Validation performed:
 Next steps:
 
 - Add process-aware status cleanup for managed adapter pid files so stale or exited child processes are reported accurately.
+
+### Managed Status Cleanup
+
+Status: `Done`
+
+Summary:
+
+- `status` now checks whether non-placeholder managed adapter processes still exist.
+- Stale managed pid files are removed and the service is reported as `stopped`.
+- Placeholder services keep their existing metadata-based behavior.
+- Added regression coverage for stale managed pid cleanup alongside managed process and placeholder status paths.
+
+Changed areas:
+
+- `core/node/src/core.ts`
+- `core/node/dist/`
+- `docs/PROGRESS.md`
+- `docs/superpowers/plans/2026-04-30-managed-status-cleanup.md`
+- `tests/test_windows_core.py`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_status_removes_stale_managed_adapter_pid_file tests.test_windows_core.WindowsCoreTests.test_start_runs_production_ready_adapter_process_and_stop_kills_it tests.test_windows_core.WindowsCoreTests.test_start_status_stop_manage_placeholder_pid_metadata -v`
+
+Next steps:
+
+- Add a structured service health summary so `status` can report process metadata, portal URL, and health-check readiness in one JSON shape.
