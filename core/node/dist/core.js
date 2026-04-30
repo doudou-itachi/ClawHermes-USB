@@ -24,6 +24,7 @@ exports.getPortalStatus = getPortalStatus;
 exports.stopPortalServer = stopPortalServer;
 exports.startSkeleton = startSkeleton;
 exports.getStatus = getStatus;
+exports.writeStatusSnapshot = writeStatusSnapshot;
 exports.stopSkeleton = stopSkeleton;
 const node_child_process_1 = require("node:child_process");
 const node_net_1 = require("node:net");
@@ -897,7 +898,14 @@ function getStatus(usbRoot) {
         };
     });
     services.push(getPortalStatus(root));
-    return { root, services };
+    return { root, generatedAt: new Date().toISOString(), services };
+}
+function writeStatusSnapshot(usbRoot, status) {
+    const root = getRoot(usbRoot);
+    const snapshotPath = (0, node_path_1.join)(root, "data", "tmp", "status.json");
+    (0, node_fs_1.mkdirSync)((0, node_path_1.dirname)(snapshotPath), { recursive: true });
+    (0, node_fs_1.writeFileSync)(snapshotPath, `${JSON.stringify(status, null, 2)}\n`, "utf8");
+    return snapshotPath;
 }
 function adapterHealth(adapter, status, placeholder) {
     const type = typeof adapter.health?.type === "string" ? adapter.health.type : "unknown";

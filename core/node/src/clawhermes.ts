@@ -1,4 +1,4 @@
-import { getRoot, getStatus, initializeEnvFiles, installRuntimeFromArchive, portableEnv, runtimePreparationPlan, serviceEnvironmentDiagnostic, setupDiagnostics, startSkeleton, stopSkeleton } from "./core";
+import { getRoot, getStatus, initializeEnvFiles, installRuntimeFromArchive, portableEnv, runtimePreparationPlan, serviceEnvironmentDiagnostic, setupDiagnostics, startSkeleton, stopSkeleton, writeStatusSnapshot } from "./core";
 
 type ParsedArgs = {
   action: string;
@@ -127,6 +127,7 @@ async function main(): Promise<void> {
     }
     case "status": {
       const result = getStatus(root);
+      writeStatusSnapshot(root, result);
       if (json) {
         printJson(result);
       } else {

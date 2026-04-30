@@ -618,3 +618,33 @@ Validation performed:
 Next steps:
 
 - Add a machine-readable status snapshot file under `data/tmp/status.json` so external tools and future portal refresh logic can reuse the latest status without rerunning all probes.
+
+### Status Snapshot
+
+Status: `Done`
+
+Summary:
+
+- Added `generatedAt` to `status` payloads.
+- `status` now writes the latest status payload to `data/tmp/status.json`.
+- The snapshot includes service health fields for external tooling and future portal refresh logic.
+- Existing JSON output remains compatible while gaining the timestamp field.
+
+Changed areas:
+
+- `core/node/src/core.ts`
+- `core/node/src/clawhermes.ts`
+- `core/node/dist/`
+- `docs/PROGRESS.md`
+- `docs/superpowers/plans/2026-05-01-status-snapshot.md`
+- `tests/test_windows_core.py`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_start_status_stop_manage_placeholder_pid_metadata -v`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_status_removes_stale_managed_adapter_pid_file tests.test_windows_core.WindowsCoreTests.test_status_reports_http_adapter_ready_when_endpoint_responds tests.test_windows_core.WindowsCoreTests.test_status_reports_http_adapter_not_ready_when_endpoint_is_unreachable tests.test_windows_core.WindowsCoreTests.test_start_serves_portal_over_localhost_and_stop_shuts_it_down -v`
+
+Next steps:
+
+- Add a `refresh-status` portal endpoint or lightweight status file serving path so the portal can update health without regenerating the full HTML.

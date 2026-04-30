@@ -897,7 +897,15 @@ export function getStatus(usbRoot: string) {
     };
   });
   services.push(getPortalStatus(root));
-  return { root, services };
+  return { root, generatedAt: new Date().toISOString(), services };
+}
+
+export function writeStatusSnapshot(usbRoot: string, status: ReturnType<typeof getStatus>): string {
+  const root = getRoot(usbRoot);
+  const snapshotPath = join(root, "data", "tmp", "status.json");
+  mkdirSync(dirname(snapshotPath), { recursive: true });
+  writeFileSync(snapshotPath, `${JSON.stringify(status, null, 2)}\n`, "utf8");
+  return snapshotPath;
 }
 
 function adapterHealth(adapter: AdapterDescriptor, status: string, placeholder: boolean | null) {

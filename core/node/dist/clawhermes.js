@@ -135,6 +135,7 @@ async function main() {
         }
         case "status": {
             const result = (0, core_1.getStatus)(root);
+            (0, core_1.writeStatusSnapshot)(root, result);
             if (json) {
                 printJson(result);
             }

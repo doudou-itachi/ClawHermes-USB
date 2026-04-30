@@ -750,6 +750,14 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertFalse(services["openclaw"]["health"]["ready"])
         self.assertEqual(services["openclaw"]["health"]["type"], "process")
 
+        snapshot_path = ROOT / "data" / "tmp" / "status.json"
+        self.assertTrue(snapshot_path.exists())
+        snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
+        self.assertEqual(Path(snapshot["root"]).resolve(), ROOT)
+        self.assertIn("generatedAt", snapshot)
+        snapshot_services = {service["id"]: service for service in snapshot["services"]}
+        self.assertEqual(snapshot_services["openclaw"]["health"]["type"], "process")
+
         stop = run_dispatcher("stop", "-Json")
         self.assertEqual(stop.returncode, 0, stop.stderr)
         stop_payload = json.loads(stop.stdout)
