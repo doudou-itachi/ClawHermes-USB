@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.wslDiagnostics = wslDiagnostics;
 exports.prepareWsl = prepareWsl;
+exports.wslExecutableInvocation = wslExecutableInvocation;
 const node_child_process_1 = require("node:child_process");
 const node_fs_1 = require("node:fs");
 const node_path_1 = require("node:path");
@@ -114,6 +115,15 @@ function prepareWsl(usbRoot, options) {
     }
     return { ...result, executed: true };
 }
+function wslExecutableInvocation(executablePath, args) {
+    if (/\.(cmd|bat)$/i.test(executablePath)) {
+        return {
+            executablePath: "cmd.exe",
+            args: ["/d", "/s", "/c", windowsCommandLine(executablePath, args)],
+        };
+    }
+    return { executablePath, args };
+}
 function preparationCommands(diagnostics, distro) {
     const executablePath = diagnostics.executablePath ?? "wsl.exe";
     const desired = diagnostics.distros.find((item) => item.name.toLowerCase() === distro.toLowerCase()) ?? null;
@@ -155,6 +165,12 @@ function commandLine(executablePath, args) {
 function quoteCommandArg(value) {
     return /\s/.test(value) ? `"${value.replaceAll('"', '\\"')}"` : value;
 }
+function windowsCommandLine(executablePath, args) {
+    return [executablePath, ...args.map(quoteWindowsCommandArg)].join(" ");
+}
+function quoteWindowsCommandArg(value) {
+    return /[\s&|<>^]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value;
+}
 function normalizeDesiredDistro(value) {
     const trimmed = value?.trim();
     return trimmed ? trimmed : null;
@@ -172,10 +188,11 @@ function resolveWslExecutable() {
     }
 }
 function runWslCommand(executablePath, args) {
+    const invocation = wslExecutableInvocation(executablePath, args);
     try {
         return {
             ok: true,
-            output: decodeCommandOutput((0, node_child_process_1.execFileSync)(executablePath, args, { stdio: ["ignore", "pipe", "pipe"], timeout: 5000, windowsHide: true })).trim(),
+            output: decodeCommandOutput((0, node_child_process_1.execFileSync)(invocation.executablePath, invocation.args, { stdio: ["ignore", "pipe", "pipe"], timeout: 5000, windowsHide: true })).trim(),
         };
     }
     catch (error) {

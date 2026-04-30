@@ -14,6 +14,7 @@ const portable_1 = require("./portable");
 const portal_1 = require("./portal");
 const status_1 = require("./status");
 const wsl_adapter_1 = require("./wsl-adapter");
+const wsl_1 = require("./wsl");
 var portable_2 = require("./portable");
 Object.defineProperty(exports, "dataWritable", { enumerable: true, get: function () { return portable_2.dataWritable; } });
 Object.defineProperty(exports, "getRoot", { enumerable: true, get: function () { return portable_2.getRoot; } });
@@ -60,16 +61,20 @@ Object.defineProperty(exports, "runtimeDiagnostics", { enumerable: true, get: fu
 Object.defineProperty(exports, "runtimePreparationPlan", { enumerable: true, get: function () { return runtimes_1.runtimePreparationPlan; } });
 var status_2 = require("./status");
 Object.defineProperty(exports, "writeStatusSnapshot", { enumerable: true, get: function () { return status_2.writeStatusSnapshot; } });
-var wsl_1 = require("./wsl");
-Object.defineProperty(exports, "prepareWsl", { enumerable: true, get: function () { return wsl_1.prepareWsl; } });
-Object.defineProperty(exports, "wslDiagnostics", { enumerable: true, get: function () { return wsl_1.wslDiagnostics; } });
+var wsl_2 = require("./wsl");
+Object.defineProperty(exports, "prepareWsl", { enumerable: true, get: function () { return wsl_2.prepareWsl; } });
+Object.defineProperty(exports, "wslDiagnostics", { enumerable: true, get: function () { return wsl_2.wslDiagnostics; } });
 async function startSkeleton(usbRoot) {
     const root = (0, portable_1.getRoot)(usbRoot);
     const setup = (0, diagnostics_1.setupDiagnostics)(root);
     (0, diagnostics_1.writeSetupSnapshot)(root, setup);
     const started = [];
     for (const adapter of (0, adapters_1.serviceOrder)(root, "start").filter((item) => item.enabled)) {
-        (0, lifecycle_1.startAdapter)(root, adapter);
+        const wslPlan = adapter.runtime?.kind === "wsl2" ? (0, wsl_adapter_1.wslAdapterCommandPlan)(root, adapter, (0, environment_1.resolveServiceEnvironment)(root, adapter.id), "start") : null;
+        if (wslPlan && adapter.integration?.productionReady === true) {
+            (0, wsl_adapter_1.assertWslReadyForAdapterDistro)(root, adapter.id, adapter.runtime?.distro);
+        }
+        (0, lifecycle_1.startAdapter)(root, adapter, wslPlan ? { processPlan: wslManagedProcessPlan(root, wslPlan) } : {});
         started.push(adapter.id);
     }
     (0, portal_1.generatePortal)(root, getStatus(root).services);
@@ -116,10 +121,32 @@ function startSingleAdapter(usbRoot, serviceId, options) {
         return result;
     if (wslPlan) {
         (0, wsl_adapter_1.assertWslReadyForAdapterDistro)(root, serviceId, adapter.runtime?.distro);
-        throw new Error(`WSL2 start supervision for ${serviceId} is not implemented yet. Use --dry-run to inspect the command plan.`);
+        const metadata = (0, lifecycle_1.startAdapter)(root, adapter, {
+            forceManaged: true,
+            processPlan: wslManagedProcessPlan(root, wslPlan),
+        });
+        return { ...result, started: true, metadata };
     }
     const metadata = (0, lifecycle_1.startAdapter)(root, adapter, { forceManaged: true });
     return { ...result, started: true, metadata };
+}
+function wslManagedProcessPlan(root, wslPlan) {
+    const invocation = (0, wsl_1.wslExecutableInvocation)(wslPlan.executablePath, wslPlan.args);
+    return {
+        runner: "wsl2",
+        executablePath: invocation.executablePath,
+        args: invocation.args,
+        command: [wslPlan.executablePath, ...wslPlan.args].join(" "),
+        workingDirectory: root,
+        metadata: {
+            wsl: {
+                executablePath: wslPlan.executablePath,
+                args: wslPlan.args,
+                workingDirectory: wslPlan.workingDirectory,
+                script: wslPlan.script,
+            },
+        },
+    };
 }
 function getStatus(usbRoot) {
     const root = (0, portable_1.getRoot)(usbRoot);

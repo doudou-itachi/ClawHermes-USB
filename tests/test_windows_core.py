@@ -109,6 +109,32 @@ def make_hermes_agent_app_ready(temp_root):
     (app_dir / "pyproject.toml").write_text("[project]\nname = \"hermes-agent-test\"\n", encoding="utf-8")
 
 
+def make_fake_wsl_cmd(temp_root):
+    fake_wsl = temp_root / "fake-wsl.cmd"
+    fake_wsl.write_text(
+        "\n".join([
+            "@echo off",
+            "if \"%~1\"==\"--status\" (",
+            "  echo Default Version: 2",
+            "  exit /b 0",
+            ")",
+            "if \"%~1\"==\"--list\" (",
+            "  echo   NAME      STATE           VERSION",
+            "  echo * Ubuntu    Running         2",
+            "  exit /b 0",
+            ")",
+            "echo %* > \"%FAKE_WSL_ARGS%\"",
+            "echo started > \"%FAKE_WSL_MARKER%\"",
+            ":loop",
+            "ping -n 2 127.0.0.1 > nul",
+            "goto loop",
+            "",
+        ]),
+        encoding="ascii",
+    )
+    return fake_wsl
+
+
 def create_local_source_repo(parent, name="source-app"):
     source_repo = parent / name
     source_repo.mkdir(parents=True)
@@ -1577,6 +1603,99 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("WSL2 is not ready", result.stderr)
         finally:
+            temp_dir.cleanup()
+
+    def test_start_adapter_wsl2_confirm_launches_managed_wsl_process_and_stop_kills_it(self):
+        temp_dir, temp_root = make_temp_usb_root()
+        try:
+            make_hermes_agent_app_ready(temp_root)
+            fake_wsl = make_fake_wsl_cmd(temp_root)
+            marker = temp_root / "data" / "tmp" / "fake-wsl-started.txt"
+            args_file = temp_root / "data" / "tmp" / "fake-wsl-args.txt"
+            env = {
+                "CLAWHERMES_WSL_EXE": str(fake_wsl),
+                "FAKE_WSL_MARKER": str(marker),
+                "FAKE_WSL_ARGS": str(args_file),
+            }
+
+            result = run_dispatcher_for_root(temp_root, "start-adapter", "hermes-agent", "--confirm-start", "-Json", env=env)
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["runner"], "wsl2")
+            self.assertTrue(payload["started"])
+            metadata = payload["metadata"]
+            self.assertEqual(metadata["status"], "running")
+            self.assertFalse(metadata["placeholder"])
+            self.assertEqual(metadata["runner"], "wsl2")
+            expected_wsl_root = f"/mnt/{temp_root.drive[0].lower()}/{str(temp_root)[3:].replace(chr(92), '/')}"
+            self.assertEqual(metadata["wsl"]["workingDirectory"].replace("\\", "/"), expected_wsl_root + "/apps/hermes-agent")
+            self.assertIsInstance(metadata["processId"], int)
+            self.assertTrue(process_exists(metadata["processId"]))
+            wait_for_file(marker)
+            wait_for_file(args_file)
+            launched_args = args_file.read_text(encoding="utf-8")
+            self.assertIn("--distribution Ubuntu", launched_args)
+            self.assertIn("hermes gateway run", launched_args)
+
+            pid_file = temp_root / "data" / "tmp" / "pids" / "hermes-agent.pid"
+            self.assertTrue(pid_file.exists())
+            pid_metadata = json.loads(pid_file.read_text(encoding="utf-8"))
+            self.assertEqual(pid_metadata["runner"], "wsl2")
+            self.assertEqual(pid_metadata["processId"], metadata["processId"])
+
+            status = run_dispatcher_for_root(temp_root, "status", "-Json", env=env)
+            self.assertEqual(status.returncode, 0, status.stderr)
+            services = {service["id"]: service for service in json.loads(status.stdout)["services"]}
+            self.assertEqual(services["hermes-agent"]["status"], "running")
+            self.assertEqual(services["hermes-agent"]["processId"], metadata["processId"])
+
+            stop = run_dispatcher_for_root(temp_root, "stop", "-Json", env=env)
+            self.assertEqual(stop.returncode, 0, stop.stderr)
+            self.assertIn("hermes-agent", json.loads(stop.stdout)["stopped"])
+            self.assertFalse(pid_file.exists())
+            self.assertFalse(process_exists(metadata["processId"]))
+        finally:
+            run_dispatcher_for_root(temp_root, "stop", "-Json", env={"CLAWHERMES_WSL_EXE": str(temp_root / "fake-wsl.cmd")})
+            temp_dir.cleanup()
+
+    def test_start_uses_wsl2_plan_for_production_ready_wsl_adapter(self):
+        temp_dir, temp_root = make_temp_usb_root()
+        try:
+            defaults = temp_root / "config" / "defaults"
+            defaults.mkdir(parents=True, exist_ok=True)
+            for config_file in (ROOT / "config" / "defaults").glob("*.json"):
+                (defaults / config_file.name).write_text(config_file.read_text(encoding="utf-8"), encoding="utf-8")
+            services = json.loads((defaults / "services.json").read_text(encoding="utf-8"))
+            services["startOrder"] = ["hermes-agent"]
+            services["stopOrder"] = ["hermes-agent"]
+            (defaults / "services.json").write_text(json.dumps(services, indent=2), encoding="utf-8")
+            portal_server = temp_root / "core" / "node" / "dist" / "portal-server.js"
+            portal_server.parent.mkdir(parents=True)
+            portal_server.write_text((ROOT / "core" / "node" / "dist" / "portal-server.js").read_text(encoding="utf-8"), encoding="utf-8")
+            make_hermes_agent_app_ready(temp_root)
+            mark_adapter_production_ready(temp_root, "hermes-agent")
+            fake_wsl = make_fake_wsl_cmd(temp_root)
+            marker = temp_root / "data" / "tmp" / "fake-wsl-started.txt"
+            args_file = temp_root / "data" / "tmp" / "fake-wsl-args.txt"
+            env = {
+                "CLAWHERMES_WSL_EXE": str(fake_wsl),
+                "FAKE_WSL_MARKER": str(marker),
+                "FAKE_WSL_ARGS": str(args_file),
+            }
+
+            start = run_dispatcher_for_root(temp_root, "start", "-Json", env=env)
+
+            self.assertEqual(start.returncode, 0, start.stderr)
+            self.assertIn("hermes-agent", json.loads(start.stdout)["started"])
+            wait_for_file(marker)
+            metadata = json.loads((temp_root / "data" / "tmp" / "pids" / "hermes-agent.pid").read_text(encoding="utf-8"))
+            self.assertEqual(metadata["runner"], "wsl2")
+            self.assertFalse(metadata["placeholder"])
+            self.assertIn("--distribution", metadata["wsl"]["args"])
+            self.assertTrue(process_exists(metadata["processId"]))
+        finally:
+            run_dispatcher_for_root(temp_root, "stop", "-Json", env={"CLAWHERMES_WSL_EXE": str(temp_root / "fake-wsl.cmd")})
             temp_dir.cleanup()
 
     def test_status_removes_stale_managed_adapter_pid_file(self):

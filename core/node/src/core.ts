@@ -8,6 +8,7 @@ import { getRoot, resolveRelative } from "./portable";
 import { generatePortal, getPortalStatus, startPortalServer, stopPortalServer } from "./portal";
 import { adapterHealth, processExists, writeStatusSnapshot } from "./status";
 import { assertWslReadyForAdapterDistro, wslAdapterCommandPlan } from "./wsl-adapter";
+import { wslExecutableInvocation } from "./wsl";
 
 export { dataWritable, getRoot, portableEnv } from "./portable";
 export { integrationReadiness, loadAdapters, serviceOrder, validateAdapter } from "./adapters";
@@ -29,7 +30,11 @@ export async function startSkeleton(usbRoot: string) {
   writeSetupSnapshot(root, setup);
   const started: string[] = [];
   for (const adapter of serviceOrder(root, "start").filter((item) => item.enabled)) {
-    startAdapter(root, adapter);
+    const wslPlan = adapter.runtime?.kind === "wsl2" ? wslAdapterCommandPlan(root, adapter, resolveServiceEnvironment(root, adapter.id), "start") : null;
+    if (wslPlan && adapter.integration?.productionReady === true) {
+      assertWslReadyForAdapterDistro(root, adapter.id, adapter.runtime?.distro);
+    }
+    startAdapter(root, adapter, wslPlan ? { processPlan: wslManagedProcessPlan(root, wslPlan) } : {});
     started.push(adapter.id);
   }
   generatePortal(root, getStatus(root).services);
@@ -73,10 +78,33 @@ export function startSingleAdapter(usbRoot: string, serviceId: string | undefine
   if (options.dryRun) return result;
   if (wslPlan) {
     assertWslReadyForAdapterDistro(root, serviceId, adapter.runtime?.distro);
-    throw new Error(`WSL2 start supervision for ${serviceId} is not implemented yet. Use --dry-run to inspect the command plan.`);
+    const metadata = startAdapter(root, adapter, {
+      forceManaged: true,
+      processPlan: wslManagedProcessPlan(root, wslPlan),
+    });
+    return { ...result, started: true, metadata };
   }
   const metadata = startAdapter(root, adapter, { forceManaged: true });
   return { ...result, started: true, metadata };
+}
+
+function wslManagedProcessPlan(root: string, wslPlan: ReturnType<typeof wslAdapterCommandPlan>) {
+  const invocation = wslExecutableInvocation(wslPlan.executablePath, wslPlan.args);
+  return {
+    runner: "wsl2",
+    executablePath: invocation.executablePath,
+    args: invocation.args,
+    command: [wslPlan.executablePath, ...wslPlan.args].join(" "),
+    workingDirectory: root,
+    metadata: {
+      wsl: {
+        executablePath: wslPlan.executablePath,
+        args: wslPlan.args,
+        workingDirectory: wslPlan.workingDirectory,
+        script: wslPlan.script,
+      },
+    },
+  };
 }
 
 export function getStatus(usbRoot: string) {

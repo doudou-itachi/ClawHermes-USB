@@ -5,14 +5,24 @@ import type { AdapterDescriptor, ServiceEnvironment } from "./types";
 import { resolveServiceEnvironment } from "./environment";
 import { resolveRelative, writeLog } from "./portable";
 
-export function startAdapter(root: string, adapter: AdapterDescriptor, options: { forceManaged?: boolean } = {}) {
+export type ManagedProcessPlan = {
+  runner?: string;
+  executablePath: string;
+  args: string[];
+  command: string;
+  workingDirectory: string;
+  env?: NodeJS.ProcessEnv;
+  metadata?: Record<string, unknown>;
+};
+
+export function startAdapter(root: string, adapter: AdapterDescriptor, options: { forceManaged?: boolean; processPlan?: ManagedProcessPlan } = {}) {
   const pidFile = resolveRelative(root, adapter.pidFile);
   const logFile = resolveRelative(root, adapter.logFile);
   const serviceEnv = resolveServiceEnvironment(root, adapter.id);
   mkdirSync(dirname(pidFile), { recursive: true });
   mkdirSync(dirname(logFile), { recursive: true });
   const metadata = shouldLaunchManagedProcess(root, adapter, options.forceManaged === true)
-    ? launchManagedAdapterProcess(root, adapter, serviceEnv)
+    ? launchManagedAdapterProcess(root, adapter, serviceEnv, options.processPlan)
     : {
       serviceId: adapter.id,
       displayName: adapter.displayName,
@@ -54,21 +64,30 @@ function environmentMetadata(serviceEnv: ServiceEnvironment) {
   };
 }
 
-function launchManagedAdapterProcess(root: string, adapter: AdapterDescriptor, serviceEnv: ServiceEnvironment) {
+function launchManagedAdapterProcess(root: string, adapter: AdapterDescriptor, serviceEnv: ServiceEnvironment, processPlan?: ManagedProcessPlan) {
   const command = adapter.commands.start;
   if (!command) throw new Error(`Adapter ${adapter.id} has no start command.`);
   const workingDirectory = resolveRelative(root, adapter.appDir);
   const logFile = resolveRelative(root, adapter.logFile);
   const logFd = openSync(logFile, "a");
   try {
-    const child = spawn(command, {
-      cwd: workingDirectory,
-      env: { ...process.env, ...serviceEnv.env },
-      detached: true,
-      shell: true,
-      stdio: ["ignore", logFd, logFd],
-      windowsHide: true,
-    });
+    const child = processPlan
+      ? spawn(processPlan.executablePath, processPlan.args, {
+        cwd: processPlan.workingDirectory,
+        env: { ...process.env, ...(processPlan.env ?? {}) },
+        detached: true,
+        shell: false,
+        stdio: ["ignore", logFd, logFd],
+        windowsHide: true,
+      })
+      : spawn(command, {
+        cwd: workingDirectory,
+        env: { ...process.env, ...serviceEnv.env },
+        detached: true,
+        shell: true,
+        stdio: ["ignore", logFd, logFd],
+        windowsHide: true,
+      });
     child.unref();
     return {
       serviceId: adapter.id,
@@ -76,11 +95,13 @@ function launchManagedAdapterProcess(root: string, adapter: AdapterDescriptor, s
       status: "running",
       processId: child.pid ?? 0,
       startedAt: new Date().toISOString(),
-      command,
-      workingDirectory,
+      command: processPlan?.command ?? command,
+      workingDirectory: processPlan?.workingDirectory ?? workingDirectory,
       logFile,
       environment: environmentMetadata(serviceEnv),
       placeholder: false,
+      ...(processPlan?.runner ? { runner: processPlan.runner } : {}),
+      ...(processPlan?.metadata ?? {}),
     };
   } finally {
     closeSync(logFd);

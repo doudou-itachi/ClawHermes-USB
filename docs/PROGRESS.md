@@ -1932,3 +1932,37 @@ Validation performed:
 Next steps:
 
 - Continue real WSL2 adapter execution work after host preparation flow and encoding guard are in place.
+
+### WSL2 Managed Start
+
+Status: `Done`
+
+Summary:
+
+- Added managed startup for WSL2 adapters.
+- `start-adapter hermes-agent --confirm-start --json` now launches the planned WSL command instead of stopping at an unimplemented supervision error.
+- Production-ready WSL2 adapters launched through normal `start` also use the WSL2 process plan.
+- PID metadata records `runner: wsl2` and the WSL executable, arguments, working directory, and generated shell script.
+- Existing `stop` removes PID metadata and terminates the Windows-side managed process tree.
+- Added fake WSL tests using a `.cmd` shim, so verification does not require real WSL2 on the development machine.
+
+Changed areas:
+
+- `core/node/src/wsl.ts`
+- `core/node/src/lifecycle.ts`
+- `core/node/src/core.ts`
+- `core/node/dist/`
+- `tests/test_windows_core.py`
+- `docs/ADAPTER_CONTRACT.md`
+- `docs/PROGRESS.md`
+- `docs/superpowers/plans/2026-05-01-wsl2-managed-start.md`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_start_adapter_wsl2_confirm_launches_managed_wsl_process_and_stop_kills_it tests.test_windows_core.WindowsCoreTests.test_start_uses_wsl2_plan_for_production_ready_wsl_adapter -v`
+
+Next steps:
+
+- Add graceful WSL2 in-distro stop hooks before Windows-side process-tree termination.
+- Promote confirmed WSL2 setup execution metadata so `setup-adapter hermes-agent --confirm-setup` records enough evidence for later production readiness.

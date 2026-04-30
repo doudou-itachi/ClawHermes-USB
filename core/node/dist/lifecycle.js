@@ -15,7 +15,7 @@ function startAdapter(root, adapter, options = {}) {
     (0, node_fs_1.mkdirSync)((0, node_path_1.dirname)(pidFile), { recursive: true });
     (0, node_fs_1.mkdirSync)((0, node_path_1.dirname)(logFile), { recursive: true });
     const metadata = shouldLaunchManagedProcess(root, adapter, options.forceManaged === true)
-        ? launchManagedAdapterProcess(root, adapter, serviceEnv)
+        ? launchManagedAdapterProcess(root, adapter, serviceEnv, options.processPlan)
         : {
             serviceId: adapter.id,
             displayName: adapter.displayName,
@@ -55,7 +55,7 @@ function environmentMetadata(serviceEnv) {
         variables: Object.keys(serviceEnv.env).sort(),
     };
 }
-function launchManagedAdapterProcess(root, adapter, serviceEnv) {
+function launchManagedAdapterProcess(root, adapter, serviceEnv, processPlan) {
     const command = adapter.commands.start;
     if (!command)
         throw new Error(`Adapter ${adapter.id} has no start command.`);
@@ -63,14 +63,23 @@ function launchManagedAdapterProcess(root, adapter, serviceEnv) {
     const logFile = (0, portable_1.resolveRelative)(root, adapter.logFile);
     const logFd = (0, node_fs_1.openSync)(logFile, "a");
     try {
-        const child = (0, node_child_process_1.spawn)(command, {
-            cwd: workingDirectory,
-            env: { ...process.env, ...serviceEnv.env },
-            detached: true,
-            shell: true,
-            stdio: ["ignore", logFd, logFd],
-            windowsHide: true,
-        });
+        const child = processPlan
+            ? (0, node_child_process_1.spawn)(processPlan.executablePath, processPlan.args, {
+                cwd: processPlan.workingDirectory,
+                env: { ...process.env, ...(processPlan.env ?? {}) },
+                detached: true,
+                shell: false,
+                stdio: ["ignore", logFd, logFd],
+                windowsHide: true,
+            })
+            : (0, node_child_process_1.spawn)(command, {
+                cwd: workingDirectory,
+                env: { ...process.env, ...serviceEnv.env },
+                detached: true,
+                shell: true,
+                stdio: ["ignore", logFd, logFd],
+                windowsHide: true,
+            });
         child.unref();
         return {
             serviceId: adapter.id,
@@ -78,11 +87,13 @@ function launchManagedAdapterProcess(root, adapter, serviceEnv) {
             status: "running",
             processId: child.pid ?? 0,
             startedAt: new Date().toISOString(),
-            command,
-            workingDirectory,
+            command: processPlan?.command ?? command,
+            workingDirectory: processPlan?.workingDirectory ?? workingDirectory,
             logFile,
             environment: environmentMetadata(serviceEnv),
             placeholder: false,
+            ...(processPlan?.runner ? { runner: processPlan.runner } : {}),
+            ...(processPlan?.metadata ?? {}),
         };
     }
     finally {

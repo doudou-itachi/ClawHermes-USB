@@ -112,6 +112,16 @@ export function prepareWsl(usbRoot: string, options: { distro?: string; dryRun: 
   return { ...result, executed: true };
 }
 
+export function wslExecutableInvocation(executablePath: string, args: string[]): { executablePath: string; args: string[] } {
+  if (/\.(cmd|bat)$/i.test(executablePath)) {
+    return {
+      executablePath: "cmd.exe",
+      args: ["/d", "/s", "/c", windowsCommandLine(executablePath, args)],
+    };
+  }
+  return { executablePath, args };
+}
+
 function preparationCommands(diagnostics: WslDiagnostic, distro: string): WslPreparationCommand[] {
   const executablePath = diagnostics.executablePath ?? "wsl.exe";
   const desired = diagnostics.distros.find((item) => item.name.toLowerCase() === distro.toLowerCase()) ?? null;
@@ -156,6 +166,14 @@ function quoteCommandArg(value: string): string {
   return /\s/.test(value) ? `"${value.replaceAll('"', '\\"')}"` : value;
 }
 
+function windowsCommandLine(executablePath: string, args: string[]): string {
+  return [executablePath, ...args.map(quoteWindowsCommandArg)].join(" ");
+}
+
+function quoteWindowsCommandArg(value: string): string {
+  return /[\s&|<>^]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value;
+}
+
 function normalizeDesiredDistro(value: string | undefined): string | null {
   const trimmed = value?.trim();
   return trimmed ? trimmed : null;
@@ -173,10 +191,11 @@ function resolveWslExecutable(): string | null {
 }
 
 function runWslCommand(executablePath: string, args: string[]): { ok: boolean; output: string } {
+  const invocation = wslExecutableInvocation(executablePath, args);
   try {
     return {
       ok: true,
-      output: decodeCommandOutput(execFileSync(executablePath, args, { stdio: ["ignore", "pipe", "pipe"], timeout: 5000, windowsHide: true })).trim(),
+      output: decodeCommandOutput(execFileSync(invocation.executablePath, invocation.args, { stdio: ["ignore", "pipe", "pipe"], timeout: 5000, windowsHide: true })).trim(),
     };
   } catch (error) {
     const failure = error as { stdout?: Buffer | string; stderr?: Buffer | string; message?: string };
