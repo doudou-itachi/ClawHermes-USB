@@ -182,6 +182,22 @@ async function main() {
             }
             return;
         }
+        case "probe-sources": {
+            const result = (0, core_1.probeAppSources)(root, positional[0]);
+            if (json) {
+                printJson(result);
+            }
+            else {
+                console.log("ClawHermes-USB upstream source probe");
+                console.log(`Root: ${result.root}`);
+                console.log("This command is read-only and does not modify apps/.");
+                for (const source of result.sources) {
+                    console.log(`- ${source.id}: ${source.reachable ? "reachable" : "unreachable"}, ref ${source.refFound ? "found" : "missing"}`);
+                    console.log(`  ${source.message}`);
+                }
+            }
+            return;
+        }
         case "checkout-source": {
             const result = (0, core_1.checkoutAppSource)(root, positional[0], { dryRun, confirm: confirmCheckout });
             if (json) {

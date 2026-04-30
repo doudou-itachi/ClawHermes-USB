@@ -1423,3 +1423,43 @@ Validation performed:
 Next steps:
 
 - Start exercising the guarded checkout/setup/verify/mark workflow against real upstream repositories in a disposable local clone before enabling any default adapter as production-ready.
+
+### Source Probe Command
+
+Status: `Done`
+
+Summary:
+
+- Added read-only `probe-sources [service-id]` for checking upstream repository reachability and checkout ref availability.
+- The command runs `git ls-remote` and reports `wouldModify: false`.
+- Source probe output includes reachability, ref presence, exit code, and concise operator messages.
+- Added tests with a local Git repository fixture for reachable refs, missing refs, and unknown adapter errors without depending on external network access.
+- Documented the command in the English and Chinese README files and adapter contract.
+
+Changed areas:
+
+- `core/node/src/adapter-guidance.ts`
+- `core/node/src/clawhermes.ts`
+- `core/node/src/core.ts`
+- `core/windows/clawhermes.ps1`
+- `core/node/dist/`
+- `tests/test_windows_core.py`
+- `README.md`
+- `README.zh-CN.md`
+- `docs/ADAPTER_CONTRACT.md`
+- `docs/ADAPTER_CONTRACT.zh-CN.md`
+- `docs/PROGRESS.md`
+- `docs/superpowers/plans/2026-05-01-add-probe-sources-command.md`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_probe_sources_json_reports_reachable_upstream_ref_without_mutation tests.test_windows_core.WindowsCoreTests.test_probe_sources_json_reports_missing_ref tests.test_windows_core.WindowsCoreTests.test_probe_sources_unknown_service_fails_with_actionable_message -v`
+- `npm test`
+- `git diff --check`
+- UTF-8 smoke check
+- Chinese README and adapter contract mojibake scans
+
+Next steps:
+
+- Run `probe-sources --json` against the real default upstream repositories and record the observed repository/ref status before any checkout attempt.

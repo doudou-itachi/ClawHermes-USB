@@ -51,6 +51,7 @@ node core/node/dist/clawhermes.js adapters --json
 node core/node/dist/clawhermes.js adapters hermes-web-ui --json
 node core/node/dist/clawhermes.js sources --json
 node core/node/dist/clawhermes.js sources hermes-web-ui --json
+node core/node/dist/clawhermes.js probe-sources hermes-web-ui --json
 node core/node/dist/clawhermes.js checkout-source hermes-web-ui --dry-run --json
 node core/node/dist/clawhermes.js setup-adapter hermes-web-ui --dry-run --json
 node core/node/dist/clawhermes.js verify-adapter hermes-web-ui --json

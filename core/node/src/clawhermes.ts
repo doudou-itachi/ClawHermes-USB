@@ -1,4 +1,4 @@
-import { adapterSetupPlan, appSourcePlan, checkoutAppSource, createBackup, getRoot, getStatus, initializeEnvFiles, installRuntimeFromArchive, markAdapterReady, portableEnv, readLogTail, runAdapterSetup, runtimePreparationPlan, serviceEnvironmentDiagnostic, setupDiagnostics, startSkeleton, stopSkeleton, verifyAdapter, writeStatusSnapshot } from "./core";
+import { adapterSetupPlan, appSourcePlan, checkoutAppSource, createBackup, getRoot, getStatus, initializeEnvFiles, installRuntimeFromArchive, markAdapterReady, portableEnv, probeAppSources, readLogTail, runAdapterSetup, runtimePreparationPlan, serviceEnvironmentDiagnostic, setupDiagnostics, startSkeleton, stopSkeleton, verifyAdapter, writeStatusSnapshot } from "./core";
 import type { BackupProfile } from "./backup";
 
 type ParsedArgs = {
@@ -171,6 +171,21 @@ async function main(): Promise<void> {
         for (const source of result.sources) {
           console.log(`- ${source.id}: ${source.appDirReady ? "ready" : "not ready"} at ${source.appDir}`);
           if (source.checkoutCommand) console.log(`  command: ${source.checkoutCommand}`);
+        }
+      }
+      return;
+    }
+    case "probe-sources": {
+      const result = probeAppSources(root, positional[0]);
+      if (json) {
+        printJson(result);
+      } else {
+        console.log("ClawHermes-USB upstream source probe");
+        console.log(`Root: ${result.root}`);
+        console.log("This command is read-only and does not modify apps/.");
+        for (const source of result.sources) {
+          console.log(`- ${source.id}: ${source.reachable ? "reachable" : "unreachable"}, ref ${source.refFound ? "found" : "missing"}`);
+          console.log(`  ${source.message}`);
         }
       }
       return;

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.writeStatusSnapshot = exports.runtimePreparationPlan = exports.runtimeDiagnostics = exports.loadRuntimeManifest = exports.installRuntimeFromArchive = exports.stopPortalServer = exports.startPortalServer = exports.getPortalStatus = exports.generatePortal = exports.PORTAL_URL = exports.writeSetupSnapshot = exports.setupDiagnostics = exports.readLogTail = exports.portDiagnostics = exports.pathDiagnostics = exports.serviceEnvironmentDiagnostic = exports.resolveServiceEnvironment = exports.initializeEnvFiles = exports.envFileDiagnostics = exports.createBackup = exports.verifyAdapter = exports.runAdapterSetup = exports.markAdapterReady = exports.checkoutAppSource = exports.appSourcePlan = exports.adapterSetupPlan = exports.validateAdapter = exports.serviceOrder = exports.loadAdapters = exports.integrationReadiness = exports.portableEnv = exports.getRoot = exports.dataWritable = void 0;
+exports.writeStatusSnapshot = exports.runtimePreparationPlan = exports.runtimeDiagnostics = exports.loadRuntimeManifest = exports.installRuntimeFromArchive = exports.stopPortalServer = exports.startPortalServer = exports.getPortalStatus = exports.generatePortal = exports.PORTAL_URL = exports.writeSetupSnapshot = exports.setupDiagnostics = exports.readLogTail = exports.portDiagnostics = exports.pathDiagnostics = exports.serviceEnvironmentDiagnostic = exports.resolveServiceEnvironment = exports.initializeEnvFiles = exports.envFileDiagnostics = exports.createBackup = exports.verifyAdapter = exports.runAdapterSetup = exports.markAdapterReady = exports.probeAppSources = exports.checkoutAppSource = exports.appSourcePlan = exports.adapterSetupPlan = exports.validateAdapter = exports.serviceOrder = exports.loadAdapters = exports.integrationReadiness = exports.portableEnv = exports.getRoot = exports.dataWritable = void 0;
 exports.startSkeleton = startSkeleton;
 exports.getStatus = getStatus;
 exports.stopSkeleton = stopSkeleton;
@@ -24,6 +24,7 @@ var adapter_guidance_1 = require("./adapter-guidance");
 Object.defineProperty(exports, "adapterSetupPlan", { enumerable: true, get: function () { return adapter_guidance_1.adapterSetupPlan; } });
 Object.defineProperty(exports, "appSourcePlan", { enumerable: true, get: function () { return adapter_guidance_1.appSourcePlan; } });
 Object.defineProperty(exports, "checkoutAppSource", { enumerable: true, get: function () { return adapter_guidance_1.checkoutAppSource; } });
+Object.defineProperty(exports, "probeAppSources", { enumerable: true, get: function () { return adapter_guidance_1.probeAppSources; } });
 var adapter_metadata_1 = require("./adapter-metadata");
 Object.defineProperty(exports, "markAdapterReady", { enumerable: true, get: function () { return adapter_metadata_1.markAdapterReady; } });
 var adapter_setup_1 = require("./adapter-setup");

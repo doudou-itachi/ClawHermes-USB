@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.adapterSetupPlan = adapterSetupPlan;
 exports.appSourcePlan = appSourcePlan;
+exports.probeAppSources = probeAppSources;
 exports.checkoutAppSource = checkoutAppSource;
 const node_child_process_1 = require("node:child_process");
 const node_fs_1 = require("node:fs");
@@ -34,6 +35,19 @@ function appSourcePlan(usbRoot, serviceId) {
         generatedAt: new Date().toISOString(),
         wouldModify: false,
         sources: selected.map((adapter) => sourcePlanItem(root, adapter)),
+    };
+}
+function probeAppSources(usbRoot, serviceId) {
+    const root = (0, portable_1.getRoot)(usbRoot);
+    const adapters = (0, adapters_1.loadAdapters)(root);
+    const selected = serviceId ? adapters.filter((adapter) => adapter.id === serviceId) : adapters;
+    if (serviceId && selected.length === 0)
+        throw new Error(`Unknown adapter: ${serviceId}`);
+    return {
+        root,
+        generatedAt: new Date().toISOString(),
+        wouldModify: false,
+        sources: selected.map((adapter) => probeSource(root, adapter)),
     };
 }
 function checkoutAppSource(usbRoot, serviceId, options) {
@@ -83,6 +97,74 @@ function checkoutAppSource(usbRoot, serviceId, options) {
         throw new Error(`git clone failed: ${(completed.stderr || completed.stdout || "unknown error").trim()}`);
     }
     return { ...result, cloned: true };
+}
+function probeSource(root, adapter) {
+    const upstream = adapter.upstream ?? null;
+    if (!upstream?.repositoryUrl) {
+        return {
+            id: adapter.id,
+            displayName: adapter.displayName,
+            upstream,
+            repositoryUrl: null,
+            checkoutRef: null,
+            reachable: false,
+            refFound: false,
+            wouldModify: false,
+            exitCode: null,
+            message: "Adapter does not declare an upstream repositoryUrl.",
+        };
+    }
+    const baseProbe = (0, node_child_process_1.spawnSync)("git", ["ls-remote", upstream.repositoryUrl], {
+        cwd: root,
+        env: { ...process.env, ...(0, portable_1.portableEnv)(root) },
+        encoding: "utf8",
+        timeout: 30000,
+        windowsHide: true,
+    });
+    const reachable = !baseProbe.error && baseProbe.status === 0;
+    if (!reachable) {
+        return {
+            id: adapter.id,
+            displayName: adapter.displayName,
+            upstream,
+            repositoryUrl: upstream.repositoryUrl,
+            checkoutRef: upstream.checkoutRef ?? null,
+            reachable: false,
+            refFound: false,
+            wouldModify: false,
+            exitCode: baseProbe.status,
+            message: `Repository is not reachable: ${probeError(baseProbe)}`,
+        };
+    }
+    const ref = upstream.checkoutRef;
+    const refFound = ref ? refExists(root, upstream.repositoryUrl, ref) : true;
+    return {
+        id: adapter.id,
+        displayName: adapter.displayName,
+        upstream,
+        repositoryUrl: upstream.repositoryUrl,
+        checkoutRef: ref ?? null,
+        reachable: true,
+        refFound,
+        wouldModify: false,
+        exitCode: baseProbe.status,
+        message: ref ? (refFound ? `Repository is reachable and ref ${ref} exists.` : `Repository is reachable but ref ${ref} was not found.`) : "Repository is reachable; no checkoutRef is declared.",
+    };
+}
+function refExists(root, repositoryUrl, ref) {
+    const refProbe = (0, node_child_process_1.spawnSync)("git", ["ls-remote", repositoryUrl, ref], {
+        cwd: root,
+        env: { ...process.env, ...(0, portable_1.portableEnv)(root) },
+        encoding: "utf8",
+        timeout: 30000,
+        windowsHide: true,
+    });
+    return !refProbe.error && refProbe.status === 0 && refProbe.stdout.trim().length > 0;
+}
+function probeError(probe) {
+    if (probe.error)
+        return probe.error.message;
+    return (typeof probe.stderr === "string" && probe.stderr.trim()) || (typeof probe.stdout === "string" && probe.stdout.trim()) || `exit code ${probe.status ?? "unknown"}`;
 }
 function sourcePlanItem(root, adapter) {
     const appDirPath = (0, portable_1.resolveRelative)(root, adapter.appDir);

@@ -791,6 +791,52 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("Unknown adapter: missing-service", result.stderr)
 
+    def test_probe_sources_json_reports_reachable_upstream_ref_without_mutation(self):
+        temp_dir, temp_root = make_temp_usb_root()
+        try:
+            source_repo = create_local_source_repo(temp_root)
+            rewrite_adapter_upstream(temp_root, "hermes-web-ui", source_repo)
+
+            result = run_dispatcher_for_root(temp_root, "probe-sources", "hermes-web-ui", "-Json")
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertFalse(payload["wouldModify"])
+            self.assertEqual([source["id"] for source in payload["sources"]], ["hermes-web-ui"])
+            source = payload["sources"][0]
+            self.assertTrue(source["reachable"])
+            self.assertTrue(source["refFound"])
+            self.assertEqual(source["checkoutRef"], "main")
+            self.assertFalse((temp_root / "apps" / "hermes-web-ui" / ".git").exists())
+        finally:
+            temp_dir.cleanup()
+
+    def test_probe_sources_json_reports_missing_ref(self):
+        temp_dir, temp_root = make_temp_usb_root()
+        try:
+            source_repo = create_local_source_repo(temp_root)
+            rewrite_adapter_upstream(temp_root, "hermes-web-ui", source_repo)
+            adapter_path = temp_root / "adapters" / "hermes-web-ui" / "adapter.json"
+            adapter = json.loads(adapter_path.read_text(encoding="utf-8"))
+            adapter["upstream"]["checkoutRef"] = "missing-branch"
+            adapter_path.write_text(json.dumps(adapter, indent=2), encoding="utf-8")
+
+            result = run_dispatcher_for_root(temp_root, "probe-sources", "hermes-web-ui", "-Json")
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            source = json.loads(result.stdout)["sources"][0]
+            self.assertTrue(source["reachable"])
+            self.assertFalse(source["refFound"])
+            self.assertIn("not found", source["message"])
+        finally:
+            temp_dir.cleanup()
+
+    def test_probe_sources_unknown_service_fails_with_actionable_message(self):
+        result = run_dispatcher("probe-sources", "missing-service", "-Json")
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Unknown adapter: missing-service", result.stderr)
+
     def test_checkout_source_requires_explicit_confirmation(self):
         temp_dir, temp_root = make_temp_usb_root()
         try:

@@ -413,6 +413,15 @@ node core/node/dist/clawhermes.js sources hermes-web-ui --json
 
 不要把建议的 clone 命令当成自动安装器。网络和文件系统写入应继续放在明确的用户或操作者动作之后。
 
+checkout 前，使用只读来源探测命令验证仓库是否可访问，以及 checkout ref 是否存在：
+
+```powershell
+node core/node/dist/clawhermes.js probe-sources --json
+node core/node/dist/clawhermes.js probe-sources hermes-web-ui --json
+```
+
+该命令运行 `git ls-remote`，不会 clone，并报告 `wouldModify: false`。
+
 当操作者准备 checkout 某一个 adapter 来源时，使用受保护的 checkout 命令：
 
 ```powershell
@@ -496,10 +505,11 @@ node core/node/dist/clawhermes.js mark-adapter-ready hermes-web-ui --confirm-rea
 6. 在 `data/<new-service>/` 下添加数据目录。
 7. 运行 `node core/node/dist/clawhermes.js adapters <new-service> --json`。
 8. 运行 `node core/node/dist/clawhermes.js sources <new-service> --json`。
-9. 在任何真实 checkout 前，先运行 `node core/node/dist/clawhermes.js checkout-source <new-service> --dry-run --json`。
-10. 在任何真实 setup 前，先运行 `node core/node/dist/clawhermes.js setup-adapter <new-service> --dry-run --json`。
-11. 运行 `node core/node/dist/clawhermes.js verify-adapter <new-service> --json`。
-12. 只有验证通过后，才运行 `node core/node/dist/clawhermes.js mark-adapter-ready <new-service> --confirm-ready --summary "<evidence>" --json`。
-13. 如有需要，更新 portal 元数据。
+9. 运行 `node core/node/dist/clawhermes.js probe-sources <new-service> --json`。
+10. 在任何真实 checkout 前，先运行 `node core/node/dist/clawhermes.js checkout-source <new-service> --dry-run --json`。
+11. 在任何真实 setup 前，先运行 `node core/node/dist/clawhermes.js setup-adapter <new-service> --dry-run --json`。
+12. 运行 `node core/node/dist/clawhermes.js verify-adapter <new-service> --json`。
+13. 只有验证通过后，才运行 `node core/node/dist/clawhermes.js mark-adapter-ready <new-service> --confirm-ready --summary "<evidence>" --json`。
+14. 如有需要，更新 portal 元数据。
 
 除非服务需要新的通用能力，否则不应修改 core 代码。

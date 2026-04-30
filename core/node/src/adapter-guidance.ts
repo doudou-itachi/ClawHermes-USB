@@ -33,6 +33,19 @@ export function appSourcePlan(usbRoot: string, serviceId?: string) {
   };
 }
 
+export function probeAppSources(usbRoot: string, serviceId?: string) {
+  const root = getRoot(usbRoot);
+  const adapters = loadAdapters(root);
+  const selected = serviceId ? adapters.filter((adapter) => adapter.id === serviceId) : adapters;
+  if (serviceId && selected.length === 0) throw new Error(`Unknown adapter: ${serviceId}`);
+  return {
+    root,
+    generatedAt: new Date().toISOString(),
+    wouldModify: false,
+    sources: selected.map((adapter) => probeSource(root, adapter)),
+  };
+}
+
 export function checkoutAppSource(usbRoot: string, serviceId: string | undefined, options: { dryRun: boolean; confirm: boolean }) {
   const root = getRoot(usbRoot);
   if (!serviceId) throw new Error("Service id is required. Example: checkout-source hermes-web-ui --confirm-checkout");
@@ -78,6 +91,78 @@ export function checkoutAppSource(usbRoot: string, serviceId: string | undefined
     throw new Error(`git clone failed: ${(completed.stderr || completed.stdout || "unknown error").trim()}`);
   }
   return { ...result, cloned: true };
+}
+
+function probeSource(root: string, adapter: AdapterDescriptor) {
+  const upstream = adapter.upstream ?? null;
+  if (!upstream?.repositoryUrl) {
+    return {
+      id: adapter.id,
+      displayName: adapter.displayName,
+      upstream,
+      repositoryUrl: null,
+      checkoutRef: null,
+      reachable: false,
+      refFound: false,
+      wouldModify: false,
+      exitCode: null,
+      message: "Adapter does not declare an upstream repositoryUrl.",
+    };
+  }
+
+  const baseProbe = spawnSync("git", ["ls-remote", upstream.repositoryUrl], {
+    cwd: root,
+    env: { ...process.env, ...portableEnv(root) },
+    encoding: "utf8",
+    timeout: 30000,
+    windowsHide: true,
+  });
+  const reachable = !baseProbe.error && baseProbe.status === 0;
+  if (!reachable) {
+    return {
+      id: adapter.id,
+      displayName: adapter.displayName,
+      upstream,
+      repositoryUrl: upstream.repositoryUrl,
+      checkoutRef: upstream.checkoutRef ?? null,
+      reachable: false,
+      refFound: false,
+      wouldModify: false,
+      exitCode: baseProbe.status,
+      message: `Repository is not reachable: ${probeError(baseProbe)}`,
+    };
+  }
+
+  const ref = upstream.checkoutRef;
+  const refFound = ref ? refExists(root, upstream.repositoryUrl, ref) : true;
+  return {
+    id: adapter.id,
+    displayName: adapter.displayName,
+    upstream,
+    repositoryUrl: upstream.repositoryUrl,
+    checkoutRef: ref ?? null,
+    reachable: true,
+    refFound,
+    wouldModify: false,
+    exitCode: baseProbe.status,
+    message: ref ? (refFound ? `Repository is reachable and ref ${ref} exists.` : `Repository is reachable but ref ${ref} was not found.`) : "Repository is reachable; no checkoutRef is declared.",
+  };
+}
+
+function refExists(root: string, repositoryUrl: string, ref: string): boolean {
+  const refProbe = spawnSync("git", ["ls-remote", repositoryUrl, ref], {
+    cwd: root,
+    env: { ...process.env, ...portableEnv(root) },
+    encoding: "utf8",
+    timeout: 30000,
+    windowsHide: true,
+  });
+  return !refProbe.error && refProbe.status === 0 && refProbe.stdout.trim().length > 0;
+}
+
+function probeError(probe: ReturnType<typeof spawnSync>): string {
+  if (probe.error) return probe.error.message;
+  return (typeof probe.stderr === "string" && probe.stderr.trim()) || (typeof probe.stdout === "string" && probe.stdout.trim()) || `exit code ${probe.status ?? "unknown"}`;
 }
 
 function sourcePlanItem(root: string, adapter: AdapterDescriptor) {

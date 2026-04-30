@@ -9,7 +9,7 @@ import { adapterHealth, processExists, writeStatusSnapshot } from "./status";
 
 export { dataWritable, getRoot, portableEnv } from "./portable";
 export { integrationReadiness, loadAdapters, serviceOrder, validateAdapter } from "./adapters";
-export { adapterSetupPlan, appSourcePlan, checkoutAppSource } from "./adapter-guidance";
+export { adapterSetupPlan, appSourcePlan, checkoutAppSource, probeAppSources } from "./adapter-guidance";
 export { markAdapterReady } from "./adapter-metadata";
 export { runAdapterSetup } from "./adapter-setup";
 export { verifyAdapter } from "./adapter-verification";

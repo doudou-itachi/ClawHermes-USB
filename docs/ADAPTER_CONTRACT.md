@@ -413,6 +413,15 @@ The command is read-only. It reports:
 
 Do not treat the suggested clone command as an automatic installer. Network and filesystem mutations should stay behind an explicit user or operator action.
 
+Before checkout, use the read-only source probe command to verify repository reachability and checkout ref availability:
+
+```powershell
+node core/node/dist/clawhermes.js probe-sources --json
+node core/node/dist/clawhermes.js probe-sources hermes-web-ui --json
+```
+
+The command runs `git ls-remote`, does not clone, and reports `wouldModify: false`.
+
 When the operator is ready to checkout one adapter source, use the guarded checkout command:
 
 ```powershell
@@ -496,10 +505,11 @@ To add a new service:
 6. Add data directory under `data/<new-service>/`.
 7. Run `node core/node/dist/clawhermes.js adapters <new-service> --json`.
 8. Run `node core/node/dist/clawhermes.js sources <new-service> --json`.
-9. Run `node core/node/dist/clawhermes.js checkout-source <new-service> --dry-run --json` before any real checkout.
-10. Run `node core/node/dist/clawhermes.js setup-adapter <new-service> --dry-run --json` before any real setup.
-11. Run `node core/node/dist/clawhermes.js verify-adapter <new-service> --json`.
-12. Run `node core/node/dist/clawhermes.js mark-adapter-ready <new-service> --confirm-ready --summary "<evidence>" --json` only after verification passes.
-13. Update portal metadata if needed.
+9. Run `node core/node/dist/clawhermes.js probe-sources <new-service> --json`.
+10. Run `node core/node/dist/clawhermes.js checkout-source <new-service> --dry-run --json` before any real checkout.
+11. Run `node core/node/dist/clawhermes.js setup-adapter <new-service> --dry-run --json` before any real setup.
+12. Run `node core/node/dist/clawhermes.js verify-adapter <new-service> --json`.
+13. Run `node core/node/dist/clawhermes.js mark-adapter-ready <new-service> --confirm-ready --summary "<evidence>" --json` only after verification passes.
+14. Update portal metadata if needed.
 
 No core code should be changed unless the service needs a new generic capability.
