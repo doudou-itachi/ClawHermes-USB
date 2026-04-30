@@ -782,28 +782,75 @@ async function startSkeleton(usbRoot) {
         const serviceEnv = resolveServiceEnvironment(root, adapter.id);
         (0, node_fs_1.mkdirSync)((0, node_path_1.dirname)(pidFile), { recursive: true });
         (0, node_fs_1.mkdirSync)((0, node_path_1.dirname)(logFile), { recursive: true });
-        const metadata = {
-            serviceId: adapter.id,
-            displayName: adapter.displayName,
-            status: "placeholder-started",
-            startedAt: new Date().toISOString(),
-            command: adapter.commands.start ?? null,
-            workingDirectory: resolveRelative(root, adapter.appDir),
-            logFile,
-            environment: {
-                files: serviceEnv.files,
-                variables: Object.keys(serviceEnv.env).sort(),
-            },
-            placeholder: true,
-        };
+        const metadata = shouldLaunchManagedProcess(adapter)
+            ? launchManagedAdapterProcess(root, adapter, serviceEnv)
+            : {
+                serviceId: adapter.id,
+                displayName: adapter.displayName,
+                status: "placeholder-started",
+                startedAt: new Date().toISOString(),
+                command: adapter.commands.start ?? null,
+                workingDirectory: resolveRelative(root, adapter.appDir),
+                logFile,
+                environment: environmentMetadata(serviceEnv),
+                placeholder: true,
+            };
         (0, node_fs_1.writeFileSync)(pidFile, JSON.stringify(metadata, null, 2), "utf8");
-        (0, node_fs_1.appendFileSync)(logFile, `${new Date().toISOString()} [${adapter.id}] [INFO] Placeholder service started.\n`);
-        writeLog(root, adapter.id, "INFO", "Started placeholder service.");
+        if (metadata.placeholder) {
+            (0, node_fs_1.appendFileSync)(logFile, `${new Date().toISOString()} [${adapter.id}] [INFO] Placeholder service started.\n`);
+            writeLog(root, adapter.id, "INFO", "Started placeholder service.");
+        }
+        else if ("processId" in metadata) {
+            writeLog(root, adapter.id, "INFO", `Started managed service process ${metadata.processId}.`);
+        }
         started.push(adapter.id);
     }
     generatePortal(root);
     const portal = await startPortalServer(root);
     return { root, started, portal, setupMessages: setup.messages };
+}
+function shouldLaunchManagedProcess(adapter) {
+    return adapter.integration?.productionReady === true && Boolean(adapter.commands.start);
+}
+function environmentMetadata(serviceEnv) {
+    return {
+        files: serviceEnv.files,
+        variables: Object.keys(serviceEnv.env).sort(),
+    };
+}
+function launchManagedAdapterProcess(root, adapter, serviceEnv) {
+    const command = adapter.commands.start;
+    if (!command)
+        throw new Error(`Adapter ${adapter.id} has no start command.`);
+    const workingDirectory = resolveRelative(root, adapter.appDir);
+    const logFile = resolveRelative(root, adapter.logFile);
+    const logFd = (0, node_fs_1.openSync)(logFile, "a");
+    try {
+        const child = (0, node_child_process_1.spawn)(command, {
+            cwd: workingDirectory,
+            env: { ...process.env, ...serviceEnv.env },
+            detached: true,
+            shell: true,
+            stdio: ["ignore", logFd, logFd],
+            windowsHide: true,
+        });
+        child.unref();
+        return {
+            serviceId: adapter.id,
+            displayName: adapter.displayName,
+            status: "running",
+            processId: child.pid ?? 0,
+            startedAt: new Date().toISOString(),
+            command,
+            workingDirectory,
+            logFile,
+            environment: environmentMetadata(serviceEnv),
+            placeholder: false,
+        };
+    }
+    finally {
+        (0, node_fs_1.closeSync)(logFd);
+    }
 }
 function getStatus(usbRoot) {
     const root = getRoot(usbRoot);
@@ -834,8 +881,17 @@ function stopSkeleton(usbRoot) {
     for (const adapter of serviceOrder(root, "stop")) {
         const pidFile = resolveRelative(root, adapter.pidFile);
         if ((0, node_fs_1.existsSync)(pidFile)) {
+            const metadata = JSON.parse((0, node_fs_1.readFileSync)(pidFile, "utf8"));
+            if (metadata.placeholder === false && metadata.processId) {
+                try {
+                    killProcessTree(metadata.processId);
+                }
+                catch {
+                    // Already gone.
+                }
+            }
             (0, node_fs_1.rmSync)(pidFile, { force: true });
-            writeLog(root, adapter.id, "INFO", "Stopped placeholder service.");
+            writeLog(root, adapter.id, "INFO", metadata.placeholder === false ? "Stopped managed service." : "Stopped placeholder service.");
             stopped.push(adapter.id);
         }
     }

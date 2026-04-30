@@ -472,3 +472,32 @@ Validation performed:
 Next steps:
 
 - Replace placeholder service metadata writes with real supervised process launch for services whose adapters have verified native Windows commands.
+
+### Managed Process Launch Scaffold
+
+Status: `Done`
+
+Summary:
+
+- Added a real managed process launch path for adapters whose `integration.productionReady` flag is true and that define a start command.
+- Existing OpenClaw, Hermes Agent, and Hermes Web UI adapters remain in placeholder mode because their native Windows integration is not production-ready.
+- Managed process metadata records pid, command, working directory, and redacted environment summary.
+- `stop` now kills managed adapter process trees before removing pid metadata.
+- Added a temporary fake adapter integration test that verifies env file values reach the child process without being written to pid metadata.
+
+Changed areas:
+
+- `core/node/src/core.ts`
+- `core/node/dist/`
+- `docs/PROGRESS.md`
+- `docs/superpowers/plans/2026-04-30-managed-process-launch.md`
+- `tests/test_windows_core.py`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_start_runs_production_ready_adapter_process_and_stop_kills_it tests.test_windows_core.WindowsCoreTests.test_start_status_stop_manage_placeholder_pid_metadata -v`
+
+Next steps:
+
+- Add process-aware status cleanup for managed adapter pid files so stale or exited child processes are reported accurately.

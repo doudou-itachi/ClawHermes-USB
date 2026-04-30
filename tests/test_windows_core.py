@@ -86,6 +86,134 @@ def make_temp_usb_root():
     return temp_dir, temp_root
 
 
+def make_temp_process_usb_root():
+    temp_dir = tempfile.TemporaryDirectory()
+    temp_root = Path(temp_dir.name)
+    for directory in [
+        temp_root / "adapters" / "fake-service",
+        temp_root / "apps" / "fake-service",
+        temp_root / "config" / "defaults",
+        temp_root / "config" / "env",
+        temp_root / "core" / "node" / "dist",
+        temp_root / "data" / "logs",
+        temp_root / "data" / "tmp",
+        temp_root / "portal",
+    ]:
+        directory.mkdir(parents=True, exist_ok=True)
+
+    adapter = {
+        "id": "fake-service",
+        "displayName": "Fake Service",
+        "description": "Temporary production-ready service used by tests.",
+        "type": "node-service",
+        "enabled": True,
+        "appDir": "apps/fake-service",
+        "runtime": {
+            "kind": "node",
+            "platform": "windows",
+            "requiredExecutable": "node.exe",
+        },
+        "commands": {
+            "setup": None,
+            "start": "node service.js",
+            "stop": None,
+        },
+        "env": {
+            "files": [
+                "config/env/fake.env",
+            ],
+            "variables": {
+                "FAKE_INLINE": "${USB_ROOT}/data/fake-service",
+            },
+        },
+        "dataDir": "data/fake-service",
+        "logFile": "data/logs/fake-service.log",
+        "pidFile": "data/tmp/pids/fake-service.pid",
+        "health": {
+            "type": "process",
+            "timeoutSeconds": 5,
+        },
+        "portal": {
+            "label": "Fake Service",
+            "url": None,
+            "group": "Tests",
+        },
+        "integration": {
+            "status": "verified",
+            "productionReady": True,
+            "verifiedAt": "2026-04-30",
+            "summary": "Test-only adapter.",
+            "sources": [],
+        },
+        "dependsOn": [],
+    }
+    (temp_root / "adapters" / "fake-service" / "adapter.json").write_text(
+        json.dumps(adapter, indent=2),
+        encoding="utf-8",
+    )
+    (temp_root / "config" / "defaults" / "services.json").write_text(
+        json.dumps({"startOrder": ["fake-service"], "stopOrder": ["fake-service"]}, indent=2),
+        encoding="utf-8",
+    )
+    (temp_root / "config" / "defaults" / "ports.json").write_text(
+        json.dumps({"portal": 17000}, indent=2),
+        encoding="utf-8",
+    )
+    (temp_root / "config" / "defaults" / "runtimes.json").write_text(
+        json.dumps({"platform": "windows", "runtimes": []}, indent=2),
+        encoding="utf-8",
+    )
+    (temp_root / "config" / "env" / "fake.env").write_text("FAKE_SECRET=from-env-file\n", encoding="utf-8")
+    (temp_root / "core" / "node" / "dist" / "portal-server.js").write_text(
+        (ROOT / "core" / "node" / "dist" / "portal-server.js").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    (temp_root / "apps" / "fake-service" / "service.js").write_text(
+        "\n".join(
+            [
+                "const fs = require('node:fs');",
+                "const path = require('node:path');",
+                "const root = process.env.USB_ROOT;",
+                "const out = path.join(root, 'data', 'tmp', 'fake-service-env.json');",
+                "fs.writeFileSync(out, JSON.stringify({",
+                "  FAKE_SECRET: process.env.FAKE_SECRET,",
+                "  FAKE_INLINE: process.env.FAKE_INLINE,",
+                "  USB_ROOT: process.env.USB_ROOT",
+                "}, null, 2));",
+                "setInterval(() => {}, 1000);",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    return temp_dir, temp_root
+
+
+def wait_for_file(path):
+    deadline = time.time() + 5
+    while time.time() < deadline:
+        if path.exists():
+            return
+        time.sleep(0.1)
+    raise AssertionError(f"Timed out waiting for {path}")
+
+
+def process_exists(pid):
+    result = subprocess.run(
+        [
+            "powershell",
+            "-NoProfile",
+            "-Command",
+            f"if (Get-Process -Id {pid} -ErrorAction SilentlyContinue) {{ 'true' }} else {{ 'false' }}",
+        ],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    return result.stdout.strip().lower() == "true"
+
+
 class WindowsCoreTests(unittest.TestCase):
     def setUp(self):
         pid_dir = ROOT / "data" / "tmp" / "pids"
@@ -504,6 +632,40 @@ class WindowsCoreTests(unittest.TestCase):
 
         for service_id in start_payload["started"]:
             self.assertFalse((pid_dir / f"{service_id}.pid").exists())
+
+    def test_start_runs_production_ready_adapter_process_and_stop_kills_it(self):
+        temp_dir, temp_root = make_temp_process_usb_root()
+        try:
+            start = run_dispatcher_for_root(temp_root, "start", "-Json")
+
+            self.assertEqual(start.returncode, 0, start.stderr)
+            start_payload = json.loads(start.stdout)
+            self.assertEqual(start_payload["started"], ["fake-service"])
+
+            pid_file = temp_root / "data" / "tmp" / "pids" / "fake-service.pid"
+            self.assertTrue(pid_file.exists())
+            metadata = json.loads(pid_file.read_text(encoding="utf-8"))
+            self.assertEqual(metadata["status"], "running")
+            self.assertFalse(metadata["placeholder"])
+            self.assertIsInstance(metadata["processId"], int)
+            self.assertIn("FAKE_SECRET", metadata["environment"]["variables"])
+            self.assertNotIn("from-env-file", json.dumps(metadata))
+
+            env_output = temp_root / "data" / "tmp" / "fake-service-env.json"
+            wait_for_file(env_output)
+            child_env = json.loads(env_output.read_text(encoding="utf-8"))
+            self.assertEqual(child_env["FAKE_SECRET"], "from-env-file")
+            self.assertEqual(Path(child_env["FAKE_INLINE"]).resolve(), (temp_root / "data" / "fake-service").resolve())
+            self.assertEqual(Path(child_env["USB_ROOT"]).resolve(), temp_root.resolve())
+
+            stop = run_dispatcher_for_root(temp_root, "stop", "-Json")
+            self.assertEqual(stop.returncode, 0, stop.stderr)
+            self.assertEqual(json.loads(stop.stdout)["stopped"], ["portal", "fake-service"])
+            self.assertFalse(pid_file.exists())
+            self.assertFalse(process_exists(metadata["processId"]))
+        finally:
+            run_dispatcher_for_root(temp_root, "stop", "-Json")
+            temp_dir.cleanup()
 
     def test_start_generates_portal_from_adapter_metadata(self):
         try:
