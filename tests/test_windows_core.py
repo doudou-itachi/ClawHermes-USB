@@ -101,6 +101,29 @@ def make_temp_usb_root():
     return temp_dir, temp_root
 
 
+def create_local_source_repo(parent, name="source-app"):
+    source_repo = parent / name
+    source_repo.mkdir(parents=True)
+    subprocess.run(["git", "init", "--initial-branch", "main"], cwd=source_repo, text=True, capture_output=True, check=True)
+    (source_repo / "README.md").write_text("# Local source app\n", encoding="utf-8")
+    subprocess.run(["git", "add", "README.md"], cwd=source_repo, text=True, capture_output=True, check=True)
+    subprocess.run(
+        ["git", "-c", "user.name=ClawHermes Tests", "-c", "user.email=tests@example.invalid", "commit", "-m", "seed"],
+        cwd=source_repo,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    return source_repo
+
+
+def rewrite_adapter_upstream(temp_root, service_id, repository_url):
+    adapter_path = temp_root / "adapters" / service_id / "adapter.json"
+    adapter = json.loads(adapter_path.read_text(encoding="utf-8"))
+    adapter["upstream"]["repositoryUrl"] = str(repository_url)
+    adapter_path.write_text(json.dumps(adapter, indent=2), encoding="utf-8")
+
+
 def make_temp_process_usb_root():
     temp_dir = tempfile.TemporaryDirectory()
     temp_root = Path(temp_dir.name)
@@ -739,6 +762,67 @@ class WindowsCoreTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("Unknown adapter: missing-service", result.stderr)
+
+    def test_checkout_source_requires_explicit_confirmation(self):
+        temp_dir, temp_root = make_temp_usb_root()
+        try:
+            source_repo = create_local_source_repo(temp_root)
+            rewrite_adapter_upstream(temp_root, "hermes-web-ui", source_repo)
+            target = temp_root / "apps" / "hermes-web-ui"
+            target.mkdir(parents=True)
+            (target / ".gitkeep").write_text("\n", encoding="utf-8")
+
+            result = run_dispatcher_for_root(temp_root, "checkout-source", "hermes-web-ui", "-Json")
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("--confirm-checkout", result.stderr)
+            self.assertTrue((target / ".gitkeep").exists())
+            self.assertFalse((target / ".git").exists())
+        finally:
+            temp_dir.cleanup()
+
+    def test_checkout_source_dry_run_does_not_modify_app_dir(self):
+        temp_dir, temp_root = make_temp_usb_root()
+        try:
+            source_repo = create_local_source_repo(temp_root)
+            rewrite_adapter_upstream(temp_root, "hermes-web-ui", source_repo)
+            target = temp_root / "apps" / "hermes-web-ui"
+            target.mkdir(parents=True)
+            (target / ".gitkeep").write_text("\n", encoding="utf-8")
+
+            result = run_dispatcher_for_root(temp_root, "checkout-source", "hermes-web-ui", "--dry-run", "-Json")
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertTrue(payload["dryRun"])
+            self.assertFalse(payload["wouldModify"])
+            self.assertFalse(payload["cloned"])
+            self.assertTrue((target / ".gitkeep").exists())
+            self.assertFalse((target / ".git").exists())
+        finally:
+            temp_dir.cleanup()
+
+    def test_checkout_source_confirm_clones_placeholder_app_dir(self):
+        temp_dir, temp_root = make_temp_usb_root()
+        try:
+            source_repo = create_local_source_repo(temp_root)
+            rewrite_adapter_upstream(temp_root, "hermes-web-ui", source_repo)
+            target = temp_root / "apps" / "hermes-web-ui"
+            target.mkdir(parents=True)
+            (target / ".gitkeep").write_text("\n", encoding="utf-8")
+
+            result = run_dispatcher_for_root(temp_root, "checkout-source", "hermes-web-ui", "--confirm-checkout", "-Json")
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertFalse(payload["dryRun"])
+            self.assertTrue(payload["wouldModify"])
+            self.assertTrue(payload["cloned"])
+            self.assertTrue((target / ".git").exists())
+            self.assertTrue((target / "README.md").exists())
+            self.assertFalse((target / ".gitkeep").exists())
+        finally:
+            temp_dir.cleanup()
 
     def test_runtimes_json_outputs_preparation_steps_from_manifest(self):
         result = run_dispatcher("runtimes", "-Json")

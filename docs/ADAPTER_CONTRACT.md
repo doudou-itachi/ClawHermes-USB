@@ -394,7 +394,7 @@ The command reports:
 
 Do not mark an adapter `productionReady: true` until the app directory, env files, setup command, start command, health check, and data path behavior have been verified.
 
-## 10. App Source Preparation Command
+## 10. App Source Preparation and Checkout Commands
 
 Use the source plan command when preparing upstream application checkouts:
 
@@ -413,6 +413,21 @@ The command is read-only. It reports:
 
 Do not treat the suggested clone command as an automatic installer. Network and filesystem mutations should stay behind an explicit user or operator action.
 
+When the operator is ready to checkout one adapter source, use the guarded checkout command:
+
+```powershell
+node core/node/dist/clawhermes.js checkout-source hermes-web-ui --dry-run --json
+node core/node/dist/clawhermes.js checkout-source hermes-web-ui --confirm-checkout --json
+```
+
+Rules:
+
+- The command requires a single service id.
+- Dry-run does not modify `apps/` and reports `wouldModify: false`.
+- Real checkout refuses to run unless `--confirm-checkout` is passed.
+- Real checkout refuses app directories that already contain real content.
+- Placeholder-only app directories may contain `.gitkeep`; the command removes only that placeholder before cloning.
+
 ## 11. Contributor Workflow
 
 To add a new service:
@@ -425,6 +440,7 @@ To add a new service:
 6. Add data directory under `data/<new-service>/`.
 7. Run `node core/node/dist/clawhermes.js adapters <new-service> --json`.
 8. Run `node core/node/dist/clawhermes.js sources <new-service> --json`.
-9. Update portal metadata if needed.
+9. Run `node core/node/dist/clawhermes.js checkout-source <new-service> --dry-run --json` before any real checkout.
+10. Update portal metadata if needed.
 
 No core code should be changed unless the service needs a new generic capability.

@@ -2,7 +2,10 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.adapterSetupPlan = adapterSetupPlan;
 exports.appSourcePlan = appSourcePlan;
+exports.checkoutAppSource = checkoutAppSource;
+const node_child_process_1 = require("node:child_process");
 const node_fs_1 = require("node:fs");
+const node_path_1 = require("node:path");
 const adapters_1 = require("./adapters");
 const environment_1 = require("./environment");
 const portable_1 = require("./portable");
@@ -33,6 +36,54 @@ function appSourcePlan(usbRoot, serviceId) {
         sources: selected.map((adapter) => sourcePlanItem(root, adapter)),
     };
 }
+function checkoutAppSource(usbRoot, serviceId, options) {
+    const root = (0, portable_1.getRoot)(usbRoot);
+    if (!serviceId)
+        throw new Error("Service id is required. Example: checkout-source hermes-web-ui --confirm-checkout");
+    const adapter = (0, adapters_1.loadAdapters)(root).find((item) => item.id === serviceId);
+    if (!adapter)
+        throw new Error(`Unknown adapter: ${serviceId}`);
+    if (!adapter.upstream?.repositoryUrl)
+        throw new Error(`Adapter ${serviceId} does not declare an upstream repositoryUrl.`);
+    const source = sourcePlanItem(root, adapter);
+    const result = {
+        root,
+        serviceId,
+        displayName: adapter.displayName,
+        dryRun: options.dryRun,
+        confirmed: options.confirm,
+        wouldModify: !options.dryRun,
+        cloned: false,
+        repositoryUrl: adapter.upstream.repositoryUrl,
+        checkoutRef: adapter.upstream.checkoutRef ?? null,
+        appDir: adapter.appDir,
+        targetPath: source.targetPath,
+        command: checkoutCommand(adapter),
+        actions: checkoutActions(source.appDirExists),
+        message: options.dryRun ? `Would checkout ${serviceId} into ${adapter.appDir}.` : `Checked out ${serviceId} into ${adapter.appDir}.`,
+    };
+    if (!options.dryRun && !options.confirm) {
+        throw new Error("checkout-source modifies apps/ and may use network. Re-run with --confirm-checkout to proceed.");
+    }
+    if (source.appDirReady) {
+        throw new Error(`App directory already contains real content: ${adapter.appDir}`);
+    }
+    if (options.dryRun)
+        return result;
+    (0, node_fs_1.mkdirSync)((0, node_path_1.dirname)(source.targetPath), { recursive: true });
+    removePlaceholderFiles(source.targetPath);
+    const completed = (0, node_child_process_1.spawnSync)("git", checkoutArgs(adapter, source.targetPath), {
+        cwd: root,
+        env: { ...process.env, ...(0, portable_1.portableEnv)(root) },
+        encoding: "utf8",
+    });
+    if (completed.error)
+        throw new Error(`git clone failed: ${completed.error.message}`);
+    if (completed.status !== 0) {
+        throw new Error(`git clone failed: ${(completed.stderr || completed.stdout || "unknown error").trim()}`);
+    }
+    return { ...result, cloned: true };
+}
 function sourcePlanItem(root, adapter) {
     const appDirPath = (0, portable_1.resolveRelative)(root, adapter.appDir);
     const appDirExists = (0, node_fs_1.existsSync)(appDirPath);
@@ -54,6 +105,29 @@ function checkoutCommand(adapter) {
         return null;
     const branch = adapter.upstream.checkoutRef ? ` --branch ${adapter.upstream.checkoutRef}` : "";
     return `git clone${branch} ${adapter.upstream.repositoryUrl} ${adapter.appDir}`;
+}
+function checkoutArgs(adapter, targetPath) {
+    const args = ["clone"];
+    if (adapter.upstream?.checkoutRef)
+        args.push("--branch", adapter.upstream.checkoutRef);
+    args.push(adapter.upstream?.repositoryUrl ?? "", targetPath);
+    return args;
+}
+function checkoutActions(appDirExists) {
+    const actions = [];
+    if (!appDirExists)
+        actions.push("Create target app directory parent.");
+    actions.push("Remove placeholder .gitkeep if present.");
+    actions.push("Run git clone for the selected adapter.");
+    return actions;
+}
+function removePlaceholderFiles(path) {
+    if (!(0, node_fs_1.existsSync)(path))
+        return;
+    for (const entry of (0, node_fs_1.readdirSync)(path)) {
+        if (entry === ".gitkeep")
+            (0, node_fs_1.rmSync)((0, node_path_1.join)(path, entry), { force: true });
+    }
 }
 function adapterSetupItem(root, adapter, readiness, envFiles) {
     const appDirExists = (0, node_fs_1.existsSync)((0, portable_1.resolveRelative)(root, adapter.appDir));

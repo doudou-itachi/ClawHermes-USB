@@ -1,8 +1,10 @@
-import { existsSync, readdirSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
+import { dirname, join } from "node:path";
 import type { AdapterDescriptor } from "./types";
 import { integrationReadiness, loadAdapters } from "./adapters";
 import { envFileDiagnostics } from "./environment";
-import { getRoot, resolveRelative } from "./portable";
+import { getRoot, portableEnv, resolveRelative } from "./portable";
 
 export function adapterSetupPlan(usbRoot: string, serviceId?: string) {
   const root = getRoot(usbRoot);
@@ -31,6 +33,53 @@ export function appSourcePlan(usbRoot: string, serviceId?: string) {
   };
 }
 
+export function checkoutAppSource(usbRoot: string, serviceId: string | undefined, options: { dryRun: boolean; confirm: boolean }) {
+  const root = getRoot(usbRoot);
+  if (!serviceId) throw new Error("Service id is required. Example: checkout-source hermes-web-ui --confirm-checkout");
+  const adapter = loadAdapters(root).find((item) => item.id === serviceId);
+  if (!adapter) throw new Error(`Unknown adapter: ${serviceId}`);
+  if (!adapter.upstream?.repositoryUrl) throw new Error(`Adapter ${serviceId} does not declare an upstream repositoryUrl.`);
+
+  const source = sourcePlanItem(root, adapter);
+  const result = {
+    root,
+    serviceId,
+    displayName: adapter.displayName,
+    dryRun: options.dryRun,
+    confirmed: options.confirm,
+    wouldModify: !options.dryRun,
+    cloned: false,
+    repositoryUrl: adapter.upstream.repositoryUrl,
+    checkoutRef: adapter.upstream.checkoutRef ?? null,
+    appDir: adapter.appDir,
+    targetPath: source.targetPath,
+    command: checkoutCommand(adapter),
+    actions: checkoutActions(source.appDirExists),
+    message: options.dryRun ? `Would checkout ${serviceId} into ${adapter.appDir}.` : `Checked out ${serviceId} into ${adapter.appDir}.`,
+  };
+
+  if (!options.dryRun && !options.confirm) {
+    throw new Error("checkout-source modifies apps/ and may use network. Re-run with --confirm-checkout to proceed.");
+  }
+  if (source.appDirReady) {
+    throw new Error(`App directory already contains real content: ${adapter.appDir}`);
+  }
+  if (options.dryRun) return result;
+
+  mkdirSync(dirname(source.targetPath), { recursive: true });
+  removePlaceholderFiles(source.targetPath);
+  const completed = spawnSync("git", checkoutArgs(adapter, source.targetPath), {
+    cwd: root,
+    env: { ...process.env, ...portableEnv(root) },
+    encoding: "utf8",
+  });
+  if (completed.error) throw new Error(`git clone failed: ${completed.error.message}`);
+  if (completed.status !== 0) {
+    throw new Error(`git clone failed: ${(completed.stderr || completed.stdout || "unknown error").trim()}`);
+  }
+  return { ...result, cloned: true };
+}
+
 function sourcePlanItem(root: string, adapter: AdapterDescriptor) {
   const appDirPath = resolveRelative(root, adapter.appDir);
   const appDirExists = existsSync(appDirPath);
@@ -52,6 +101,28 @@ function checkoutCommand(adapter: AdapterDescriptor): string | null {
   if (!adapter.upstream?.repositoryUrl) return null;
   const branch = adapter.upstream.checkoutRef ? ` --branch ${adapter.upstream.checkoutRef}` : "";
   return `git clone${branch} ${adapter.upstream.repositoryUrl} ${adapter.appDir}`;
+}
+
+function checkoutArgs(adapter: AdapterDescriptor, targetPath: string): string[] {
+  const args = ["clone"];
+  if (adapter.upstream?.checkoutRef) args.push("--branch", adapter.upstream.checkoutRef);
+  args.push(adapter.upstream?.repositoryUrl ?? "", targetPath);
+  return args;
+}
+
+function checkoutActions(appDirExists: boolean): string[] {
+  const actions = [];
+  if (!appDirExists) actions.push("Create target app directory parent.");
+  actions.push("Remove placeholder .gitkeep if present.");
+  actions.push("Run git clone for the selected adapter.");
+  return actions;
+}
+
+function removePlaceholderFiles(path: string): void {
+  if (!existsSync(path)) return;
+  for (const entry of readdirSync(path)) {
+    if (entry === ".gitkeep") rmSync(join(path, entry), { force: true });
+  }
 }
 
 function adapterSetupItem(

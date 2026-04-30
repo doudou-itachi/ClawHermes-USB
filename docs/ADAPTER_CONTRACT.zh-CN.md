@@ -394,7 +394,7 @@ node core/node/dist/clawhermes.js adapters hermes-web-ui --json
 
 在 app 目录、env 文件、setup 命令、start 命令、健康检查和数据路径行为都经过验证前，不要把 adapter 标记为 `productionReady: true`。
 
-## 10. App 来源准备命令
+## 10. App 来源准备和 Checkout 命令
 
 准备上游应用 checkout 时，使用来源计划命令：
 
@@ -413,6 +413,21 @@ node core/node/dist/clawhermes.js sources hermes-web-ui --json
 
 不要把建议的 clone 命令当成自动安装器。网络和文件系统写入应继续放在明确的用户或操作者动作之后。
 
+当操作者准备 checkout 某一个 adapter 来源时，使用受保护的 checkout 命令：
+
+```powershell
+node core/node/dist/clawhermes.js checkout-source hermes-web-ui --dry-run --json
+node core/node/dist/clawhermes.js checkout-source hermes-web-ui --confirm-checkout --json
+```
+
+规则：
+
+- 命令必须指定单个服务 id。
+- dry-run 不会修改 `apps/`，并报告 `wouldModify: false`。
+- 真实 checkout 必须传入 `--confirm-checkout`，否则拒绝执行。
+- 真实 checkout 会拒绝已经包含真实内容的 app 目录。
+- 只包含占位内容的 app 目录可以有 `.gitkeep`；命令在 clone 前只会移除这个占位文件。
+
 ## 11. 贡献者工作流
 
 新增服务：
@@ -425,6 +440,7 @@ node core/node/dist/clawhermes.js sources hermes-web-ui --json
 6. 在 `data/<new-service>/` 下添加数据目录。
 7. 运行 `node core/node/dist/clawhermes.js adapters <new-service> --json`。
 8. 运行 `node core/node/dist/clawhermes.js sources <new-service> --json`。
-9. 如有需要，更新 portal 元数据。
+9. 在任何真实 checkout 前，先运行 `node core/node/dist/clawhermes.js checkout-source <new-service> --dry-run --json`。
+10. 如有需要，更新 portal 元数据。
 
 除非服务需要新的通用能力，否则不应修改 core 代码。

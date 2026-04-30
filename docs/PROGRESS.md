@@ -1259,3 +1259,44 @@ Validation performed:
 Next steps:
 
 - Consider a gated, explicit checkout helper that refuses to mutate `apps/` unless the operator passes a deliberate opt-in flag.
+
+### Guarded Checkout Source Command
+
+Status: `Done`
+
+Summary:
+
+- Added `checkout-source <service-id>` for one-adapter upstream checkout.
+- The command supports `--dry-run` with `wouldModify: false`.
+- Real checkout refuses to run unless `--confirm-checkout` is passed.
+- Real checkout refuses app directories that already contain real content and removes only `.gitkeep` placeholders before cloning.
+- Added tests using a local Git repository fixture so checkout behavior is verified without depending on external network access.
+- Documented the command in the English and Chinese README files and adapter contract.
+
+Changed areas:
+
+- `core/node/src/adapter-guidance.ts`
+- `core/node/src/clawhermes.ts`
+- `core/node/src/core.ts`
+- `core/windows/clawhermes.ps1`
+- `core/node/dist/`
+- `tests/test_windows_core.py`
+- `README.md`
+- `README.zh-CN.md`
+- `docs/ADAPTER_CONTRACT.md`
+- `docs/ADAPTER_CONTRACT.zh-CN.md`
+- `docs/PROGRESS.md`
+- `docs/superpowers/plans/2026-05-01-add-checkout-source-command.md`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_checkout_source_requires_explicit_confirmation tests.test_windows_core.WindowsCoreTests.test_checkout_source_dry_run_does_not_modify_app_dir tests.test_windows_core.WindowsCoreTests.test_checkout_source_confirm_clones_placeholder_app_dir -v`
+- `npm test`
+- `git diff --check`
+- UTF-8 smoke check
+- Chinese README and adapter contract mojibake scans
+
+Next steps:
+
+- Add install/setup execution planning after source checkout so adapter setup commands can be run with the same dry-run and explicit-confirmation pattern.

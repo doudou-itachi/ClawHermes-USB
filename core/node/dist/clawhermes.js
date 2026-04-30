@@ -12,6 +12,7 @@ function parseArgs(argv) {
     let profile = "data-only";
     let includeLogs = false;
     let dryRun = false;
+    let confirmCheckout = false;
     let lines = 50;
     for (let index = 0; index < args.length; index += 1) {
         const arg = args[index];
@@ -40,6 +41,9 @@ function parseArgs(argv) {
         else if (arg === "--dry-run") {
             dryRun = true;
         }
+        else if (arg === "--confirm-checkout" || arg === "--confirm") {
+            confirmCheckout = true;
+        }
         else if (arg === "--lines" && args[index + 1]) {
             lines = Number(args[index + 1]);
             index += 1;
@@ -48,7 +52,7 @@ function parseArgs(argv) {
             positional.push(arg);
         }
     }
-    return { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, lines };
+    return { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, confirmCheckout, lines };
 }
 function parseBackupProfile(value) {
     if (value === "data-only" || value === "full")
@@ -59,7 +63,7 @@ function printJson(value) {
     process.stdout.write(`${JSON.stringify(value, null, 2)}\n`);
 }
 async function main() {
-    const { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, lines } = parseArgs(process.argv.slice(2));
+    const { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, confirmCheckout, lines } = parseArgs(process.argv.slice(2));
     const root = (0, core_1.getRoot)(usbRoot);
     switch (action) {
         case "env-json":
@@ -162,6 +166,20 @@ async function main() {
                     if (source.checkoutCommand)
                         console.log(`  command: ${source.checkoutCommand}`);
                 }
+            }
+            return;
+        }
+        case "checkout-source": {
+            const result = (0, core_1.checkoutAppSource)(root, positional[0], { dryRun, confirm: confirmCheckout });
+            if (json) {
+                printJson(result);
+            }
+            else {
+                console.log(result.message);
+                console.log(`Target: ${result.appDir}`);
+                console.log(`Repository: ${result.repositoryUrl}`);
+                if (result.command)
+                    console.log(`Command: ${result.command}`);
             }
             return;
         }
