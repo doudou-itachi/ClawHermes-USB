@@ -901,3 +901,30 @@ Validation performed:
 Next steps:
 
 - Split setup diagnostics, path checks, port checks, and log tail helpers into a diagnostics-focused TypeScript module.
+
+### Diagnostics Utilities Split
+
+Status: `Done`
+
+Summary:
+
+- Extracted setup diagnostics aggregation, required path checks, port availability checks, and controlled log tail reading into `core/node/src/diagnostics.ts`.
+- `core.ts` now imports `setupDiagnostics` for startup preflight reporting and re-exports diagnostics helpers for CLI compatibility.
+- Setup JSON and logs JSON behavior remain unchanged while the main core module is reduced to lifecycle orchestration.
+
+Changed areas:
+
+- `core/node/src/diagnostics.ts`
+- `core/node/src/core.ts`
+- `core/node/dist/`
+- `docs/PROGRESS.md`
+- `docs/superpowers/plans/2026-05-01-split-diagnostics-utils.md`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_setup_json_reports_runtime_diagnostics_and_valid_adapters tests.test_windows_core.WindowsCoreTests.test_setup_json_reports_default_port_diagnostics tests.test_windows_core.WindowsCoreTests.test_setup_json_reports_occupied_port tests.test_windows_core.WindowsCoreTests.test_setup_json_reports_required_paths tests.test_windows_core.WindowsCoreTests.test_logs_json_tails_known_service_log tests.test_windows_core.WindowsCoreTests.test_logs_unknown_target_fails_with_actionable_message -v`
+
+Next steps:
+
+- Split managed adapter process launch and stop helpers into a lifecycle-focused TypeScript module.
