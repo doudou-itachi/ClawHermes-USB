@@ -2,19 +2,69 @@
 
 ClawHermes-USB is a Windows-first portable runtime suite for running official OpenClaw, Hermes Agent, and EKKOLearnAI/hermes-web-ui from a USB drive.
 
-The project goal is not to fork these upstream tools. It provides a portable launcher, consistent directory layout, data isolation rules, service adapters, and a local portal so users can carry their agent environment between Windows machines with minimal host pollution.
+The project goal is not to fork these upstream tools. It provides a portable launcher, consistent directory layout, data isolation rules, service adapters, backup workflow, and a local portal so users can carry their agent environment between Windows machines with minimal host pollution.
 
 ## Current Status
 
-This repository currently contains the project skeleton and detailed planning documents only.
+The repository now contains a runnable TypeScript + Node.js orchestration skeleton with small Batch and PowerShell launchers for Windows.
 
-It does not yet download, vendor, install, or run OpenClaw, Hermes Agent, or Hermes Web UI.
+Implemented:
+
+- USB root detection from launcher location.
+- Process-local portable environment variables.
+- Runtime, path, port, adapter, env-file, and readiness diagnostics.
+- Adapter descriptor loading and dependency ordering.
+- Placeholder service start/status/stop with logs and PID metadata.
+- Managed process launch for production-ready adapters.
+- Local portal at `http://127.0.0.1:17000/` with live status and backup visibility.
+- Portable backup command that writes timestamped zip archives under `data/backups/`.
+
+Not implemented yet:
+
+- Automatic download, vendoring, or installation of OpenClaw, Hermes Agent, or Hermes Web UI.
+- Verified real upstream service integration for the three default adapters.
+
+## Quick Start
+
+Install dependencies and build the TypeScript core:
+
+```powershell
+npm install
+npm run build
+```
+
+Run the Windows launchers:
+
+```text
+launcher/windows/Setup.bat
+launcher/windows/Start.bat
+launcher/windows/Status.bat
+launcher/windows/Stop.bat
+launcher/windows/Backup.bat
+```
+
+Run the Node CLI directly:
+
+```powershell
+node core/node/dist/clawhermes.js setup --json
+node core/node/dist/clawhermes.js start --json
+node core/node/dist/clawhermes.js status --json
+node core/node/dist/clawhermes.js logs openclaw --lines 50 --json
+node core/node/dist/clawhermes.js backup --dry-run --json
+```
+
+Run verification:
+
+```powershell
+npm test
+```
 
 ## Core Documents
 
 - [PRD](docs/PRD.md)
 - [Architecture Design](docs/DESIGN.md)
 - [Adapter Contract](docs/ADAPTER_CONTRACT.md)
+- [Progress Log](docs/PROGRESS.md)
 
 Chinese versions:
 
@@ -31,31 +81,20 @@ Chinese versions:
 - Do not require Docker for the primary path.
 - Preserve clear boundaries so future contributors can replace or extend services without rewriting the launcher.
 
-## Planned Top-Level Layout
+## Top-Level Layout
 
 ```text
 ClawHermes-USB/
-  launcher/   User-facing start, stop, setup, and status scripts.
-  core/       Shared orchestration logic.
+  launcher/   User-facing start, stop, setup, status, and backup scripts.
+  core/       Shared TypeScript/Node orchestration logic and Windows dispatcher.
   adapters/   Service-specific integration descriptors and helpers.
   apps/       Upstream application checkouts or installed packages.
   runtimes/   Portable Node.js, Python, Git, and future platform runtimes.
-  data/       Portable state, memory, sessions, logs, cache, and backups.
+  data/       Portable state, memory, sessions, logs, cache, temp files, and backups.
   portal/     Local unified entry page.
   config/     Defaults, env templates, profiles, and ports.
   scripts/    Setup, diagnostics, backup, and update automation.
   docs/       Product and architecture documentation.
 ```
 
-## First Milestone
-
-The first implementation milestone will create a Windows launcher that can:
-
-1. Detect the USB root path dynamically.
-2. Set portable environment variables for the current process tree.
-3. Validate the presence of portable Node.js, Python, and Git.
-4. Load service adapter descriptors.
-5. Start placeholder services and write logs under `data/logs`.
-6. Open the local portal at `http://127.0.0.1:17000/`.
-
-Real OpenClaw and Hermes integration will follow after the launcher skeleton is verified.
+Real OpenClaw and Hermes integration will follow after the portable launcher skeleton is verified against the upstream projects.

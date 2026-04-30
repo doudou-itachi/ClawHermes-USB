@@ -1017,3 +1017,30 @@ Validation performed:
 Next steps:
 
 - Update user-facing README status and command documentation so the implemented TypeScript/Node workflow is discoverable.
+
+### README Status Refresh
+
+Status: `Done`
+
+Summary:
+
+- Updated the English README to describe the implemented TypeScript/Node core, Windows launcher scripts, backup command, portal status, and test workflow.
+- Rewrote the Chinese README as readable UTF-8 text, replacing the previous mojibake content.
+- Clarified that real upstream OpenClaw and Hermes integration is still pending.
+
+Changed areas:
+
+- `README.md`
+- `README.zh-CN.md`
+- `docs/PROGRESS.md`
+- `docs/superpowers/plans/2026-05-01-update-readme-status.md`
+
+Validation performed:
+
+- Markdown review
+- `git diff --check`
+- UTF-8 smoke check
+
+Next steps:
+
+- Continue toward real upstream adapter integration by improving adapter setup guidance and runtime readiness messages.
