@@ -114,7 +114,7 @@ function probeSource(root, adapter) {
             message: "Adapter does not declare an upstream repositoryUrl.",
         };
     }
-    const baseProbe = (0, node_child_process_1.spawnSync)("git", ["ls-remote", upstream.repositoryUrl], {
+    const baseProbe = (0, node_child_process_1.spawnSync)("git", ["ls-remote", "--exit-code", upstream.repositoryUrl, "HEAD"], {
         cwd: root,
         env: { ...process.env, ...(0, portable_1.portableEnv)(root) },
         encoding: "utf8",
@@ -152,7 +152,7 @@ function probeSource(root, adapter) {
     };
 }
 function refExists(root, repositoryUrl, ref) {
-    const refProbe = (0, node_child_process_1.spawnSync)("git", ["ls-remote", repositoryUrl, ref], {
+    const refProbe = (0, node_child_process_1.spawnSync)("git", ["ls-remote", "--exit-code", repositoryUrl, ref], {
         cwd: root,
         env: { ...process.env, ...(0, portable_1.portableEnv)(root) },
         encoding: "utf8",

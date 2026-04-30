@@ -1463,3 +1463,39 @@ Validation performed:
 Next steps:
 
 - Run `probe-sources --json` against the real default upstream repositories and record the observed repository/ref status before any checkout attempt.
+
+### Source Probe Buffering Fix and Real Upstream Probe
+
+Status: `Done`
+
+Summary:
+
+- Fixed `probe-sources` to avoid `spawnSync git ENOBUFS` on repositories with many refs.
+- Reachability now uses `git ls-remote --exit-code <repo> HEAD` and checkout ref validation uses a separate bounded `git ls-remote --exit-code <repo> <ref>`.
+- Ran the read-only real upstream probe against the default adapters without cloning or modifying `apps/`.
+
+Observed upstream probe results:
+
+- `hermes-agent`: repository reachable, `main` ref found.
+- `hermes-web-ui`: repository reachable, `main` ref found.
+- `openclaw`: repository reachable, `main` ref found.
+
+Changed areas:
+
+- `core/node/src/adapter-guidance.ts`
+- `core/node/dist/adapter-guidance.js`
+- `docs/PROGRESS.md`
+- `docs/superpowers/plans/2026-05-01-fix-source-probe-buffering.md`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_probe_sources_json_reports_reachable_upstream_ref_without_mutation tests.test_windows_core.WindowsCoreTests.test_probe_sources_json_reports_missing_ref tests.test_windows_core.WindowsCoreTests.test_probe_sources_unknown_service_fails_with_actionable_message -v`
+- `node core/node/dist/clawhermes.js probe-sources --json`
+- `npm test`
+- `git diff --check`
+- UTF-8 smoke check
+
+Next steps:
+
+- Use a disposable USB root to attempt a guarded checkout of one real upstream adapter, starting with `hermes-web-ui` because its source probe is green and its setup command is already modeled as `npm install`.

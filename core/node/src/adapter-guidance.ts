@@ -110,7 +110,7 @@ function probeSource(root: string, adapter: AdapterDescriptor) {
     };
   }
 
-  const baseProbe = spawnSync("git", ["ls-remote", upstream.repositoryUrl], {
+  const baseProbe = spawnSync("git", ["ls-remote", "--exit-code", upstream.repositoryUrl, "HEAD"], {
     cwd: root,
     env: { ...process.env, ...portableEnv(root) },
     encoding: "utf8",
@@ -150,7 +150,7 @@ function probeSource(root: string, adapter: AdapterDescriptor) {
 }
 
 function refExists(root: string, repositoryUrl: string, ref: string): boolean {
-  const refProbe = spawnSync("git", ["ls-remote", repositoryUrl, ref], {
+  const refProbe = spawnSync("git", ["ls-remote", "--exit-code", repositoryUrl, ref], {
     cwd: root,
     env: { ...process.env, ...portableEnv(root) },
     encoding: "utf8",
