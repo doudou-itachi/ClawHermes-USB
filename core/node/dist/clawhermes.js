@@ -132,6 +132,22 @@ async function main() {
             }
             return;
         }
+        case "adapters": {
+            const result = (0, core_1.adapterSetupPlan)(root, positional[0]);
+            if (json) {
+                printJson(result);
+            }
+            else {
+                console.log("ClawHermes-USB adapter preparation");
+                console.log(`Root: ${result.root}`);
+                for (const adapter of result.adapters) {
+                    console.log(`- ${adapter.id}: ${adapter.integration.status}, appDir ${adapter.appDirExists ? "present" : "missing"}`);
+                    for (const step of adapter.nextSteps)
+                        console.log(`  - ${step}`);
+                }
+            }
+            return;
+        }
         case "logs": {
             const target = positional[0];
             if (!target)

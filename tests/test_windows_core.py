@@ -668,6 +668,37 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertIn("Adapter hermes-agent integration is not production-ready", messages)
         self.assertIn("Adapter hermes-web-ui integration is not production-ready", messages)
 
+    def test_adapters_json_reports_preparation_plan(self):
+        result = run_dispatcher("adapters", "-Json")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        adapters = {adapter["id"]: adapter for adapter in payload["adapters"]}
+
+        self.assertEqual(set(adapters), {"openclaw", "hermes-agent", "hermes-web-ui"})
+        self.assertTrue(adapters["openclaw"]["appDirExists"])
+        self.assertFalse(adapters["openclaw"]["integration"]["productionReady"])
+        self.assertIn("config/env/openclaw.env", [item["path"] for item in adapters["openclaw"]["envFiles"]])
+        self.assertTrue(any("init-env" in step for step in adapters["openclaw"]["nextSteps"]))
+
+    def test_adapters_json_can_filter_one_adapter(self):
+        result = run_dispatcher("adapters", "hermes-web-ui", "-Json")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual([adapter["id"] for adapter in payload["adapters"]], ["hermes-web-ui"])
+        adapter = payload["adapters"][0]
+        self.assertEqual(adapter["commands"]["setup"], "npm install")
+        self.assertEqual(adapter["commands"]["start"], "npm run start")
+        self.assertEqual(adapter["dependsOn"], ["hermes-agent"])
+        self.assertTrue(any("setup command" in step for step in adapter["nextSteps"]))
+
+    def test_adapters_unknown_service_fails_with_actionable_message(self):
+        result = run_dispatcher("adapters", "missing-service", "-Json")
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Unknown adapter: missing-service", result.stderr)
+
     def test_runtimes_json_outputs_preparation_steps_from_manifest(self):
         result = run_dispatcher("runtimes", "-Json")
 

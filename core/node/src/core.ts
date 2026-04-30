@@ -9,6 +9,7 @@ import { adapterHealth, processExists, writeStatusSnapshot } from "./status";
 
 export { dataWritable, getRoot, portableEnv } from "./portable";
 export { integrationReadiness, loadAdapters, serviceOrder, validateAdapter } from "./adapters";
+export { adapterSetupPlan } from "./adapter-guidance";
 export { createBackup } from "./backup";
 export { envFileDiagnostics, initializeEnvFiles, resolveServiceEnvironment, serviceEnvironmentDiagnostic } from "./environment";
 export { pathDiagnostics, portDiagnostics, readLogTail, setupDiagnostics, writeSetupSnapshot } from "./diagnostics";

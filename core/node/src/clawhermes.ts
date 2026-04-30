@@ -1,4 +1,4 @@
-import { createBackup, getRoot, getStatus, initializeEnvFiles, installRuntimeFromArchive, portableEnv, readLogTail, runtimePreparationPlan, serviceEnvironmentDiagnostic, setupDiagnostics, startSkeleton, stopSkeleton, writeStatusSnapshot } from "./core";
+import { adapterSetupPlan, createBackup, getRoot, getStatus, initializeEnvFiles, installRuntimeFromArchive, portableEnv, readLogTail, runtimePreparationPlan, serviceEnvironmentDiagnostic, setupDiagnostics, startSkeleton, stopSkeleton, writeStatusSnapshot } from "./core";
 import type { BackupProfile } from "./backup";
 
 type ParsedArgs = {
@@ -126,6 +126,20 @@ async function main(): Promise<void> {
           console.log(`- ${file.path}: ${file.loaded ? "loaded" : file.exists ? "parse issues" : "missing"}`);
         }
         console.log(`Variables: ${result.variables.join(", ")}`);
+      }
+      return;
+    }
+    case "adapters": {
+      const result = adapterSetupPlan(root, positional[0]);
+      if (json) {
+        printJson(result);
+      } else {
+        console.log("ClawHermes-USB adapter preparation");
+        console.log(`Root: ${result.root}`);
+        for (const adapter of result.adapters) {
+          console.log(`- ${adapter.id}: ${adapter.integration.status}, appDir ${adapter.appDirExists ? "present" : "missing"}`);
+          for (const step of adapter.nextSteps) console.log(`  - ${step}`);
+        }
       }
       return;
     }

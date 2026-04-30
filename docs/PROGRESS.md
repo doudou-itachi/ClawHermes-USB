@@ -1105,3 +1105,34 @@ Validation performed:
 Next steps:
 
 - Add adapter-focused CLI guidance for setup commands and app directory preparation before attempting real upstream integration.
+
+### Adapter Guidance Command
+
+Status: `Done`
+
+Summary:
+
+- Added an `adapters` CLI action that reports adapter preparation status for all services or one service id.
+- Adapter guidance includes app directory presence, data directory presence, runtime metadata, env file status, setup/start/stop commands, dependencies, integration readiness, portal metadata, and next steps.
+- PowerShell dispatcher now accepts the `adapters` action.
+- Added regression coverage for all-adapter output, single-adapter filtering, and unknown adapter errors.
+
+Changed areas:
+
+- `core/node/src/adapter-guidance.ts`
+- `core/node/src/clawhermes.ts`
+- `core/node/src/core.ts`
+- `core/windows/clawhermes.ps1`
+- `core/node/dist/`
+- `tests/test_windows_core.py`
+- `docs/PROGRESS.md`
+- `docs/superpowers/plans/2026-05-01-add-adapter-guidance-command.md`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_adapters_json_reports_preparation_plan tests.test_windows_core.WindowsCoreTests.test_adapters_json_can_filter_one_adapter tests.test_windows_core.WindowsCoreTests.test_adapters_unknown_service_fails_with_actionable_message -v`
+
+Next steps:
+
+- Add documentation for the new `adapters` command in README and adapter contract guidance.
