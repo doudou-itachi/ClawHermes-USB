@@ -163,3 +163,26 @@ When changing behavior, update the relevant documents:
 - Data policy: `docs/portable-data.md`
 
 If a decision affects long-term architecture, add a decision record under `docs/decisions/`.
+
+## Project Progress Tracking
+
+Maintain a project progress document at:
+
+```text
+docs/PROGRESS.md
+```
+
+Update it whenever a meaningful part of the project is completed, changed, blocked, or deferred.
+
+Use judgment: not every tiny edit needs a progress entry, but each completed milestone, architecture decision, implementation phase, integration result, or blocker should be recorded.
+
+Progress entries should include:
+
+- date
+- summary
+- status
+- changed areas
+- validation performed
+- next steps
+
+Keep the document concise enough to scan, but detailed enough that a new developer can understand what has already happened and what remains.
