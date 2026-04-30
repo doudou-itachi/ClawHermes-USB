@@ -12,6 +12,7 @@ exports.installRuntimeFromArchive = installRuntimeFromArchive;
 exports.integrationReadiness = integrationReadiness;
 exports.dataWritable = dataWritable;
 exports.setupDiagnostics = setupDiagnostics;
+exports.envFileDiagnostics = envFileDiagnostics;
 exports.pathDiagnostics = pathDiagnostics;
 exports.portDiagnostics = portDiagnostics;
 exports.generatePortal = generatePortal;
@@ -266,6 +267,7 @@ function setupDiagnostics(usbRoot) {
     const readiness = integrationReadiness(adapters);
     const ports = portDiagnostics(root);
     const paths = pathDiagnostics(root);
+    const envFiles = envFileDiagnostics(root, adapters);
     const writable = dataWritable(root);
     const messages = [];
     for (const runtime of runtimes) {
@@ -288,9 +290,36 @@ function setupDiagnostics(usbRoot) {
         if (path.required && !path.exists)
             messages.push(`Required ${path.type} is missing: ${path.path}.`);
     }
+    for (const envFile of envFiles) {
+        if (!envFile.exists) {
+            messages.push(`Env file missing: ${envFile.path}. To configure ${envFile.serviceId}, copy ${envFile.examplePath} to ${envFile.path}.`);
+        }
+    }
     if (!writable)
         messages.push("Data directory is not writable.");
-    return { root, adapters: adapterResults, runtimes, readiness, ports, paths, dataWritable: writable, messages };
+    return { root, adapters: adapterResults, runtimes, readiness, ports, paths, envFiles, dataWritable: writable, messages };
+}
+function envFileDiagnostics(usbRoot, adapters) {
+    const root = getRoot(usbRoot);
+    const diagnostics = [];
+    const seen = new Set();
+    for (const adapter of adapters) {
+        for (const envFile of adapter.env?.files ?? []) {
+            const key = `${adapter.id}:${envFile}`;
+            if (seen.has(key))
+                continue;
+            seen.add(key);
+            const examplePath = `${envFile}.example`;
+            diagnostics.push({
+                serviceId: adapter.id,
+                path: envFile,
+                exists: (0, node_fs_1.existsSync)(resolveRelative(root, envFile)),
+                examplePath,
+                exampleExists: (0, node_fs_1.existsSync)(resolveRelative(root, examplePath)),
+            });
+        }
+    }
+    return diagnostics.sort((a, b) => a.path.localeCompare(b.path));
 }
 function pathDiagnostics(usbRoot) {
     const root = getRoot(usbRoot);

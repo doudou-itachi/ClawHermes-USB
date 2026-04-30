@@ -194,6 +194,27 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertEqual(paths["config/defaults/ports.json"]["type"], "file")
         self.assertEqual(paths["data/logs"]["type"], "directory")
 
+    def test_setup_json_reports_env_template_diagnostics(self):
+        result = run_dispatcher("setup", "-Json")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        env_files = {item["path"]: item for item in payload["envFiles"]}
+
+        for env_file in [
+            "config/env/hermes.env",
+            "config/env/hermes-web-ui.env",
+            "config/env/openclaw.env",
+        ]:
+            self.assertIn(env_file, env_files)
+            self.assertFalse(env_files[env_file]["exists"])
+            self.assertTrue(env_files[env_file]["exampleExists"])
+            self.assertTrue(env_files[env_file]["examplePath"].endswith(".env.example"))
+
+        messages = "\n".join(payload["messages"])
+        self.assertIn("Env file missing: config/env/hermes.env", messages)
+        self.assertIn("copy config/env/hermes.env.example", messages)
+
     def test_setup_json_reports_adapter_integration_readiness(self):
         result = run_dispatcher("setup", "-Json")
 

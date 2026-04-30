@@ -4,7 +4,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSyn
 import { dirname, isAbsolute, join, resolve, sep } from "node:path";
 import { get } from "node:http";
 import { createHash } from "node:crypto";
-import type { AdapterDescriptor, AdapterValidation, IntegrationReadiness, PathDiagnostic, PortDiagnostic, RuntimeDiagnostic, RuntimeInstallResult, RuntimeManifest, RuntimePreparationStep, ServiceStatus } from "./types";
+import type { AdapterDescriptor, AdapterValidation, EnvFileDiagnostic, IntegrationReadiness, PathDiagnostic, PortDiagnostic, RuntimeDiagnostic, RuntimeInstallResult, RuntimeManifest, RuntimePreparationStep, ServiceStatus } from "./types";
 
 export const PORTAL_URL = "http://127.0.0.1:17000/";
 
@@ -252,6 +252,7 @@ export function setupDiagnostics(usbRoot: string) {
   const readiness = integrationReadiness(adapters);
   const ports = portDiagnostics(root);
   const paths = pathDiagnostics(root);
+  const envFiles = envFileDiagnostics(root, adapters);
   const writable = dataWritable(root);
   const messages: string[] = [];
 
@@ -270,9 +271,36 @@ export function setupDiagnostics(usbRoot: string) {
   for (const path of paths) {
     if (path.required && !path.exists) messages.push(`Required ${path.type} is missing: ${path.path}.`);
   }
+  for (const envFile of envFiles) {
+    if (!envFile.exists) {
+      messages.push(`Env file missing: ${envFile.path}. To configure ${envFile.serviceId}, copy ${envFile.examplePath} to ${envFile.path}.`);
+    }
+  }
   if (!writable) messages.push("Data directory is not writable.");
 
-  return { root, adapters: adapterResults, runtimes, readiness, ports, paths, dataWritable: writable, messages };
+  return { root, adapters: adapterResults, runtimes, readiness, ports, paths, envFiles, dataWritable: writable, messages };
+}
+
+export function envFileDiagnostics(usbRoot: string, adapters: AdapterDescriptor[]): EnvFileDiagnostic[] {
+  const root = getRoot(usbRoot);
+  const diagnostics: EnvFileDiagnostic[] = [];
+  const seen = new Set<string>();
+  for (const adapter of adapters) {
+    for (const envFile of adapter.env?.files ?? []) {
+      const key = `${adapter.id}:${envFile}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const examplePath = `${envFile}.example`;
+      diagnostics.push({
+        serviceId: adapter.id,
+        path: envFile,
+        exists: existsSync(resolveRelative(root, envFile)),
+        examplePath,
+        exampleExists: existsSync(resolveRelative(root, examplePath)),
+      });
+    }
+  }
+  return diagnostics.sort((a, b) => a.path.localeCompare(b.path));
 }
 
 export function pathDiagnostics(usbRoot: string): PathDiagnostic[] {

@@ -128,3 +128,11 @@ export type PathDiagnostic = {
   required: boolean;
   exists: boolean;
 };
+
+export type EnvFileDiagnostic = {
+  serviceId: string;
+  path: string;
+  exists: boolean;
+  examplePath: string;
+  exampleExists: boolean;
+};

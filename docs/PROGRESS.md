@@ -381,3 +381,31 @@ Validation performed:
 Next steps:
 
 - Add setup diagnostics for user env files versus committed `.env.example` templates.
+
+### Setup Env Template Diagnostics
+
+Status: `Done`
+
+Summary:
+
+- Added setup diagnostics for adapter-declared env files.
+- Setup JSON now includes `envFiles` with service id, env path, existence, example path, and example existence.
+- Missing env files now generate actionable messages that tell users which `.env.example` file to copy.
+- Added regression coverage for Hermes Agent, Hermes Web UI, and OpenClaw env templates.
+
+Changed areas:
+
+- `core/node/src/core.ts`
+- `core/node/src/types.ts`
+- `core/node/dist/`
+- `docs/PROGRESS.md`
+- `tests/test_windows_core.py`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_setup_json_reports_env_template_diagnostics -v`
+
+Next steps:
+
+- Add optional helper command to create local env files from examples without overwriting existing secrets.
