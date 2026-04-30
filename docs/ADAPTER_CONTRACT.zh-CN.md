@@ -177,7 +177,7 @@ Adapter 禁止使用绝对路径。
 - `installMode`：`source-checkout`、`package`、`manual` 或 `unknown`
 - `notes`：简短集成说明或当前 blocker
 
-这些元数据会被 `node core/node/dist/clawhermes.js adapters --json` 使用。真实集成标记为 production-ready 前，应先更新并验证这些字段。
+这些元数据会被 `node core/node/dist/clawhermes.js adapters --json` 和 `node core/node/dist/clawhermes.js sources --json` 使用。真实集成标记为 production-ready 前，应先更新并验证这些字段。
 
 ### `commands`
 
@@ -394,7 +394,26 @@ node core/node/dist/clawhermes.js adapters hermes-web-ui --json
 
 在 app 目录、env 文件、setup 命令、start 命令、健康检查和数据路径行为都经过验证前，不要把 adapter 标记为 `productionReady: true`。
 
-## 10. 贡献者工作流
+## 10. App 来源准备命令
+
+准备上游应用 checkout 时，使用来源计划命令：
+
+```powershell
+node core/node/dist/clawhermes.js sources --json
+node core/node/dist/clawhermes.js sources hermes-web-ui --json
+```
+
+该命令是只读的。它会报告：
+
+- `apps/` 下的目标 app 目录路径
+- 每个 app 目录是否存在，以及是否包含真实内容
+- 来自 `adapter.json` 的上游仓库元数据
+- 建议的 `git clone` 命令文本
+- 用于自动化安全检查的 `wouldModify: false`
+
+不要把建议的 clone 命令当成自动安装器。网络和文件系统写入应继续放在明确的用户或操作者动作之后。
+
+## 11. 贡献者工作流
 
 新增服务：
 
@@ -405,6 +424,7 @@ node core/node/dist/clawhermes.js adapters hermes-web-ui --json
 5. 在 `apps/<new-service>/` 下添加 app 占位目录。
 6. 在 `data/<new-service>/` 下添加数据目录。
 7. 运行 `node core/node/dist/clawhermes.js adapters <new-service> --json`。
-8. 如有需要，更新 portal 元数据。
+8. 运行 `node core/node/dist/clawhermes.js sources <new-service> --json`。
+9. 如有需要，更新 portal 元数据。
 
 除非服务需要新的通用能力，否则不应修改 core 代码。

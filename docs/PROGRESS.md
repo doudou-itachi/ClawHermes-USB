@@ -1229,3 +1229,33 @@ Validation performed:
 Next steps:
 
 - Document the `sources` command and then consider a gated, explicit checkout helper once the user opts into network mutations.
+
+### Source Plan Documentation
+
+Status: `Done`
+
+Summary:
+
+- Added `sources --json` and single-adapter examples to the English and Chinese README files.
+- Documented the read-only source plan command in the English and Chinese adapter contract.
+- Updated the contributor workflow to run both adapter guidance and source planning before real integration work.
+
+Changed areas:
+
+- `README.md`
+- `README.zh-CN.md`
+- `docs/ADAPTER_CONTRACT.md`
+- `docs/ADAPTER_CONTRACT.zh-CN.md`
+- `docs/PROGRESS.md`
+- `docs/superpowers/plans/2026-05-01-document-source-plan-command.md`
+
+Validation performed:
+
+- Markdown review
+- `git diff --check`
+- UTF-8 smoke check
+- Chinese README and adapter contract mojibake scans
+
+Next steps:
+
+- Consider a gated, explicit checkout helper that refuses to mutate `apps/` unless the operator passes a deliberate opt-in flag.

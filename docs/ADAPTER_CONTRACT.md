@@ -177,7 +177,7 @@ Fields:
 - `installMode`: `source-checkout`, `package`, `manual`, or `unknown`
 - `notes`: concise integration notes or current blocker
 
-This metadata is consumed by `node core/node/dist/clawhermes.js adapters --json` and should be updated before a real integration is marked production-ready.
+This metadata is consumed by `node core/node/dist/clawhermes.js adapters --json` and `node core/node/dist/clawhermes.js sources --json`. It should be updated before a real integration is marked production-ready.
 
 ### `commands`
 
@@ -394,7 +394,26 @@ The command reports:
 
 Do not mark an adapter `productionReady: true` until the app directory, env files, setup command, start command, health check, and data path behavior have been verified.
 
-## 10. Contributor Workflow
+## 10. App Source Preparation Command
+
+Use the source plan command when preparing upstream application checkouts:
+
+```powershell
+node core/node/dist/clawhermes.js sources --json
+node core/node/dist/clawhermes.js sources hermes-web-ui --json
+```
+
+The command is read-only. It reports:
+
+- target app directory paths under `apps/`
+- whether each app directory exists and contains real content
+- upstream repository metadata from `adapter.json`
+- suggested `git clone` command text
+- `wouldModify: false` for automation safety checks
+
+Do not treat the suggested clone command as an automatic installer. Network and filesystem mutations should stay behind an explicit user or operator action.
+
+## 11. Contributor Workflow
 
 To add a new service:
 
@@ -405,6 +424,7 @@ To add a new service:
 5. Add app placeholder under `apps/<new-service>/`.
 6. Add data directory under `data/<new-service>/`.
 7. Run `node core/node/dist/clawhermes.js adapters <new-service> --json`.
-8. Update portal metadata if needed.
+8. Run `node core/node/dist/clawhermes.js sources <new-service> --json`.
+9. Update portal metadata if needed.
 
 No core code should be changed unless the service needs a new generic capability.
