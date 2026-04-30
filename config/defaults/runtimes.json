@@ -1,0 +1,43 @@
+{
+  "platform": "windows",
+  "runtimes": [
+    {
+      "name": "node",
+      "label": "Portable Node.js",
+      "versionPolicy": "lts",
+      "packageType": "official-windows-zip",
+      "sourceUrl": "https://nodejs.org/en/download",
+      "installDir": "runtimes/windows/node",
+      "candidates": [
+        "runtimes/windows/node/node.exe",
+        "runtimes/windows/node/bin/node.exe"
+      ],
+      "notes": "Use the official Windows standalone zip. Extract so node.exe is available under runtimes/windows/node."
+    },
+    {
+      "name": "python",
+      "label": "Portable Python",
+      "versionPolicy": "3.11+",
+      "packageType": "official-windows-embeddable",
+      "sourceUrl": "https://www.python.org/downloads/windows/",
+      "installDir": "runtimes/windows/python",
+      "candidates": [
+        "runtimes/windows/python/python.exe"
+      ],
+      "notes": "Use the official Windows embeddable package. It is isolated and does not include pip by default."
+    },
+    {
+      "name": "git",
+      "label": "Portable Git",
+      "versionPolicy": "latest-stable",
+      "packageType": "Git for Windows Portable",
+      "sourceUrl": "https://git-scm.com/downloads/win",
+      "installDir": "runtimes/windows/git",
+      "candidates": [
+        "runtimes/windows/git/cmd/git.exe",
+        "runtimes/windows/git/bin/git.exe"
+      ],
+      "notes": "Use Git for Windows Portable, also called the thumbdrive edition."
+    }
+  ]
+}

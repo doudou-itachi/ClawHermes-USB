@@ -87,11 +87,24 @@ function validateAdapter(adapter, knownIds) {
 }
 function runtimeDiagnostics(usbRoot) {
     const root = getRoot(usbRoot);
-    return [
-        { name: "node", label: "Portable Node.js", path: (0, node_path_1.join)(root, "runtimes", "windows", "node", "node.exe") },
-        { name: "python", label: "Portable Python", path: (0, node_path_1.join)(root, "runtimes", "windows", "python", "python.exe") },
-        { name: "git", label: "Portable Git", path: (0, node_path_1.join)(root, "runtimes", "windows", "git", "cmd", "git.exe") },
-    ].map((runtime) => ({ ...runtime, found: (0, node_fs_1.existsSync)(runtime.path) }));
+    const manifestPath = (0, node_path_1.join)(root, "config", "defaults", "runtimes.json");
+    const manifest = JSON.parse((0, node_fs_1.readFileSync)(manifestPath, "utf8"));
+    return manifest.runtimes.map((runtime) => {
+        const resolvedCandidates = runtime.candidates.map((candidate) => resolveRelative(root, candidate));
+        const foundPath = resolvedCandidates.find((candidate) => (0, node_fs_1.existsSync)(candidate)) ?? resolvedCandidates[0];
+        return {
+            name: runtime.name,
+            label: runtime.label,
+            path: foundPath,
+            found: resolvedCandidates.some((candidate) => (0, node_fs_1.existsSync)(candidate)),
+            versionPolicy: runtime.versionPolicy,
+            packageType: runtime.packageType,
+            sourceUrl: runtime.sourceUrl,
+            installDir: resolveRelative(root, runtime.installDir),
+            candidates: resolvedCandidates,
+            notes: runtime.notes,
+        };
+    });
 }
 function integrationReadiness(adapters) {
     return adapters.map((adapter) => ({

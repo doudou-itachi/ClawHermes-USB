@@ -195,3 +195,36 @@ Next steps:
 - Keep Batch and PowerShell launchers thin.
 - Move future orchestration features into `core/node/src/`.
 - Add focused TypeScript unit tests as the core grows beyond the current command-level behavior suite.
+
+### Runtime Manifest Diagnostics
+
+Status: `Done`
+
+Summary:
+
+- Added `config/defaults/runtimes.json` as the source of truth for Windows runtime validation.
+- Recorded official source URLs and package types for Node.js, Python, and Git.
+- Updated TypeScript setup diagnostics to read candidate executable paths from the manifest.
+- Expanded runtime tests to verify source URLs, package types, version policies, and candidate paths.
+- Updated English and Chinese Windows runtime documentation.
+- Rewrote `docs/windows-runtime.zh-CN.md` as readable UTF-8 Chinese text.
+
+Changed areas:
+
+- `config/defaults/runtimes.json`
+- `core/node/src/core.ts`
+- `core/node/src/types.ts`
+- `core/node/dist/`
+- `docs/windows-runtime.md`
+- `docs/windows-runtime.zh-CN.md`
+- `tests/test_windows_core.py`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_setup_json_reports_runtime_diagnostics_and_valid_adapters -v`
+
+Next steps:
+
+- Add an explicit setup command for copying or unpacking runtime payloads into the expected directories.
+- Keep runtime binaries ignored by git and outside normal source commits.

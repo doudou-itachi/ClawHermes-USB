@@ -3,6 +3,26 @@ export type RuntimeDiagnostic = {
   label: string;
   path: string;
   found: boolean;
+  versionPolicy: string;
+  packageType: string;
+  sourceUrl: string;
+  installDir: string;
+  candidates: string[];
+  notes: string;
+};
+
+export type RuntimeManifest = {
+  platform: string;
+  runtimes: Array<{
+    name: string;
+    label: string;
+    versionPolicy: string;
+    packageType: string;
+    sourceUrl: string;
+    installDir: string;
+    candidates: string[];
+    notes: string;
+  }>;
 };
 
 export type AdapterDescriptor = {

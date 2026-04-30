@@ -2,7 +2,7 @@
 
 ## 目标
 
-Windows runtime 设计目标是让 ClawHermes-USB 不依赖系统级 Node.js、Python 或 Git 安装。
+Windows runtime 的目标是让 ClawHermes-USB 不依赖系统级 Node.js、Python 或 Git 安装。
 
 ## Runtime 目录
 
@@ -30,18 +30,75 @@ runtimes/windows/python/python.exe
 runtimes/windows/git/cmd/git.exe
 ```
 
-不同便携 runtime 的实际路径可能不同。后续 runtime 校验应支持可配置可执行文件路径。
+Runtime 校验由以下配置驱动：
+
+```text
+config/defaults/runtimes.json
+```
+
+该 manifest 记录 runtime 名称、版本策略、包类型、官方来源、安装目录、候选可执行文件路径和打包注意事项。这样 setup 诊断不需要把所有路径硬编码在代码里。
+
+## 推荐 Runtime 包
+
+### Node.js
+
+使用官方 Windows standalone zip：
+
+```text
+https://nodejs.org/en/download
+```
+
+解压后应让 `node.exe` 位于：
+
+```text
+runtimes/windows/node/node.exe
+```
+
+当前项目记录 `lts` 版本策略，而不是在仓库中固定某个具体 Node 版本。
+
+### Python
+
+使用官方 Windows embeddable package：
+
+```text
+https://www.python.org/downloads/windows/
+```
+
+解压后应让 `python.exe` 位于：
+
+```text
+runtimes/windows/python/python.exe
+```
+
+Embeddable package 默认是隔离环境，并且不包含 pip。需要 Python 包的 service adapter 不应依赖宿主机 Python 或全局 pip。
+
+### Git
+
+使用 Git for Windows Portable，也就是 thumbdrive edition：
+
+```text
+https://git-scm.com/downloads/win
+```
+
+解压后应至少存在以下文件之一：
+
+```text
+runtimes/windows/git/cmd/git.exe
+runtimes/windows/git/bin/git.exe
+```
 
 ## 约束
 
 - 除非显式允许，不调用全局安装的 `npm`、`python` 或 `git`。
 - 不永久修改宿主机环境变量。
-- 正常启动时不安装 Windows 服务。
+- 正常启动时不安装 Windows service。
 - MVP 尽量不要求管理员权限。
+- 不在日常启动中静默下载或更新 runtime payload。
+- 不把 runtime 二进制提交到 git。
 
 ## 已知风险
 
 - Node native modules 可能需要 Visual C++ runtime 或预构建二进制。
 - PTY 包在不同 Windows 版本上的行为可能不同。
-- 可移动盘启动时可能被杀毒软件拖慢。
+- 从可移动盘启动时可能被杀毒软件拖慢。
 - 老版本 Windows 的长路径限制可能影响 package 安装。

@@ -3,7 +3,7 @@ import { createServer } from "node:net";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve, sep } from "node:path";
 import { get } from "node:http";
-import type { AdapterDescriptor, AdapterValidation, IntegrationReadiness, RuntimeDiagnostic, ServiceStatus } from "./types";
+import type { AdapterDescriptor, AdapterValidation, IntegrationReadiness, RuntimeDiagnostic, RuntimeManifest, ServiceStatus } from "./types";
 
 export const PORTAL_URL = "http://127.0.0.1:17000/";
 
@@ -70,11 +70,24 @@ export function validateAdapter(adapter: AdapterDescriptor, knownIds: string[]):
 
 export function runtimeDiagnostics(usbRoot: string): RuntimeDiagnostic[] {
   const root = getRoot(usbRoot);
-  return [
-    { name: "node", label: "Portable Node.js", path: join(root, "runtimes", "windows", "node", "node.exe") },
-    { name: "python", label: "Portable Python", path: join(root, "runtimes", "windows", "python", "python.exe") },
-    { name: "git", label: "Portable Git", path: join(root, "runtimes", "windows", "git", "cmd", "git.exe") },
-  ].map((runtime) => ({ ...runtime, found: existsSync(runtime.path) }));
+  const manifestPath = join(root, "config", "defaults", "runtimes.json");
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as RuntimeManifest;
+  return manifest.runtimes.map((runtime) => {
+    const resolvedCandidates = runtime.candidates.map((candidate) => resolveRelative(root, candidate));
+    const foundPath = resolvedCandidates.find((candidate) => existsSync(candidate)) ?? resolvedCandidates[0];
+    return {
+      name: runtime.name,
+      label: runtime.label,
+      path: foundPath,
+      found: resolvedCandidates.some((candidate) => existsSync(candidate)),
+      versionPolicy: runtime.versionPolicy,
+      packageType: runtime.packageType,
+      sourceUrl: runtime.sourceUrl,
+      installDir: resolveRelative(root, runtime.installDir),
+      candidates: resolvedCandidates,
+      notes: runtime.notes,
+    };
+  });
 }
 
 export function integrationReadiness(adapters: AdapterDescriptor[]): IntegrationReadiness[] {

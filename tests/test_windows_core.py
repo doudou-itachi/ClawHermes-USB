@@ -121,6 +121,18 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertEqual(runtime_names, {"node", "python", "git"})
         missing = [runtime for runtime in payload["runtimes"] if not runtime["found"]]
         self.assertEqual({runtime["name"] for runtime in missing}, {"node", "python", "git"})
+        node_runtime = next(runtime for runtime in payload["runtimes"] if runtime["name"] == "node")
+        python_runtime = next(runtime for runtime in payload["runtimes"] if runtime["name"] == "python")
+        git_runtime = next(runtime for runtime in payload["runtimes"] if runtime["name"] == "git")
+        self.assertEqual(node_runtime["versionPolicy"], "lts")
+        self.assertIn("nodejs.org", node_runtime["sourceUrl"])
+        self.assertIn("embeddable", python_runtime["packageType"])
+        self.assertIn("python.org", python_runtime["sourceUrl"])
+        self.assertIn("Portable", git_runtime["packageType"])
+        self.assertIn("git-scm.com", git_runtime["sourceUrl"])
+        self.assertTrue(any(candidate.endswith("node.exe") for candidate in node_runtime["candidates"]))
+        self.assertTrue(any(candidate.endswith("python.exe") for candidate in python_runtime["candidates"]))
+        self.assertTrue(any(candidate.endswith("git.exe") for candidate in git_runtime["candidates"]))
 
         self.assertTrue(payload["dataWritable"])
         self.assertIn("Portable Node.js not found", "\n".join(payload["messages"]))
