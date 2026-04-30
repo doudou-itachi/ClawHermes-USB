@@ -174,6 +174,8 @@ Service-specific assumptions belong in adapters.
 - Keep secrets out of committed files.
 - Write logs under `data/logs/`.
 - Write temporary process metadata under `data/tmp/`.
+- Clean up large temporary test and integration artifacts after use, especially directories created under the host temp folder such as `%TEMP%\ClawHermes-USB-*`.
+- Do not leave upstream checkouts, `node_modules`, downloaded archives, caches, or disposable runtime labs on the host `C:` drive after verification is complete.
 - Keep documentation updated when changing architecture or adapter behavior.
 
 ## Documentation Expectations

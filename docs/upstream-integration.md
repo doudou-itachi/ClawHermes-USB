@@ -1,6 +1,6 @@
 # Upstream Integration Notes
 
-Last verified: 2026-04-30
+Last verified: 2026-05-01
 
 This document records the current upstream startup facts that affect ClawHermes-USB adapters. It is intentionally conservative: production adapter commands should not be enabled until the portable data paths, process behavior, and Windows support level are verified against installed upstream payloads.
 
@@ -43,13 +43,16 @@ Source:
 
 Current conclusion:
 
-- Upstream documents npm global install followed by `hermes-web-ui start`.
-- Default UI URL is `http://localhost:8648`.
+- Upstream source checkout under `apps/hermes-web-ui` works with official portable Node.js 24.15.0.
+- `npm install` completed successfully in a disposable Windows lab root.
+- `npm run start` launched through `start-adapter hermes-web-ui --confirm-start`.
+- Default UI URL is `http://127.0.0.1:8648`.
 - The BFF server proxies to Hermes Gateway on port `8642`.
-- Upstream also documents `hermes-web-ui start --port 9000` for custom ports and `hermes-web-ui stop` for stopping the background process.
-- The current adapter remains a candidate because ClawHermes-USB still needs to decide between source checkout mode under `apps/hermes-web-ui` and CLI package mode under portable Node.js.
+- `status --json` reported HTTP health ready with status code `200`.
+- `verify-adapter hermes-web-ui --json` reported `productionReadyCandidate: true`.
+- The default repository still keeps only a `.gitkeep` app placeholder; normal `start` stays in placeholder mode until the current USB root has a real checkout.
 
-Adapter status: `candidate`
+Adapter status: `verified`
 
 ## Next Integration Gate
 
