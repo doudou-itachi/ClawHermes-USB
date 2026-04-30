@@ -154,6 +154,47 @@ function Get-ClawHermesRuntimeDiagnostics {
     return $diagnostics
 }
 
+function Get-ClawHermesIntegrationReadiness {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object[]]$Adapters
+    )
+
+    $readiness = @()
+    foreach ($adapter in $Adapters) {
+        $integration = $adapter.integration
+        $status = "unknown"
+        $productionReady = $false
+        $summary = "No upstream integration metadata has been recorded for this adapter."
+        $verifiedAt = $null
+        $sources = @()
+
+        if ($null -ne $integration) {
+            if (-not [string]::IsNullOrWhiteSpace($integration.status)) {
+                $status = $integration.status
+            }
+            if ($null -ne $integration.productionReady) {
+                $productionReady = [bool]$integration.productionReady
+            }
+            if (-not [string]::IsNullOrWhiteSpace($integration.summary)) {
+                $summary = $integration.summary
+            }
+            $verifiedAt = $integration.verifiedAt
+            $sources = @($integration.sources)
+        }
+
+        $readiness += [pscustomobject]@{
+            id = $adapter.id
+            status = $status
+            productionReady = $productionReady
+            verifiedAt = $verifiedAt
+            summary = $summary
+            sources = @($sources)
+        }
+    }
+    return $readiness
+}
+
 function Test-ClawHermesDataWritable {
     param(
         [Parameter(Mandatory = $true)]
@@ -186,6 +227,7 @@ function Test-ClawHermesSetup {
     $knownIds = @($adapters | ForEach-Object { $_.id })
     $adapterResults = @($adapters | ForEach-Object { Test-ClawHermesAdapter -Adapter $_ -KnownIds $knownIds })
     $runtimeResults = @(Get-ClawHermesRuntimeDiagnostics -UsbRoot $root)
+    $readinessResults = @(Get-ClawHermesIntegrationReadiness -Adapters $adapters)
     $dataWritable = Test-ClawHermesDataWritable -UsbRoot $root
 
     $messages = New-Object System.Collections.Generic.List[string]
@@ -201,6 +243,11 @@ function Test-ClawHermesSetup {
             }
         }
     }
+    foreach ($readiness in $readinessResults) {
+        if (-not $readiness.productionReady) {
+            $messages.Add("Adapter $($readiness.id) integration is not production-ready: $($readiness.summary)")
+        }
+    }
     if (-not $dataWritable) {
         $messages.Add("Data directory is not writable.")
     }
@@ -209,6 +256,7 @@ function Test-ClawHermesSetup {
         root = $root
         adapters = @($adapterResults)
         runtimes = @($runtimeResults)
+        readiness = @($readinessResults)
         dataWritable = $dataWritable
         messages = @($messages)
     }

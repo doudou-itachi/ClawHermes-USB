@@ -123,3 +123,35 @@ Validation performed:
 Next steps:
 
 - Keep portal implementation intentionally small until real service status and log viewing are wired in.
+
+### Upstream Integration Readiness
+
+Status: `Done`
+
+Summary:
+
+- Verified current upstream startup guidance before enabling real adapter commands.
+- Added `docs/upstream-integration.md` with conservative integration conclusions and source links.
+- Added machine-readable `integration` metadata to OpenClaw, Hermes Agent, and Hermes Web UI adapter descriptors.
+- Updated setup diagnostics to report adapter integration readiness alongside runtime and adapter validation.
+- Updated adapter READMEs with the 2026-04-30 upstream check.
+
+Changed areas:
+
+- `adapters/openclaw/`
+- `adapters/hermes-agent/`
+- `adapters/hermes-web-ui/`
+- `core/windows/ClawHermes.Core.psm1`
+- `docs/upstream-integration.md`
+- `tests/test_windows_core.py`
+
+Validation performed:
+
+- `python -m unittest tests.test_windows_core -v`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File core\windows\clawhermes.ps1 setup -UsbRoot . -Json`
+
+Next steps:
+
+- Decide the portable runtime acquisition strategy for Node.js, Python, and Git.
+- Verify installed upstream payloads locally before marking any adapter `productionReady: true`.
+- Prefer foreground commands for services managed by ClawHermes-USB; avoid upstream service installers for portable daily startup.

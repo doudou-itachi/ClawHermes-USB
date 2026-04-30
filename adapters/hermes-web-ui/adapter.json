@@ -39,6 +39,15 @@
     "url": "http://127.0.0.1:8648",
     "group": "Hermes"
   },
+  "integration": {
+    "status": "candidate",
+    "productionReady": false,
+    "verifiedAt": "2026-04-30",
+    "summary": "Upstream documents `hermes-web-ui start` and `hermes-web-ui start --port 9000`, with default UI port 8648 and BFF proxying Hermes on 8642. The portable adapter still needs source-vs-CLI install mode verification.",
+    "sources": [
+      "https://github.com/EKKOLearnAI/hermes-web-ui"
+    ]
+  },
   "dependsOn": [
     "hermes-agent"
   ]

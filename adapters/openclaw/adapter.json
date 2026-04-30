@@ -38,5 +38,14 @@
     "url": null,
     "group": "OpenClaw"
   },
+  "integration": {
+    "status": "blocked",
+    "productionReady": false,
+    "verifiedAt": "2026-04-30",
+    "summary": "Official Windows guidance recommends WSL2 for the full experience. Native Windows gateway use exists but has service-install caveats, so the portable native adapter is blocked until data path and port behavior are verified.",
+    "sources": [
+      "https://github.com/openclaw/openclaw/blob/main/docs/platforms/windows.md"
+    ]
+  },
   "dependsOn": []
 }

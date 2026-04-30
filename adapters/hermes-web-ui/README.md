@@ -17,4 +17,10 @@ This adapter integrates EKKOLearnAI/hermes-web-ui.
 
 ## Notes
 
-The command in `adapter.json` assumes a normal Node project start script. The real implementation must verify the current upstream package scripts before enabling production startup.
+The current upstream quick start documents `hermes-web-ui start`, with `hermes-web-ui start --port <port>` for custom ports and `hermes-web-ui stop` for shutdown.
+
+## 2026-04-30 Upstream Check
+
+EKKOLearnAI/hermes-web-ui defaults to port `8648` and proxies Hermes Gateway on `8642`. It can be run through a globally installed CLI package, while development mode uses source checkout commands.
+
+For ClawHermes-USB, the adapter remains a candidate until we decide whether portable runtime setup should install the CLI package into the USB environment or run from the `apps/hermes-web-ui` source checkout.

@@ -12,7 +12,7 @@
   },
   "commands": {
     "setup": "python -m pip install -e .",
-    "start": "hermes gateway",
+    "start": "hermes gateway run",
     "stop": null
   },
   "env": {
@@ -37,6 +37,16 @@
     "label": "Hermes Agent API",
     "url": "http://127.0.0.1:8642",
     "group": "Hermes"
+  },
+  "integration": {
+    "status": "blocked",
+    "productionReady": false,
+    "verifiedAt": "2026-04-30",
+    "summary": "Official Hermes Agent install support is Linux, macOS, and Windows through WSL2. Native Windows portable startup remains blocked until Hermes confirms native Windows support and HERMES_HOME behavior.",
+    "sources": [
+      "https://hermes-agent.org/",
+      "https://github.com/NousResearch/hermes-agent/blob/main/hermes_cli/gateway.py"
+    ]
   },
   "dependsOn": []
 }

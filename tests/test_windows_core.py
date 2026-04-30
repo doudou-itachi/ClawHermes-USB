@@ -130,6 +130,30 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertIn("Portable Python not found", "\n".join(payload["messages"]))
         self.assertIn("Portable Git not found", "\n".join(payload["messages"]))
 
+    def test_setup_json_reports_adapter_integration_readiness(self):
+        result = run_dispatcher("setup", "-Json")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        readiness = {item["id"]: item for item in payload["readiness"]}
+
+        self.assertEqual(readiness["openclaw"]["status"], "blocked")
+        self.assertFalse(readiness["openclaw"]["productionReady"])
+        self.assertIn("WSL2", readiness["openclaw"]["summary"])
+
+        self.assertEqual(readiness["hermes-agent"]["status"], "blocked")
+        self.assertFalse(readiness["hermes-agent"]["productionReady"])
+        self.assertIn("WSL2", readiness["hermes-agent"]["summary"])
+
+        self.assertEqual(readiness["hermes-web-ui"]["status"], "candidate")
+        self.assertFalse(readiness["hermes-web-ui"]["productionReady"])
+        self.assertIn("hermes-web-ui start", readiness["hermes-web-ui"]["summary"])
+
+        messages = "\n".join(payload["messages"])
+        self.assertIn("Adapter openclaw integration is not production-ready", messages)
+        self.assertIn("Adapter hermes-agent integration is not production-ready", messages)
+        self.assertIn("Adapter hermes-web-ui integration is not production-ready", messages)
+
     def test_start_status_stop_manage_placeholder_pid_metadata(self):
         start = run_dispatcher("start", "-Json")
 
