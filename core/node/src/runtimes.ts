@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import type { AdapterDescriptor, AdapterRuntimeRequirementDiagnostic, RuntimeDiagnostic, RuntimeInstallResult, RuntimeManifest, RuntimePreparationStep } from "./types";
+import { loadAdapters } from "./adapters";
 import { getRoot, resolveRelative } from "./portable";
 
 export function runtimeDiagnostics(usbRoot: string): RuntimeDiagnostic[] {
@@ -63,7 +64,9 @@ export function loadRuntimeManifest(usbRoot: string): RuntimeManifest {
 export function runtimePreparationPlan(usbRoot: string) {
   const root = getRoot(usbRoot);
   const manifest = loadRuntimeManifest(root);
+  const adapters = loadAdapters(root);
   const diagnosticsByName = new Map(runtimeDiagnostics(root).map((runtime) => [runtime.name, runtime]));
+  const adapterRuntimeRequirements = adapterRuntimeRequirementDiagnostics(root, adapters);
   const steps: RuntimePreparationStep[] = manifest.runtimes.map((runtime) => {
     const diagnostic = diagnosticsByName.get(runtime.name);
     return {
@@ -89,6 +92,7 @@ export function runtimePreparationPlan(usbRoot: string) {
     root,
     platform: manifest.platform,
     steps,
+    adapterRuntimeRequirements,
     messages,
   };
 }

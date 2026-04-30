@@ -9,6 +9,7 @@ const node_child_process_1 = require("node:child_process");
 const node_crypto_1 = require("node:crypto");
 const node_fs_1 = require("node:fs");
 const node_path_1 = require("node:path");
+const adapters_1 = require("./adapters");
 const portable_1 = require("./portable");
 function runtimeDiagnostics(usbRoot) {
     const root = (0, portable_1.getRoot)(usbRoot);
@@ -65,7 +66,9 @@ function loadRuntimeManifest(usbRoot) {
 function runtimePreparationPlan(usbRoot) {
     const root = (0, portable_1.getRoot)(usbRoot);
     const manifest = loadRuntimeManifest(root);
+    const adapters = (0, adapters_1.loadAdapters)(root);
     const diagnosticsByName = new Map(runtimeDiagnostics(root).map((runtime) => [runtime.name, runtime]));
+    const adapterRuntimeRequirements = adapterRuntimeRequirementDiagnostics(root, adapters);
     const steps = manifest.runtimes.map((runtime) => {
         const diagnostic = diagnosticsByName.get(runtime.name);
         return {
@@ -91,6 +94,7 @@ function runtimePreparationPlan(usbRoot) {
         root,
         platform: manifest.platform,
         steps,
+        adapterRuntimeRequirements,
         messages,
     };
 }

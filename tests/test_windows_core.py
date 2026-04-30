@@ -1104,6 +1104,14 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertEqual("official-windows-embeddable", steps["python"]["packageType"])
         self.assertIn("thumbdrive", steps["git"]["notes"])
         self.assertTrue(any(message.startswith("Download Portable Node.js") for message in payload["messages"]))
+        requirements = {
+            item["serviceId"]: item
+            for item in payload["adapterRuntimeRequirements"]
+            if item["versionRequirement"]
+        }
+        self.assertEqual(requirements["hermes-web-ui"]["runtime"], "node")
+        self.assertEqual(requirements["hermes-web-ui"]["versionRequirement"], ">=23.0.0")
+        self.assertIn("requires node >=23.0.0", requirements["hermes-web-ui"]["message"])
 
     def test_install_runtime_dry_run_reports_archive_plan(self):
         archive = ROOT / "data" / "tmp" / "node-runtime-test.zip"

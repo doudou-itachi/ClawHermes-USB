@@ -1568,3 +1568,33 @@ Validation performed:
 Next steps:
 
 - Prepare a portable Node >=23 runtime before attempting real `setup-adapter hermes-web-ui --confirm-setup`.
+
+### Runtime Preparation Requirements
+
+Status: `Done`
+
+Summary:
+
+- `runtimes --json` now includes `adapterRuntimeRequirements`.
+- Runtime preparation output surfaces Hermes Web UI's Node `>=23.0.0` requirement before any runtime download or setup command is attempted.
+- Reused the same diagnostics as setup output so runtime preparation and setup agree on version requirement messages.
+
+Changed areas:
+
+- `core/node/src/runtimes.ts`
+- `core/node/dist/runtimes.js`
+- `tests/test_windows_core.py`
+- `docs/PROGRESS.md`
+- `docs/superpowers/plans/2026-05-01-add-runtime-plan-requirements.md`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_runtimes_json_outputs_preparation_steps_from_manifest -v`
+- `npm test`
+- `git diff --check`
+- UTF-8 smoke check
+
+Next steps:
+
+- Select and install a portable Node release satisfying `>=23.0.0`, then retry the disposable Hermes Web UI setup flow.
