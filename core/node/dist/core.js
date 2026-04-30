@@ -821,6 +821,7 @@ async function startSkeleton(usbRoot) {
     }
     generatePortal(root);
     const portal = await startPortalServer(root);
+    writeStatusSnapshot(root, getStatus(root));
     return { root, started, portal, setupMessages: setup.messages };
 }
 function shouldLaunchManagedProcess(adapter) {

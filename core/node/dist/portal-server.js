@@ -21,6 +21,7 @@ function parseArgs(argv) {
 }
 const { usbRoot, port } = parseArgs(process.argv.slice(2));
 const portalFile = (0, node_path_1.join)(usbRoot, "portal", "index.html");
+const statusFile = (0, node_path_1.join)(usbRoot, "data", "tmp", "status.json");
 const logFile = (0, node_path_1.join)(usbRoot, "data", "logs", "portal.log");
 (0, node_fs_1.mkdirSync)((0, node_path_1.dirname)(logFile), { recursive: true });
 function log(message) {
@@ -28,6 +29,19 @@ function log(message) {
 }
 const server = (0, node_http_1.createServer)((request, response) => {
     try {
+        if (request.url === "/status.json") {
+            if (!(0, node_fs_1.existsSync)(statusFile)) {
+                response.writeHead(503, { "content-type": "application/json; charset=utf-8" });
+                response.end(JSON.stringify({ error: "Status snapshot is not available" }));
+                return;
+            }
+            response.writeHead(200, {
+                "content-type": "application/json; charset=utf-8",
+                "cache-control": "no-store",
+            });
+            response.end((0, node_fs_1.readFileSync)(statusFile));
+            return;
+        }
         if (request.url !== "/" && request.url !== "/index.html") {
             response.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
             response.end("Not found");

@@ -648,3 +648,32 @@ Validation performed:
 Next steps:
 
 - Add a `refresh-status` portal endpoint or lightweight status file serving path so the portal can update health without regenerating the full HTML.
+
+### Portal Status Endpoint
+
+Status: `Done`
+
+Summary:
+
+- `start` now writes an initial `data/tmp/status.json` snapshot after the portal process is running.
+- The portal server now serves `/status.json` from the status snapshot.
+- `/status.json` uses JSON content type and `no-store` cache control for refresh-friendly reads.
+- Portal HTML serving and lifecycle behavior remain intact.
+
+Changed areas:
+
+- `core/node/src/core.ts`
+- `core/node/src/portal-server.ts`
+- `core/node/dist/`
+- `docs/PROGRESS.md`
+- `docs/superpowers/plans/2026-05-01-portal-status-endpoint.md`
+- `tests/test_windows_core.py`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_start_serves_portal_over_localhost_and_stop_shuts_it_down tests.test_windows_core.WindowsCoreTests.test_start_generates_portal_from_adapter_metadata -v`
+
+Next steps:
+
+- Add a small portal-side refresh script that fetches `/status.json` and updates health cells without reloading the page.

@@ -819,6 +819,7 @@ export async function startSkeleton(usbRoot: string) {
   }
   generatePortal(root);
   const portal = await startPortalServer(root);
+  writeStatusSnapshot(root, getStatus(root));
   return { root, started, portal, setupMessages: setup.messages };
 }
 

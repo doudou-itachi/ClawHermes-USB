@@ -44,6 +44,11 @@ def fetch_portal(timeout=0.5):
         return response.read().decode("utf-8")
 
 
+def fetch_portal_status(timeout=0.5):
+    with urllib.request.urlopen(f"{PORTAL_URL}status.json", timeout=timeout) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
 def wait_for_portal():
     deadline = time.time() + 5
     last_error = None
@@ -934,6 +939,12 @@ class WindowsCoreTests(unittest.TestCase):
         status_payload = json.loads(status.stdout)
         statuses = {service["id"]: service["status"] for service in status_payload["services"]}
         self.assertEqual(statuses["portal"], "running")
+
+        portal_status = fetch_portal_status()
+        self.assertIn("generatedAt", portal_status)
+        portal_services = {service["id"]: service for service in portal_status["services"]}
+        self.assertEqual(portal_services["portal"]["status"], "running")
+        self.assertIn("health", portal_services["portal"])
 
         portal_pid = ROOT / "data" / "tmp" / "pids" / "portal.pid"
         self.assertTrue(portal_pid.exists())
