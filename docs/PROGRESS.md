@@ -1837,3 +1837,39 @@ Validation performed:
 Next steps:
 
 - Add supervised WSL2 process metadata once a WSL2 distro can be used to validate process lifetime and stop behavior.
+
+### WSL2 Distro Targeting
+
+Status: `Done`
+
+Summary:
+
+- Added explicit WSL distro targeting for WSL2 adapters.
+- Hermes Agent now declares `runtime.distro: Ubuntu`.
+- `wsl --distro Ubuntu --json` reports the desired distro, whether it is registered, and its WSL version when available.
+- `setup-adapter hermes-agent --dry-run --json` and `start-adapter hermes-agent --dry-run --json` include `--distribution Ubuntu` in the generated WSL arguments.
+- Documented that users must install and initialize WSL2 themselves; ClawHermes-USB only diagnoses and uses an existing distro.
+
+Changed areas:
+
+- `adapters/hermes-agent/adapter.json`
+- `core/node/src/wsl.ts`
+- `core/node/src/wsl-adapter.ts`
+- `core/node/src/diagnostics.ts`
+- `core/node/src/clawhermes.ts`
+- `core/node/src/types.ts`
+- `core/node/dist/`
+- `tests/test_windows_core.py`
+- `README.md`
+- `docs/ADAPTER_CONTRACT.md`
+- `docs/PROGRESS.md`
+- `docs/superpowers/plans/2026-05-01-wsl2-distro-targeting.md`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_wsl_json_reports_desired_distro tests.test_windows_core.WindowsCoreTests.test_adapters_json_reports_hermes_agent_wsl2_strategy tests.test_windows_core.WindowsCoreTests.test_setup_adapter_wsl2_dry_run_reports_wsl_command_without_running tests.test_windows_core.WindowsCoreTests.test_start_adapter_wsl2_dry_run_reports_wsl_command_without_running -v`
+
+Next steps:
+
+- Add user-facing WSL2 readiness guidance around `wsl.exe --install -d Ubuntu`, while keeping installation user-owned and outside automatic setup.

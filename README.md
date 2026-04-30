@@ -47,7 +47,7 @@ Run the Node CLI directly:
 
 ```powershell
 node core/node/dist/clawhermes.js setup --json
-node core/node/dist/clawhermes.js wsl --json
+node core/node/dist/clawhermes.js wsl --distro Ubuntu --json
 node core/node/dist/clawhermes.js adapters --json
 node core/node/dist/clawhermes.js adapters hermes-web-ui --json
 node core/node/dist/clawhermes.js sources --json

@@ -7,7 +7,7 @@ import { startAdapter, stopAdapter } from "./lifecycle";
 import { getRoot, resolveRelative } from "./portable";
 import { generatePortal, getPortalStatus, startPortalServer, stopPortalServer } from "./portal";
 import { adapterHealth, processExists, writeStatusSnapshot } from "./status";
-import { assertWslReadyForAdapter, wslAdapterCommandPlan } from "./wsl-adapter";
+import { assertWslReadyForAdapterDistro, wslAdapterCommandPlan } from "./wsl-adapter";
 
 export { dataWritable, getRoot, portableEnv } from "./portable";
 export { integrationReadiness, loadAdapters, serviceOrder, validateAdapter } from "./adapters";
@@ -72,7 +72,7 @@ export function startSingleAdapter(usbRoot: string, serviceId: string | undefine
   }
   if (options.dryRun) return result;
   if (wslPlan) {
-    assertWslReadyForAdapter(root, serviceId);
+    assertWslReadyForAdapterDistro(root, serviceId, adapter.runtime?.distro);
     throw new Error(`WSL2 start supervision for ${serviceId} is not implemented yet. Use --dry-run to inspect the command plan.`);
   }
   const metadata = startAdapter(root, adapter, { forceManaged: true });

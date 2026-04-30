@@ -8,7 +8,8 @@
   "runtime": {
     "kind": "wsl2",
     "platform": "windows",
-    "requiredExecutable": "wsl.exe"
+    "requiredExecutable": "wsl.exe",
+    "distro": "Ubuntu"
   },
   "upstream": {
     "name": "NousResearch/hermes-agent",

@@ -15,6 +15,7 @@ type ParsedArgs = {
   confirmSetup: boolean;
   confirmReady: boolean;
   confirmStart: boolean;
+  distro?: string;
   summary?: string;
   lines: number;
 };
@@ -34,6 +35,7 @@ function parseArgs(argv: string[]): ParsedArgs {
   let confirmSetup = false;
   let confirmReady = false;
   let confirmStart = false;
+  let distro: string | undefined;
   let summary: string | undefined;
   let lines = 50;
   for (let index = 0; index < args.length; index += 1) {
@@ -64,6 +66,9 @@ function parseArgs(argv: string[]): ParsedArgs {
       confirmReady = true;
     } else if (arg === "--confirm-start") {
       confirmStart = true;
+    } else if (arg === "--distro" && args[index + 1]) {
+      distro = args[index + 1];
+      index += 1;
     } else if (arg === "--summary" && args[index + 1]) {
       summary = args[index + 1];
       index += 1;
@@ -74,7 +79,7 @@ function parseArgs(argv: string[]): ParsedArgs {
       positional.push(arg);
     }
   }
-  return { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, confirmCheckout, confirmSetup, confirmReady, confirmStart, summary, lines };
+  return { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, confirmCheckout, confirmSetup, confirmReady, confirmStart, distro, summary, lines };
 }
 
 function parseBackupProfile(value: string): BackupProfile {
@@ -87,7 +92,7 @@ function printJson(value: unknown): void {
 }
 
 async function main(): Promise<void> {
-  const { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, confirmCheckout, confirmSetup, confirmReady, confirmStart, summary, lines } = parseArgs(process.argv.slice(2));
+  const { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, confirmCheckout, confirmSetup, confirmReady, confirmStart, distro, summary, lines } = parseArgs(process.argv.slice(2));
   const root = getRoot(usbRoot);
 
   switch (action) {
@@ -126,7 +131,7 @@ async function main(): Promise<void> {
       return;
     }
     case "wsl": {
-      const result = wslDiagnostics(root);
+      const result = wslDiagnostics(root, distro);
       if (json) {
         printJson(result);
       } else {

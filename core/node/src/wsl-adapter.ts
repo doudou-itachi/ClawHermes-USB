@@ -7,7 +7,8 @@ export function wslAdapterSetupPlan(root: string, adapter: AdapterDescriptor, se
 }
 
 export function wslAdapterCommandPlan(root: string, adapter: AdapterDescriptor, serviceEnv: ServiceEnvironment, phase: "setup" | "start") {
-  const diagnostics = wslDiagnostics(root);
+  const distro = adapter.runtime?.distro;
+  const diagnostics = wslDiagnostics(root, distro);
   const workingDirectory = windowsPathToWslPath(resolveRelative(root, adapter.appDir));
   const command = adapter.commands[phase];
   if (!command) throw new Error(`Adapter ${adapter.id} does not declare a ${phase} command.`);
@@ -18,7 +19,7 @@ export function wslAdapterCommandPlan(root: string, adapter: AdapterDescriptor, 
   return {
     executablePath: diagnostics.executablePath ?? "wsl.exe",
     workingDirectory,
-    args: ["--cd", workingDirectory, "--", "bash", "-lc", script],
+    args: [...distroArgs(distro), "--cd", workingDirectory, "--", "bash", "-lc", script],
     script,
     diagnostics,
   };
@@ -29,6 +30,19 @@ export function assertWslReadyForAdapter(root: string, serviceId: string): void 
   if (!diagnostics.found || !diagnostics.hasWsl2Distro) {
     throw new Error(`WSL2 is not ready for ${serviceId}: ${diagnostics.messages.join(" ")}`);
   }
+}
+
+export function assertWslReadyForAdapterDistro(root: string, serviceId: string, distro: string | undefined): void {
+  const diagnostics = wslDiagnostics(root, distro);
+  const distroReady = distro ? diagnostics.hasDesiredDistro && diagnostics.desiredDistroVersion === 2 : diagnostics.hasWsl2Distro;
+  if (!diagnostics.found || !distroReady) {
+    throw new Error(`WSL2 is not ready for ${serviceId}: ${diagnostics.messages.join(" ")}`);
+  }
+}
+
+function distroArgs(distro: string | undefined): string[] {
+  const trimmed = distro?.trim();
+  return trimmed ? ["--distribution", trimmed] : [];
 }
 
 function environmentExports(root: string, env: Record<string, string>): string[] {

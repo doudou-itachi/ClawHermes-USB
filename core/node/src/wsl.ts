@@ -3,8 +3,9 @@ import { existsSync } from "node:fs";
 import type { WslDiagnostic, WslDistroDiagnostic } from "./types";
 import { getRoot } from "./portable";
 
-export function wslDiagnostics(usbRoot: string): WslDiagnostic {
+export function wslDiagnostics(usbRoot: string, desiredDistro?: string): WslDiagnostic {
   const root = getRoot(usbRoot);
+  const targetDistro = normalizeDesiredDistro(desiredDistro);
   const executablePath = resolveWslExecutable();
   if (!executablePath) {
     return {
@@ -18,6 +19,9 @@ export function wslDiagnostics(usbRoot: string): WslDiagnostic {
       distros: [],
       defaultDistro: null,
       hasWsl2Distro: false,
+      desiredDistro: targetDistro,
+      hasDesiredDistro: false,
+      desiredDistroVersion: null,
       messages: ["wsl.exe not found. Install or enable WSL2 before running WSL2 adapters."],
     };
   }
@@ -27,11 +31,14 @@ export function wslDiagnostics(usbRoot: string): WslDiagnostic {
   const distros = list.ok ? parseWslList(list.output) : [];
   const defaultDistro = distros.find((distro) => distro.default)?.name ?? null;
   const hasWsl2Distro = distros.some((distro) => distro.version === 2);
+  const desired = targetDistro ? distros.find((distro) => distro.name.toLowerCase() === targetDistro.toLowerCase()) ?? null : null;
   const messages: string[] = [];
   if (!status.ok) messages.push(`wsl.exe --status failed: ${status.output}`);
   if (!list.ok) messages.push(`wsl.exe --list --verbose failed: ${list.output}`);
   if (list.ok && distros.length === 0) messages.push("No WSL distributions are registered.");
   if (distros.length > 0 && !hasWsl2Distro) messages.push("No registered WSL2 distribution was detected.");
+  if (targetDistro && list.ok && !desired) messages.push(`Target WSL distribution is not registered: ${targetDistro}.`);
+  if (desired && desired.version !== 2) messages.push(`Target WSL distribution ${targetDistro} is version ${desired.version ?? "unknown"}, not WSL2.`);
   if (messages.length === 0) messages.push("WSL2 host diagnostics passed.");
 
   return {
@@ -45,8 +52,16 @@ export function wslDiagnostics(usbRoot: string): WslDiagnostic {
     distros,
     defaultDistro,
     hasWsl2Distro,
+    desiredDistro: targetDistro,
+    hasDesiredDistro: desired !== null,
+    desiredDistroVersion: desired?.version ?? null,
     messages,
   };
+}
+
+function normalizeDesiredDistro(value: string | undefined): string | null {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
 }
 
 function resolveWslExecutable(): string | null {

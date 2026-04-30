@@ -59,7 +59,7 @@ function runAdapterSetup(usbRoot, serviceId, options) {
         return result;
     (0, node_fs_1.mkdirSync)((0, node_path_1.dirname)(logFile), { recursive: true });
     if (wslPlan) {
-        (0, wsl_adapter_1.assertWslReadyForAdapter)(root, serviceId);
+        (0, wsl_adapter_1.assertWslReadyForAdapterDistro)(root, serviceId, adapter.runtime?.distro);
     }
     const completed = wslPlan
         ? (0, node_child_process_1.spawnSync)(wslPlan.executablePath, wslPlan.args, {

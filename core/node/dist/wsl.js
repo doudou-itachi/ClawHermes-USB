@@ -4,8 +4,9 @@ exports.wslDiagnostics = wslDiagnostics;
 const node_child_process_1 = require("node:child_process");
 const node_fs_1 = require("node:fs");
 const portable_1 = require("./portable");
-function wslDiagnostics(usbRoot) {
+function wslDiagnostics(usbRoot, desiredDistro) {
     const root = (0, portable_1.getRoot)(usbRoot);
+    const targetDistro = normalizeDesiredDistro(desiredDistro);
     const executablePath = resolveWslExecutable();
     if (!executablePath) {
         return {
@@ -19,6 +20,9 @@ function wslDiagnostics(usbRoot) {
             distros: [],
             defaultDistro: null,
             hasWsl2Distro: false,
+            desiredDistro: targetDistro,
+            hasDesiredDistro: false,
+            desiredDistroVersion: null,
             messages: ["wsl.exe not found. Install or enable WSL2 before running WSL2 adapters."],
         };
     }
@@ -27,6 +31,7 @@ function wslDiagnostics(usbRoot) {
     const distros = list.ok ? parseWslList(list.output) : [];
     const defaultDistro = distros.find((distro) => distro.default)?.name ?? null;
     const hasWsl2Distro = distros.some((distro) => distro.version === 2);
+    const desired = targetDistro ? distros.find((distro) => distro.name.toLowerCase() === targetDistro.toLowerCase()) ?? null : null;
     const messages = [];
     if (!status.ok)
         messages.push(`wsl.exe --status failed: ${status.output}`);
@@ -36,6 +41,10 @@ function wslDiagnostics(usbRoot) {
         messages.push("No WSL distributions are registered.");
     if (distros.length > 0 && !hasWsl2Distro)
         messages.push("No registered WSL2 distribution was detected.");
+    if (targetDistro && list.ok && !desired)
+        messages.push(`Target WSL distribution is not registered: ${targetDistro}.`);
+    if (desired && desired.version !== 2)
+        messages.push(`Target WSL distribution ${targetDistro} is version ${desired.version ?? "unknown"}, not WSL2.`);
     if (messages.length === 0)
         messages.push("WSL2 host diagnostics passed.");
     return {
@@ -49,8 +58,15 @@ function wslDiagnostics(usbRoot) {
         distros,
         defaultDistro,
         hasWsl2Distro,
+        desiredDistro: targetDistro,
+        hasDesiredDistro: desired !== null,
+        desiredDistroVersion: desired?.version ?? null,
         messages,
     };
+}
+function normalizeDesiredDistro(value) {
+    const trimmed = value?.trim();
+    return trimmed ? trimmed : null;
 }
 function resolveWslExecutable() {
     const override = process.env.CLAWHERMES_WSL_EXE;

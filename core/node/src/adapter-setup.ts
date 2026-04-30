@@ -4,7 +4,7 @@ import { dirname } from "node:path";
 import { loadAdapters } from "./adapters";
 import { resolveServiceEnvironment } from "./environment";
 import { getRoot, resolveRelative } from "./portable";
-import { assertWslReadyForAdapter, wslAdapterSetupPlan } from "./wsl-adapter";
+import { assertWslReadyForAdapterDistro, wslAdapterSetupPlan } from "./wsl-adapter";
 
 export function runAdapterSetup(usbRoot: string, serviceId: string | undefined, options: { dryRun: boolean; confirm: boolean }) {
   const root = getRoot(usbRoot);
@@ -57,7 +57,7 @@ export function runAdapterSetup(usbRoot: string, serviceId: string | undefined, 
 
   mkdirSync(dirname(logFile), { recursive: true });
   if (wslPlan) {
-    assertWslReadyForAdapter(root, serviceId);
+    assertWslReadyForAdapterDistro(root, serviceId, adapter.runtime?.distro);
   }
   const completed = wslPlan
     ? spawnSync(wslPlan.executablePath, wslPlan.args, {

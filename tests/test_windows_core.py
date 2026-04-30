@@ -545,6 +545,17 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertFalse(payload["hasWsl2Distro"])
         self.assertIn("wsl.exe not found", "\n".join(payload["messages"]))
 
+    def test_wsl_json_reports_desired_distro(self):
+        missing_wsl = str(ROOT / "data" / "tmp" / "missing-wsl.exe")
+
+        result = run_dispatcher("wsl", "--distro", "Ubuntu", "-Json", env={"CLAWHERMES_WSL_EXE": missing_wsl})
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["desiredDistro"], "Ubuntu")
+        self.assertFalse(payload["hasDesiredDistro"])
+        self.assertIsNone(payload["desiredDistroVersion"])
+
     def test_setup_json_reports_wsl2_action_when_hermes_agent_needs_wsl2(self):
         missing_wsl = str(ROOT / "data" / "tmp" / "missing-wsl.exe")
 
@@ -860,6 +871,7 @@ class WindowsCoreTests(unittest.TestCase):
         adapter = json.loads(result.stdout)["adapters"][0]
         self.assertEqual(adapter["runtime"]["kind"], "wsl2")
         self.assertEqual(adapter["runtime"]["requiredExecutable"], "wsl.exe")
+        self.assertEqual(adapter["runtime"]["distro"], "Ubuntu")
         self.assertEqual(adapter["integration"]["platform"], "wsl2")
         self.assertEqual(adapter["integration"]["strategy"], "wsl2-adapter")
 
@@ -1075,6 +1087,8 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertEqual(payload["runner"], "wsl2")
             self.assertEqual(payload["command"], "python -m pip install -e .")
             self.assertIn("--cd", payload["wsl"]["args"])
+            self.assertIn("--distribution", payload["wsl"]["args"])
+            self.assertIn("Ubuntu", payload["wsl"]["args"])
             self.assertTrue(payload["wsl"]["workingDirectory"].startswith("/mnt/"))
             self.assertIn("bash", payload["wsl"]["args"])
             self.assertIn("HERMES_HOME=", payload["wsl"]["script"])
@@ -1492,6 +1506,8 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertEqual(payload["runner"], "wsl2")
             self.assertEqual(payload["command"], "hermes gateway run")
             self.assertIn("--cd", payload["wsl"]["args"])
+            self.assertIn("--distribution", payload["wsl"]["args"])
+            self.assertIn("Ubuntu", payload["wsl"]["args"])
             self.assertTrue(payload["wsl"]["workingDirectory"].startswith("/mnt/"))
             self.assertIn("hermes gateway run", payload["wsl"]["script"])
         finally:

@@ -78,8 +78,12 @@ function setupDiagnostics(usbRoot) {
     }
     const wslAdapters = adapters.filter((adapter) => adapter.runtime?.kind === "wsl2" || adapter.integration?.platform === "wsl2");
     for (const adapter of wslAdapters) {
-        if (!wsl.found || !wsl.hasWsl2Distro) {
-            const detail = wsl.messages.join(" ");
+        const adapterWsl = (0, wsl_1.wslDiagnostics)(root, adapter.runtime?.distro);
+        const wslReady = adapter.runtime?.distro
+            ? adapterWsl.hasDesiredDistro && adapterWsl.desiredDistroVersion === 2
+            : adapterWsl.hasWsl2Distro;
+        if (!adapterWsl.found || !wslReady) {
+            const detail = adapterWsl.messages.join(" ");
             messages.push(`Adapter ${adapter.id} requires WSL2: ${detail}`);
             actions.push({
                 id: `wsl2:${adapter.id}`,

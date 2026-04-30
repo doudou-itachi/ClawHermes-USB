@@ -546,13 +546,16 @@ Adapters that must run inside WSL2 should declare their Windows-side launcher de
 Before attempting WSL2 setup or startup, run:
 
 ```powershell
-node core/node/dist/clawhermes.js wsl --json
+node core/node/dist/clawhermes.js wsl --distro Ubuntu --json
 ```
 
 Rules:
 
 - The diagnostic is read-only.
+- Users must install and initialize WSL2 themselves before WSL2 adapters can run; ClawHermes-USB does not silently enable Windows features or install Linux distributions.
+- A typical user-owned installation command is `wsl.exe --install -d Ubuntu`, followed by the standard WSL first-run initialization.
 - Missing `wsl.exe`, missing distributions, and missing WSL2 distributions must be reported as setup actions.
+- When `runtime.distro` is set, WSL commands must include `--distribution <name>` and diagnostics must verify that target distribution.
 - WSL2 adapter setup/start commands must not run until the WSL2 diagnostic is healthy.
 10. Run `node core/node/dist/clawhermes.js checkout-source <new-service> --dry-run --json` before any real checkout.
 11. Run `node core/node/dist/clawhermes.js setup-adapter <new-service> --dry-run --json` before any real setup.

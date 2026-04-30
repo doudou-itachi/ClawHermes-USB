@@ -76,6 +76,7 @@ export type AdapterDescriptor = {
     platform: string;
     requiredExecutable: string;
     versionRequirement?: string;
+    distro?: string;
   };
   upstream?: {
     name: string;
@@ -250,5 +251,8 @@ export type WslDiagnostic = {
   distros: WslDistroDiagnostic[];
   defaultDistro: string | null;
   hasWsl2Distro: boolean;
+  desiredDistro: string | null;
+  hasDesiredDistro: boolean;
+  desiredDistroVersion: number | null;
   messages: string[];
 };

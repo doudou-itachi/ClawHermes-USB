@@ -114,7 +114,7 @@ function startSingleAdapter(usbRoot, serviceId, options) {
     if (options.dryRun)
         return result;
     if (wslPlan) {
-        (0, wsl_adapter_1.assertWslReadyForAdapter)(root, serviceId);
+        (0, wsl_adapter_1.assertWslReadyForAdapterDistro)(root, serviceId, adapter.runtime?.distro);
         throw new Error(`WSL2 start supervision for ${serviceId} is not implemented yet. Use --dry-run to inspect the command plan.`);
     }
     const metadata = (0, lifecycle_1.startAdapter)(root, adapter, { forceManaged: true });
