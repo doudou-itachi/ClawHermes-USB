@@ -447,7 +447,27 @@ Rules:
 - The command runs from `appDir` with the same resolved service environment used for startup.
 - JSON output lists environment variable names and env file diagnostics, not secret values.
 
-## 12. Contributor Workflow
+## 12. Adapter Verification Command
+
+Before marking an adapter production-ready, run the read-only verifier:
+
+```powershell
+node core/node/dist/clawhermes.js verify-adapter hermes-web-ui --json
+```
+
+The verifier reports `productionReadyCandidate` and individual checks for:
+
+- app directory readiness
+- setup command declaration
+- setup output log presence
+- start command declaration
+- env file presence
+- health check declaration
+- health behavior
+
+The command does not modify `adapter.json`. Use the result as evidence for a later explicit production-readiness metadata update.
+
+## 13. Contributor Workflow
 
 To add a new service:
 
@@ -461,6 +481,7 @@ To add a new service:
 8. Run `node core/node/dist/clawhermes.js sources <new-service> --json`.
 9. Run `node core/node/dist/clawhermes.js checkout-source <new-service> --dry-run --json` before any real checkout.
 10. Run `node core/node/dist/clawhermes.js setup-adapter <new-service> --dry-run --json` before any real setup.
-11. Update portal metadata if needed.
+11. Run `node core/node/dist/clawhermes.js verify-adapter <new-service> --json`.
+12. Update portal metadata if needed.
 
 No core code should be changed unless the service needs a new generic capability.

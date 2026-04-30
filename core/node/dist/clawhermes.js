@@ -199,6 +199,19 @@ async function main() {
             }
             return;
         }
+        case "verify-adapter": {
+            const result = (0, core_1.verifyAdapter)(root, positional[0]);
+            if (json) {
+                printJson(result);
+            }
+            else {
+                console.log(`ClawHermes-USB adapter verification: ${result.serviceId}`);
+                console.log(`Production-ready candidate: ${result.productionReadyCandidate ? "yes" : "no"}`);
+                for (const item of result.checks)
+                    console.log(`- [${item.status}] ${item.label}: ${item.message}`);
+            }
+            return;
+        }
         case "logs": {
             const target = positional[0];
             if (!target)

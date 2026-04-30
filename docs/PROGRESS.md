@@ -1342,3 +1342,43 @@ Validation performed:
 Next steps:
 
 - Add a guarded adapter verification command that checks setup output, start command readiness, and health endpoint behavior before any adapter can be marked production-ready.
+
+### Adapter Verification Command
+
+Status: `Done`
+
+Summary:
+
+- Added read-only `verify-adapter <service-id>` for one-adapter production-readiness evidence.
+- The verifier reports `productionReadyCandidate` plus checks for app directory readiness, setup command, setup output log, start command, env files, health declaration, and health behavior.
+- Verification output avoids secret values by listing env file diagnostics and variable names only.
+- Added tests for missing setup evidence, passing verification after confirmed setup for a process adapter, and unknown adapter errors.
+- Documented the command in the English and Chinese README files and adapter contract.
+
+Changed areas:
+
+- `core/node/src/adapter-verification.ts`
+- `core/node/src/clawhermes.ts`
+- `core/node/src/core.ts`
+- `core/windows/clawhermes.ps1`
+- `core/node/dist/`
+- `tests/test_windows_core.py`
+- `README.md`
+- `README.zh-CN.md`
+- `docs/ADAPTER_CONTRACT.md`
+- `docs/ADAPTER_CONTRACT.zh-CN.md`
+- `docs/PROGRESS.md`
+- `docs/superpowers/plans/2026-05-01-add-verify-adapter-command.md`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_verify_adapter_reports_missing_setup_output tests.test_windows_core.WindowsCoreTests.test_verify_adapter_passes_after_confirmed_setup_for_process_adapter tests.test_windows_core.WindowsCoreTests.test_verify_adapter_unknown_service_fails_with_actionable_message -v`
+- `npm test`
+- `git diff --check`
+- UTF-8 smoke check
+- Chinese README and adapter contract mojibake scans
+
+Next steps:
+
+- Add an explicit metadata update command for adapter integration status that requires verifier evidence instead of editing production-ready fields by hand.

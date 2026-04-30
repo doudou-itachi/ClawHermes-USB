@@ -1,4 +1,4 @@
-import { adapterSetupPlan, appSourcePlan, checkoutAppSource, createBackup, getRoot, getStatus, initializeEnvFiles, installRuntimeFromArchive, portableEnv, readLogTail, runAdapterSetup, runtimePreparationPlan, serviceEnvironmentDiagnostic, setupDiagnostics, startSkeleton, stopSkeleton, writeStatusSnapshot } from "./core";
+import { adapterSetupPlan, appSourcePlan, checkoutAppSource, createBackup, getRoot, getStatus, initializeEnvFiles, installRuntimeFromArchive, portableEnv, readLogTail, runAdapterSetup, runtimePreparationPlan, serviceEnvironmentDiagnostic, setupDiagnostics, startSkeleton, stopSkeleton, verifyAdapter, writeStatusSnapshot } from "./core";
 import type { BackupProfile } from "./backup";
 
 type ParsedArgs = {
@@ -186,6 +186,17 @@ async function main(): Promise<void> {
         console.log(result.message);
         console.log(`Command: ${result.command}`);
         console.log(`Working directory: ${result.workingDirectory}`);
+      }
+      return;
+    }
+    case "verify-adapter": {
+      const result = verifyAdapter(root, positional[0]);
+      if (json) {
+        printJson(result);
+      } else {
+        console.log(`ClawHermes-USB adapter verification: ${result.serviceId}`);
+        console.log(`Production-ready candidate: ${result.productionReadyCandidate ? "yes" : "no"}`);
+        for (const item of result.checks) console.log(`- [${item.status}] ${item.label}: ${item.message}`);
       }
       return;
     }

@@ -902,6 +902,48 @@ class WindowsCoreTests(unittest.TestCase):
         finally:
             temp_dir.cleanup()
 
+    def test_verify_adapter_reports_missing_setup_output(self):
+        temp_dir, temp_root = make_temp_process_usb_root()
+        try:
+            configure_fake_setup_command(temp_root)
+
+            result = run_dispatcher_for_root(temp_root, "verify-adapter", "fake-service", "-Json")
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            checks = {check["id"]: check for check in payload["checks"]}
+            self.assertFalse(payload["productionReadyCandidate"])
+            self.assertEqual(checks["app-dir-ready"]["status"], "pass")
+            self.assertEqual(checks["setup-output"]["status"], "fail")
+            self.assertEqual(checks["start-command"]["status"], "pass")
+            self.assertNotIn("from-env-file", result.stdout)
+        finally:
+            temp_dir.cleanup()
+
+    def test_verify_adapter_passes_after_confirmed_setup_for_process_adapter(self):
+        temp_dir, temp_root = make_temp_process_usb_root()
+        try:
+            configure_fake_setup_command(temp_root)
+            setup = run_dispatcher_for_root(temp_root, "setup-adapter", "fake-service", "--confirm-setup", "-Json")
+            self.assertEqual(setup.returncode, 0, setup.stderr)
+
+            result = run_dispatcher_for_root(temp_root, "verify-adapter", "fake-service", "-Json")
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            checks = {check["id"]: check for check in payload["checks"]}
+            self.assertTrue(payload["productionReadyCandidate"])
+            self.assertEqual(checks["setup-output"]["status"], "pass")
+            self.assertEqual(checks["health-behavior"]["status"], "pass")
+        finally:
+            temp_dir.cleanup()
+
+    def test_verify_adapter_unknown_service_fails_with_actionable_message(self):
+        result = run_dispatcher("verify-adapter", "missing-service", "-Json")
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Unknown adapter: missing-service", result.stderr)
+
     def test_runtimes_json_outputs_preparation_steps_from_manifest(self):
         result = run_dispatcher("runtimes", "-Json")
 

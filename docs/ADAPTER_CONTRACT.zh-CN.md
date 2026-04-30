@@ -447,7 +447,27 @@ node core/node/dist/clawhermes.js setup-adapter hermes-web-ui --confirm-setup --
 - 命令会在 `appDir` 中运行，并使用与启动流程相同的服务环境解析结果。
 - JSON 输出只列出环境变量名和 env 文件诊断，不输出 secret 值。
 
-## 12. 贡献者工作流
+## 12. Adapter 验证命令
+
+把 adapter 标记为 production-ready 前，先运行只读验证命令：
+
+```powershell
+node core/node/dist/clawhermes.js verify-adapter hermes-web-ui --json
+```
+
+验证器会报告 `productionReadyCandidate` 和各项检查：
+
+- app 目录就绪度
+- setup 命令声明
+- setup 输出日志是否存在
+- start 命令声明
+- env 文件是否存在
+- 健康检查声明
+- 健康行为
+
+该命令不会修改 `adapter.json`。后续如需更新 production-ready 元数据，应把这个结果作为证据。
+
+## 13. 贡献者工作流
 
 新增服务：
 
@@ -461,6 +481,7 @@ node core/node/dist/clawhermes.js setup-adapter hermes-web-ui --confirm-setup --
 8. 运行 `node core/node/dist/clawhermes.js sources <new-service> --json`。
 9. 在任何真实 checkout 前，先运行 `node core/node/dist/clawhermes.js checkout-source <new-service> --dry-run --json`。
 10. 在任何真实 setup 前，先运行 `node core/node/dist/clawhermes.js setup-adapter <new-service> --dry-run --json`。
-11. 如有需要，更新 portal 元数据。
+11. 运行 `node core/node/dist/clawhermes.js verify-adapter <new-service> --json`。
+12. 如有需要，更新 portal 元数据。
 
 除非服务需要新的通用能力，否则不应修改 core 代码。
