@@ -57,6 +57,14 @@ Example:
     "platform": "windows",
     "requiredExecutable": "node.exe"
   },
+  "upstream": {
+    "name": "EKKOLearnAI/hermes-web-ui",
+    "repositoryUrl": "https://github.com/EKKOLearnAI/hermes-web-ui",
+    "installDocs": "https://github.com/EKKOLearnAI/hermes-web-ui",
+    "checkoutRef": "main",
+    "installMode": "source-checkout",
+    "notes": "Portable adapter still needs source checkout versus package CLI mode verification."
+  },
   "commands": {
     "setup": "npm install",
     "start": "npm run start",
@@ -155,6 +163,21 @@ Fields:
 - `kind`: `node`, `python`, `git`, `binary`, or `none`
 - `platform`: `windows`, `macos`, or `any`
 - `requiredExecutable`: executable name expected under the runtime path
+
+### `upstream`
+
+Upstream source and installation metadata.
+
+Fields:
+
+- `name`: upstream project or package name
+- `repositoryUrl`: canonical source repository URL
+- `installDocs`: upstream installation or platform documentation URL
+- `checkoutRef`: branch, tag, or revision expected by the adapter
+- `installMode`: `source-checkout`, `package`, `manual`, or `unknown`
+- `notes`: concise integration notes or current blocker
+
+This metadata is consumed by `node core/node/dist/clawhermes.js adapters --json` and should be updated before a real integration is marked production-ready.
 
 ### `commands`
 

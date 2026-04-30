@@ -10,6 +10,14 @@
     "platform": "windows",
     "requiredExecutable": "python.exe"
   },
+  "upstream": {
+    "name": "NousResearch/hermes-agent",
+    "repositoryUrl": "https://github.com/NousResearch/hermes-agent",
+    "installDocs": "https://hermes-agent.org/",
+    "checkoutRef": "main",
+    "installMode": "source-checkout",
+    "notes": "Native Windows portable startup remains blocked until Hermes confirms support and HERMES_HOME behavior."
+  },
   "commands": {
     "setup": "python -m pip install -e .",
     "start": "hermes gateway run",

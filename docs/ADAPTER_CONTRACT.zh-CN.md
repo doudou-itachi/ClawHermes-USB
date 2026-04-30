@@ -57,6 +57,14 @@ adapters/<service-id>/
     "platform": "windows",
     "requiredExecutable": "node.exe"
   },
+  "upstream": {
+    "name": "EKKOLearnAI/hermes-web-ui",
+    "repositoryUrl": "https://github.com/EKKOLearnAI/hermes-web-ui",
+    "installDocs": "https://github.com/EKKOLearnAI/hermes-web-ui",
+    "checkoutRef": "main",
+    "installMode": "source-checkout",
+    "notes": "Portable adapter still needs source checkout versus package CLI mode verification."
+  },
   "commands": {
     "setup": "npm install",
     "start": "npm run start",
@@ -155,6 +163,21 @@ Adapter 禁止使用绝对路径。
 - `kind`：`node`、`python`、`git`、`binary` 或 `none`
 - `platform`：`windows`、`macos` 或 `any`
 - `requiredExecutable`：runtime 路径下预期存在的可执行文件
+
+### `upstream`
+
+上游来源和安装元数据。
+
+字段：
+
+- `name`：上游项目或 package 名称
+- `repositoryUrl`：规范来源仓库 URL
+- `installDocs`：上游安装或平台文档 URL
+- `checkoutRef`：adapter 预期使用的分支、tag 或 revision
+- `installMode`：`source-checkout`、`package`、`manual` 或 `unknown`
+- `notes`：简短集成说明或当前 blocker
+
+这些元数据会被 `node core/node/dist/clawhermes.js adapters --json` 使用。真实集成标记为 production-ready 前，应先更新并验证这些字段。
 
 ### `commands`
 

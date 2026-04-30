@@ -693,6 +693,18 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertEqual(adapter["dependsOn"], ["hermes-agent"])
         self.assertTrue(any("setup command" in step for step in adapter["nextSteps"]))
 
+    def test_adapters_json_reports_upstream_source_metadata(self):
+        result = run_dispatcher("adapters", "hermes-web-ui", "-Json")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        adapter = json.loads(result.stdout)["adapters"][0]
+
+        self.assertFalse(adapter["appDirReady"])
+        self.assertEqual(adapter["upstream"]["name"], "EKKOLearnAI/hermes-web-ui")
+        self.assertEqual(adapter["upstream"]["repositoryUrl"], "https://github.com/EKKOLearnAI/hermes-web-ui")
+        self.assertEqual(adapter["upstream"]["installMode"], "source-checkout")
+        self.assertTrue(any("Checkout upstream source" in step for step in adapter["nextSteps"]))
+
     def test_adapters_unknown_service_fails_with_actionable_message(self):
         result = run_dispatcher("adapters", "missing-service", "-Json")
 

@@ -63,6 +63,14 @@ export type AdapterDescriptor = {
     platform: string;
     requiredExecutable: string;
   };
+  upstream?: {
+    name: string;
+    repositoryUrl: string;
+    installDocs?: string;
+    checkoutRef?: string;
+    installMode: "source-checkout" | "package" | "manual" | "unknown";
+    notes?: string;
+  };
   commands: {
     setup?: string | null;
     start?: string | null;

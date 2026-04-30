@@ -1166,3 +1166,35 @@ Validation performed:
 Next steps:
 
 - Start turning adapter guidance into real upstream integration preparation by adding explicit app checkout/install source metadata.
+
+### Adapter Upstream Metadata
+
+Status: `Done`
+
+Summary:
+
+- Added explicit `upstream` metadata to the default OpenClaw, Hermes Agent, and Hermes Web UI adapter descriptors.
+- Added TypeScript schema support for repository URL, install docs, checkout ref, install mode, and integration notes.
+- Adapter guidance now reports `upstream` metadata and distinguishes `appDirExists` from `appDirReady` so placeholder-only app directories are visible.
+- Updated English and Chinese adapter contract docs with the new field.
+
+Changed areas:
+
+- `adapters/*/adapter.json`
+- `core/node/src/types.ts`
+- `core/node/src/adapter-guidance.ts`
+- `core/node/dist/`
+- `tests/test_windows_core.py`
+- `docs/ADAPTER_CONTRACT.md`
+- `docs/ADAPTER_CONTRACT.zh-CN.md`
+- `docs/PROGRESS.md`
+- `docs/superpowers/plans/2026-05-01-add-adapter-upstream-metadata.md`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_adapters_json_reports_upstream_source_metadata -v`
+
+Next steps:
+
+- Add a safe app-source preparation plan command that can show checkout targets without mutating `apps/`.

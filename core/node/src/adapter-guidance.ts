@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import type { AdapterDescriptor } from "./types";
 import { integrationReadiness, loadAdapters } from "./adapters";
 import { envFileDiagnostics } from "./environment";
@@ -25,6 +25,7 @@ function adapterSetupItem(
   envFiles: ReturnType<typeof envFileDiagnostics>,
 ) {
   const appDirExists = existsSync(resolveRelative(root, adapter.appDir));
+  const appDirReady = appDirExists && directoryHasRealContent(resolveRelative(root, adapter.appDir));
   const dataDirExists = existsSync(resolveRelative(root, adapter.dataDir));
   return {
     id: adapter.id,
@@ -33,8 +34,10 @@ function adapterSetupItem(
     type: adapter.type,
     appDir: adapter.appDir,
     appDirExists,
+    appDirReady,
     dataDir: adapter.dataDir,
     dataDirExists,
+    upstream: adapter.upstream ?? null,
     runtime: adapter.runtime ?? null,
     commands: {
       setup: adapter.commands.setup ?? null,
@@ -57,19 +60,30 @@ function adapterSetupItem(
       sources: [],
     },
     portal: adapter.portal ?? null,
-    nextSteps: adapterNextSteps(adapter, appDirExists, envFiles, readiness),
+    nextSteps: adapterNextSteps(adapter, appDirExists, appDirReady, envFiles, readiness),
   };
+}
+
+function directoryHasRealContent(path: string): boolean {
+  try {
+    return readdirSync(path).some((entry) => entry !== ".gitkeep");
+  } catch {
+    return false;
+  }
 }
 
 function adapterNextSteps(
   adapter: AdapterDescriptor,
   appDirExists: boolean,
+  appDirReady: boolean,
   envFiles: ReturnType<typeof envFileDiagnostics>,
   readiness: ReturnType<typeof integrationReadiness>[number] | undefined,
 ): string[] {
   const steps: string[] = [];
   if (!appDirExists) {
     steps.push(`Place or checkout the upstream application at ${adapter.appDir}.`);
+  } else if (!appDirReady && adapter.upstream?.repositoryUrl) {
+    steps.push(`Checkout upstream source from ${adapter.upstream.repositoryUrl} into ${adapter.appDir}.`);
   }
   if (envFiles.some((file) => !file.exists)) {
     steps.push("Run node core/node/dist/clawhermes.js init-env --dry-run --json, then create the missing env files.");

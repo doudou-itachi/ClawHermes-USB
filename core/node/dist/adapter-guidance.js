@@ -21,6 +21,7 @@ function adapterSetupPlan(usbRoot, serviceId) {
 }
 function adapterSetupItem(root, adapter, readiness, envFiles) {
     const appDirExists = (0, node_fs_1.existsSync)((0, portable_1.resolveRelative)(root, adapter.appDir));
+    const appDirReady = appDirExists && directoryHasRealContent((0, portable_1.resolveRelative)(root, adapter.appDir));
     const dataDirExists = (0, node_fs_1.existsSync)((0, portable_1.resolveRelative)(root, adapter.dataDir));
     return {
         id: adapter.id,
@@ -29,8 +30,10 @@ function adapterSetupItem(root, adapter, readiness, envFiles) {
         type: adapter.type,
         appDir: adapter.appDir,
         appDirExists,
+        appDirReady,
         dataDir: adapter.dataDir,
         dataDirExists,
+        upstream: adapter.upstream ?? null,
         runtime: adapter.runtime ?? null,
         commands: {
             setup: adapter.commands.setup ?? null,
@@ -53,13 +56,24 @@ function adapterSetupItem(root, adapter, readiness, envFiles) {
             sources: [],
         },
         portal: adapter.portal ?? null,
-        nextSteps: adapterNextSteps(adapter, appDirExists, envFiles, readiness),
+        nextSteps: adapterNextSteps(adapter, appDirExists, appDirReady, envFiles, readiness),
     };
 }
-function adapterNextSteps(adapter, appDirExists, envFiles, readiness) {
+function directoryHasRealContent(path) {
+    try {
+        return (0, node_fs_1.readdirSync)(path).some((entry) => entry !== ".gitkeep");
+    }
+    catch {
+        return false;
+    }
+}
+function adapterNextSteps(adapter, appDirExists, appDirReady, envFiles, readiness) {
     const steps = [];
     if (!appDirExists) {
         steps.push(`Place or checkout the upstream application at ${adapter.appDir}.`);
+    }
+    else if (!appDirReady && adapter.upstream?.repositoryUrl) {
+        steps.push(`Checkout upstream source from ${adapter.upstream.repositoryUrl} into ${adapter.appDir}.`);
     }
     if (envFiles.some((file) => !file.exists)) {
         steps.push("Run node core/node/dist/clawhermes.js init-env --dry-run --json, then create the missing env files.");

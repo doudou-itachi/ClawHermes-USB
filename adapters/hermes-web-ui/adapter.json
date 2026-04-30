@@ -10,6 +10,14 @@
     "platform": "windows",
     "requiredExecutable": "node.exe"
   },
+  "upstream": {
+    "name": "EKKOLearnAI/hermes-web-ui",
+    "repositoryUrl": "https://github.com/EKKOLearnAI/hermes-web-ui",
+    "installDocs": "https://github.com/EKKOLearnAI/hermes-web-ui",
+    "checkoutRef": "main",
+    "installMode": "source-checkout",
+    "notes": "Portable adapter still needs source checkout versus package CLI mode verification."
+  },
   "commands": {
     "setup": "npm install",
     "start": "npm run start",

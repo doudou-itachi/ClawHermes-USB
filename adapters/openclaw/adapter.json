@@ -10,6 +10,14 @@
     "platform": "windows",
     "requiredExecutable": "node.exe"
   },
+  "upstream": {
+    "name": "openclaw/openclaw",
+    "repositoryUrl": "https://github.com/openclaw/openclaw",
+    "installDocs": "https://github.com/openclaw/openclaw/blob/main/docs/platforms/windows.md",
+    "checkoutRef": "main",
+    "installMode": "source-checkout",
+    "notes": "Native portable Windows startup remains blocked pending upstream Windows data path verification."
+  },
   "commands": {
     "setup": null,
     "start": null,
