@@ -1598,3 +1598,39 @@ Validation performed:
 Next steps:
 
 - Select and install a portable Node release satisfying `>=23.0.0`, then retry the disposable Hermes Web UI setup flow.
+
+### Portable Node 24 and Hermes Web UI Setup Lab
+
+Status: `Done`
+
+Summary:
+
+- Selected official Node.js `v24.15.0` LTS (`Krypton`) from the Node.js release index because it satisfies Hermes Web UI's `>=23.0.0` requirement.
+- Downloaded `node-v24.15.0-win-x64.zip` and verified SHA256 against official `SHASUMS256.txt`.
+- Installed the runtime through `install-runtime node --archive ... --sha256 ... --json`.
+- Confirmed local portable runtime versions: Node `v24.15.0`, npm `11.12.1`.
+- Copied the portable Node runtime into the disposable upstream lab root and ran `setup-adapter hermes-web-ui --confirm-setup --json`.
+- Real Hermes Web UI setup completed with exit code `0`.
+- Initialized env files in the disposable lab root and reran `verify-adapter hermes-web-ui --json`.
+- Verification now passes app directory, setup command, setup output, start command, env files, and health declaration checks; the only remaining blocker is health behavior because the service has not been launched yet.
+
+Changed areas:
+
+- `docs/PROGRESS.md`
+
+Validation performed:
+
+- SHA256 check for `node-v24.15.0-win-x64.zip`
+- `node core/node/dist/clawhermes.js install-runtime node --archive <zip> --sha256 <sha> --json`
+- `runtimes/windows/node/node.exe --version`
+- `runtimes/windows/node/npm.cmd --version`
+- `node core/node/dist/clawhermes.js setup --json`
+- `node core/node/dist/clawhermes.js setup-adapter hermes-web-ui --confirm-setup --json --usb-root <lab>`
+- `node core/node/dist/clawhermes.js init-env --json --usb-root <lab>`
+- `node core/node/dist/clawhermes.js verify-adapter hermes-web-ui --json --usb-root <lab>`
+- `git diff --check`
+- UTF-8 smoke check
+
+Next steps:
+
+- Add a guarded single-adapter integration start command so non-production-ready adapters can be launched in disposable lab roots for health verification without marking them production-ready first.
