@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.adapterSetupPlan = adapterSetupPlan;
+exports.appSourcePlan = appSourcePlan;
 const node_fs_1 = require("node:fs");
 const adapters_1 = require("./adapters");
 const environment_1 = require("./environment");
@@ -18,6 +19,41 @@ function adapterSetupPlan(usbRoot, serviceId) {
         generatedAt: new Date().toISOString(),
         adapters: selected.map((adapter) => adapterSetupItem(root, adapter, readiness.get(adapter.id), envFiles.filter((item) => item.serviceId === adapter.id))),
     };
+}
+function appSourcePlan(usbRoot, serviceId) {
+    const root = (0, portable_1.getRoot)(usbRoot);
+    const adapters = (0, adapters_1.loadAdapters)(root);
+    const selected = serviceId ? adapters.filter((adapter) => adapter.id === serviceId) : adapters;
+    if (serviceId && selected.length === 0)
+        throw new Error(`Unknown adapter: ${serviceId}`);
+    return {
+        root,
+        generatedAt: new Date().toISOString(),
+        wouldModify: false,
+        sources: selected.map((adapter) => sourcePlanItem(root, adapter)),
+    };
+}
+function sourcePlanItem(root, adapter) {
+    const appDirPath = (0, portable_1.resolveRelative)(root, adapter.appDir);
+    const appDirExists = (0, node_fs_1.existsSync)(appDirPath);
+    const appDirReady = appDirExists && directoryHasRealContent(appDirPath);
+    return {
+        id: adapter.id,
+        displayName: adapter.displayName,
+        appDir: adapter.appDir,
+        targetPath: appDirPath,
+        appDirExists,
+        appDirReady,
+        upstream: adapter.upstream ?? null,
+        checkoutCommand: checkoutCommand(adapter),
+        wouldModify: false,
+    };
+}
+function checkoutCommand(adapter) {
+    if (!adapter.upstream?.repositoryUrl)
+        return null;
+    const branch = adapter.upstream.checkoutRef ? ` --branch ${adapter.upstream.checkoutRef}` : "";
+    return `git clone${branch} ${adapter.upstream.repositoryUrl} ${adapter.appDir}`;
 }
 function adapterSetupItem(root, adapter, readiness, envFiles) {
     const appDirExists = (0, node_fs_1.existsSync)((0, portable_1.resolveRelative)(root, adapter.appDir));

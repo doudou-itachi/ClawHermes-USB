@@ -711,6 +711,35 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("Unknown adapter: missing-service", result.stderr)
 
+    def test_sources_json_reports_checkout_targets_without_mutation(self):
+        result = run_dispatcher("sources", "-Json")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        sources = {source["id"]: source for source in payload["sources"]}
+
+        self.assertFalse(payload["wouldModify"])
+        self.assertEqual(set(sources), {"openclaw", "hermes-agent", "hermes-web-ui"})
+        self.assertFalse(sources["hermes-web-ui"]["appDirReady"])
+        self.assertEqual(sources["hermes-web-ui"]["upstream"]["repositoryUrl"], "https://github.com/EKKOLearnAI/hermes-web-ui")
+        self.assertIn("git clone", sources["hermes-web-ui"]["checkoutCommand"])
+
+    def test_sources_json_can_filter_one_adapter(self):
+        result = run_dispatcher("sources", "hermes-web-ui", "-Json")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual([source["id"] for source in payload["sources"]], ["hermes-web-ui"])
+        source = payload["sources"][0]
+        self.assertTrue(source["targetPath"].endswith(str(Path("apps") / "hermes-web-ui")))
+        self.assertIn("--branch main", source["checkoutCommand"])
+
+    def test_sources_unknown_service_fails_with_actionable_message(self):
+        result = run_dispatcher("sources", "missing-service", "-Json")
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Unknown adapter: missing-service", result.stderr)
+
     def test_runtimes_json_outputs_preparation_steps_from_manifest(self):
         result = run_dispatcher("runtimes", "-Json")
 

@@ -148,6 +148,23 @@ async function main() {
             }
             return;
         }
+        case "sources": {
+            const result = (0, core_1.appSourcePlan)(root, positional[0]);
+            if (json) {
+                printJson(result);
+            }
+            else {
+                console.log("ClawHermes-USB app source preparation plan");
+                console.log(`Root: ${result.root}`);
+                console.log("This command is read-only and does not modify apps/.");
+                for (const source of result.sources) {
+                    console.log(`- ${source.id}: ${source.appDirReady ? "ready" : "not ready"} at ${source.appDir}`);
+                    if (source.checkoutCommand)
+                        console.log(`  command: ${source.checkoutCommand}`);
+                }
+            }
+            return;
+        }
         case "logs": {
             const target = positional[0];
             if (!target)

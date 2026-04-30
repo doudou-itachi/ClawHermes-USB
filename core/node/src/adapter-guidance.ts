@@ -18,6 +18,42 @@ export function adapterSetupPlan(usbRoot: string, serviceId?: string) {
   };
 }
 
+export function appSourcePlan(usbRoot: string, serviceId?: string) {
+  const root = getRoot(usbRoot);
+  const adapters = loadAdapters(root);
+  const selected = serviceId ? adapters.filter((adapter) => adapter.id === serviceId) : adapters;
+  if (serviceId && selected.length === 0) throw new Error(`Unknown adapter: ${serviceId}`);
+  return {
+    root,
+    generatedAt: new Date().toISOString(),
+    wouldModify: false,
+    sources: selected.map((adapter) => sourcePlanItem(root, adapter)),
+  };
+}
+
+function sourcePlanItem(root: string, adapter: AdapterDescriptor) {
+  const appDirPath = resolveRelative(root, adapter.appDir);
+  const appDirExists = existsSync(appDirPath);
+  const appDirReady = appDirExists && directoryHasRealContent(appDirPath);
+  return {
+    id: adapter.id,
+    displayName: adapter.displayName,
+    appDir: adapter.appDir,
+    targetPath: appDirPath,
+    appDirExists,
+    appDirReady,
+    upstream: adapter.upstream ?? null,
+    checkoutCommand: checkoutCommand(adapter),
+    wouldModify: false,
+  };
+}
+
+function checkoutCommand(adapter: AdapterDescriptor): string | null {
+  if (!adapter.upstream?.repositoryUrl) return null;
+  const branch = adapter.upstream.checkoutRef ? ` --branch ${adapter.upstream.checkoutRef}` : "";
+  return `git clone${branch} ${adapter.upstream.repositoryUrl} ${adapter.appDir}`;
+}
+
 function adapterSetupItem(
   root: string,
   adapter: AdapterDescriptor,

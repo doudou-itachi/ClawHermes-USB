@@ -1198,3 +1198,34 @@ Validation performed:
 Next steps:
 
 - Add a safe app-source preparation plan command that can show checkout targets without mutating `apps/`.
+
+### Source Plan Command
+
+Status: `Done`
+
+Summary:
+
+- Added a read-only `sources` CLI action that reports upstream checkout targets for all adapters or one adapter id.
+- Source plans include target app directory path, app directory readiness, upstream metadata, checkout command, and `wouldModify: false`.
+- PowerShell dispatcher now accepts the `sources` action.
+- Added regression coverage for all-source output, single-adapter filtering, and unknown adapter errors.
+
+Changed areas:
+
+- `core/node/src/adapter-guidance.ts`
+- `core/node/src/clawhermes.ts`
+- `core/node/src/core.ts`
+- `core/windows/clawhermes.ps1`
+- `core/node/dist/`
+- `tests/test_windows_core.py`
+- `docs/PROGRESS.md`
+- `docs/superpowers/plans/2026-05-01-add-source-plan-command.md`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_sources_json_reports_checkout_targets_without_mutation tests.test_windows_core.WindowsCoreTests.test_sources_json_can_filter_one_adapter tests.test_windows_core.WindowsCoreTests.test_sources_unknown_service_fails_with_actionable_message -v`
+
+Next steps:
+
+- Document the `sources` command and then consider a gated, explicit checkout helper once the user opts into network mutations.

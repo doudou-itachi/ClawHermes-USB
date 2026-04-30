@@ -1,4 +1,4 @@
-import { adapterSetupPlan, createBackup, getRoot, getStatus, initializeEnvFiles, installRuntimeFromArchive, portableEnv, readLogTail, runtimePreparationPlan, serviceEnvironmentDiagnostic, setupDiagnostics, startSkeleton, stopSkeleton, writeStatusSnapshot } from "./core";
+import { adapterSetupPlan, appSourcePlan, createBackup, getRoot, getStatus, initializeEnvFiles, installRuntimeFromArchive, portableEnv, readLogTail, runtimePreparationPlan, serviceEnvironmentDiagnostic, setupDiagnostics, startSkeleton, stopSkeleton, writeStatusSnapshot } from "./core";
 import type { BackupProfile } from "./backup";
 
 type ParsedArgs = {
@@ -139,6 +139,21 @@ async function main(): Promise<void> {
         for (const adapter of result.adapters) {
           console.log(`- ${adapter.id}: ${adapter.integration.status}, appDir ${adapter.appDirExists ? "present" : "missing"}`);
           for (const step of adapter.nextSteps) console.log(`  - ${step}`);
+        }
+      }
+      return;
+    }
+    case "sources": {
+      const result = appSourcePlan(root, positional[0]);
+      if (json) {
+        printJson(result);
+      } else {
+        console.log("ClawHermes-USB app source preparation plan");
+        console.log(`Root: ${result.root}`);
+        console.log("This command is read-only and does not modify apps/.");
+        for (const source of result.sources) {
+          console.log(`- ${source.id}: ${source.appDirReady ? "ready" : "not ready"} at ${source.appDir}`);
+          if (source.checkoutCommand) console.log(`  command: ${source.checkoutCommand}`);
         }
       }
       return;
