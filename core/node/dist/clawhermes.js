@@ -9,6 +9,8 @@ function parseArgs(argv) {
     let json = false;
     let archive;
     let sha256;
+    let profile = "data-only";
+    let includeLogs = false;
     let dryRun = false;
     let lines = 50;
     for (let index = 0; index < args.length; index += 1) {
@@ -28,6 +30,13 @@ function parseArgs(argv) {
             sha256 = args[index + 1];
             index += 1;
         }
+        else if (arg === "--profile" && args[index + 1]) {
+            profile = parseBackupProfile(args[index + 1]);
+            index += 1;
+        }
+        else if (arg === "--include-logs") {
+            includeLogs = true;
+        }
         else if (arg === "--dry-run") {
             dryRun = true;
         }
@@ -39,13 +48,18 @@ function parseArgs(argv) {
             positional.push(arg);
         }
     }
-    return { action, positional, usbRoot, json, archive, sha256, dryRun, lines };
+    return { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, lines };
+}
+function parseBackupProfile(value) {
+    if (value === "data-only" || value === "full")
+        return value;
+    throw new Error(`Unknown backup profile: ${value}. Expected data-only or full.`);
 }
 function printJson(value) {
     process.stdout.write(`${JSON.stringify(value, null, 2)}\n`);
 }
 async function main() {
-    const { action, positional, usbRoot, json, archive, sha256, dryRun, lines } = parseArgs(process.argv.slice(2));
+    const { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, lines } = parseArgs(process.argv.slice(2));
     const root = (0, core_1.getRoot)(usbRoot);
     switch (action) {
         case "env-json":
@@ -143,6 +157,18 @@ async function main() {
                 console.log(result.message);
                 for (const exe of result.expectedExecutables)
                     console.log(`- expected: ${exe}`);
+            }
+            return;
+        }
+        case "backup": {
+            const result = (0, core_1.createBackup)(root, { profile, includeLogs, dryRun });
+            if (json) {
+                printJson(result);
+            }
+            else {
+                console.log(result.message);
+                for (const entry of result.entries)
+                    console.log(`- ${entry.path}`);
             }
             return;
         }

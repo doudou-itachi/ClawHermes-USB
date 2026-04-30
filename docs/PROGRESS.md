@@ -956,3 +956,35 @@ Validation performed:
 Next steps:
 
 - Review the smaller TypeScript core for remaining production gaps and prioritize the next functional improvement over further mechanical splitting.
+
+### Backup Command
+
+Status: `Done`
+
+Summary:
+
+- Added a `backup` CLI action with `data-only` and `full` profiles, `--include-logs`, and `--dry-run`.
+- Implemented timestamped zip archive creation under `data/backups/` with a generated `backup-manifest.json`.
+- Added `launcher/windows/Backup.bat` and allowed `backup` through the PowerShell dispatcher.
+- Covered dry-run planning and data-only archive contents with integration tests.
+
+Changed areas:
+
+- `core/node/src/backup.ts`
+- `core/node/src/clawhermes.ts`
+- `core/node/src/core.ts`
+- `core/windows/clawhermes.ps1`
+- `launcher/windows/Backup.bat`
+- `tests/test_windows_core.py`
+- `core/node/dist/`
+- `docs/PROGRESS.md`
+- `docs/superpowers/plans/2026-05-01-add-backup-command.md`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_backup_dry_run_reports_data_only_entries_without_archive tests.test_windows_core.WindowsCoreTests.test_backup_json_creates_data_only_archive -v`
+
+Next steps:
+
+- Add portal-facing backup visibility or a richer backup status/action surface after the command-line workflow is stable.

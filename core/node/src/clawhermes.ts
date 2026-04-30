@@ -1,4 +1,5 @@
-import { getRoot, getStatus, initializeEnvFiles, installRuntimeFromArchive, portableEnv, readLogTail, runtimePreparationPlan, serviceEnvironmentDiagnostic, setupDiagnostics, startSkeleton, stopSkeleton, writeStatusSnapshot } from "./core";
+import { createBackup, getRoot, getStatus, initializeEnvFiles, installRuntimeFromArchive, portableEnv, readLogTail, runtimePreparationPlan, serviceEnvironmentDiagnostic, setupDiagnostics, startSkeleton, stopSkeleton, writeStatusSnapshot } from "./core";
+import type { BackupProfile } from "./backup";
 
 type ParsedArgs = {
   action: string;
@@ -7,6 +8,8 @@ type ParsedArgs = {
   json: boolean;
   archive?: string;
   sha256?: string;
+  profile: BackupProfile;
+  includeLogs: boolean;
   dryRun: boolean;
   lines: number;
 };
@@ -19,6 +22,8 @@ function parseArgs(argv: string[]): ParsedArgs {
   let json = false;
   let archive: string | undefined;
   let sha256: string | undefined;
+  let profile: BackupProfile = "data-only";
+  let includeLogs = false;
   let dryRun = false;
   let lines = 50;
   for (let index = 0; index < args.length; index += 1) {
@@ -34,6 +39,11 @@ function parseArgs(argv: string[]): ParsedArgs {
     } else if (arg === "--sha256" && args[index + 1]) {
       sha256 = args[index + 1];
       index += 1;
+    } else if (arg === "--profile" && args[index + 1]) {
+      profile = parseBackupProfile(args[index + 1]);
+      index += 1;
+    } else if (arg === "--include-logs") {
+      includeLogs = true;
     } else if (arg === "--dry-run") {
       dryRun = true;
     } else if (arg === "--lines" && args[index + 1]) {
@@ -43,7 +53,12 @@ function parseArgs(argv: string[]): ParsedArgs {
       positional.push(arg);
     }
   }
-  return { action, positional, usbRoot, json, archive, sha256, dryRun, lines };
+  return { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, lines };
+}
+
+function parseBackupProfile(value: string): BackupProfile {
+  if (value === "data-only" || value === "full") return value;
+  throw new Error(`Unknown backup profile: ${value}. Expected data-only or full.`);
 }
 
 function printJson(value: unknown): void {
@@ -51,7 +66,7 @@ function printJson(value: unknown): void {
 }
 
 async function main(): Promise<void> {
-  const { action, positional, usbRoot, json, archive, sha256, dryRun, lines } = parseArgs(process.argv.slice(2));
+  const { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, lines } = parseArgs(process.argv.slice(2));
   const root = getRoot(usbRoot);
 
   switch (action) {
@@ -133,6 +148,16 @@ async function main(): Promise<void> {
       } else {
         console.log(result.message);
         for (const exe of result.expectedExecutables) console.log(`- expected: ${exe}`);
+      }
+      return;
+    }
+    case "backup": {
+      const result = createBackup(root, { profile, includeLogs, dryRun });
+      if (json) {
+        printJson(result);
+      } else {
+        console.log(result.message);
+        for (const entry of result.entries) console.log(`- ${entry.path}`);
       }
       return;
     }

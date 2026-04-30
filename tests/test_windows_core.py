@@ -871,6 +871,43 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("Unknown log target: missing-service", result.stderr)
 
+    def test_backup_dry_run_reports_data_only_entries_without_archive(self):
+        result = run_dispatcher("backup", "--dry-run", "-Json")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        entries = {entry["path"] for entry in payload["entries"]}
+        self.assertTrue(payload["dryRun"])
+        self.assertEqual(payload["profile"], "data-only")
+        self.assertIn("config", entries)
+        self.assertIn("adapters", entries)
+        self.assertIn(str(Path("data") / "openclaw"), entries)
+        self.assertFalse(Path(payload["archivePath"]).exists())
+
+    def test_backup_json_creates_data_only_archive(self):
+        result = run_dispatcher("backup", "-Json")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        archive_path = Path(payload["archivePath"])
+        try:
+            self.assertTrue(payload["created"])
+            self.assertEqual(payload["profile"], "data-only")
+            self.assertTrue(archive_path.exists())
+            self.assertGreater(payload["sizeBytes"], 0)
+            with zipfile.ZipFile(archive_path) as archive:
+                names = set(archive.namelist())
+            self.assertIn("backup-manifest.json", names)
+            self.assertIn("config/defaults/ports.json", names)
+            self.assertIn("adapters/openclaw/adapter.json", names)
+            self.assertIn("data/openclaw/.gitkeep", names)
+            self.assertFalse(any(name.startswith("data/cache/") for name in names))
+            self.assertFalse(any(name.startswith("data/tmp/") for name in names))
+            self.assertFalse(any(name.startswith("data/backups/") for name in names))
+        finally:
+            if archive_path.exists():
+                archive_path.unlink()
+
     def test_status_reports_http_adapter_ready_when_endpoint_responds(self):
         temp_dir, temp_root, port = make_temp_http_usb_root()
         try:
