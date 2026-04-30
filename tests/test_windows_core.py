@@ -49,6 +49,11 @@ def fetch_portal_status(timeout=0.5):
         return json.loads(response.read().decode("utf-8"))
 
 
+def fetch_portal_backups(timeout=0.5):
+    with urllib.request.urlopen(f"{PORTAL_URL}backups.json", timeout=timeout) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
 def wait_for_portal():
     deadline = time.time() + 5
     last_error = None
@@ -1022,6 +1027,27 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertEqual(stop.returncode, 0, stop.stderr)
         self.assertFalse(portal_pid.exists())
         assert_portal_unreachable(self)
+
+    def test_portal_serves_backup_status(self):
+        backup = run_dispatcher("backup", "-Json")
+        self.assertEqual(backup.returncode, 0, backup.stderr)
+        backup_payload = json.loads(backup.stdout)
+        archive_path = Path(backup_payload["archivePath"])
+        try:
+            start = run_dispatcher("start", "-Json")
+            self.assertEqual(start.returncode, 0, start.stderr)
+            wait_for_portal()
+
+            backups = fetch_portal_backups()
+
+            self.assertEqual(Path(backups["backupRoot"]).resolve(), ROOT / "data" / "backups")
+            self.assertGreaterEqual(backups["count"], 1)
+            self.assertEqual(backups["latest"]["fileName"], archive_path.name)
+            self.assertEqual(Path(backups["latest"]["path"]).resolve(), archive_path.resolve())
+        finally:
+            run_dispatcher("stop", "-Json")
+            if archive_path.exists():
+                archive_path.unlink()
 
     def test_status_removes_portal_pid_when_process_is_not_portal_server(self):
         pid_dir = ROOT / "data" / "tmp" / "pids"

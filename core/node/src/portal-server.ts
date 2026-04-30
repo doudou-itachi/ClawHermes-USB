@@ -1,5 +1,5 @@
 import { createServer } from "node:http";
-import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
 function parseArgs(argv: string[]): { usbRoot: string; port: number } {
@@ -21,6 +21,7 @@ function parseArgs(argv: string[]): { usbRoot: string; port: number } {
 const { usbRoot, port } = parseArgs(process.argv.slice(2));
 const portalFile = join(usbRoot, "portal", "index.html");
 const statusFile = join(usbRoot, "data", "tmp", "status.json");
+const backupRoot = join(usbRoot, "data", "backups");
 const logFile = join(usbRoot, "data", "logs", "portal.log");
 mkdirSync(dirname(logFile), { recursive: true });
 
@@ -43,6 +44,14 @@ const server = createServer((request, response) => {
       response.end(readFileSync(statusFile));
       return;
     }
+    if (request.url === "/backups.json") {
+      response.writeHead(200, {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+      });
+      response.end(JSON.stringify(backupSnapshot(), null, 2));
+      return;
+    }
     if (request.url !== "/" && request.url !== "/index.html") {
       response.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
       response.end("Not found");
@@ -61,6 +70,31 @@ const server = createServer((request, response) => {
     response.end("Portal request failed");
   }
 });
+
+function backupSnapshot() {
+  const backups = existsSync(backupRoot)
+    ? readdirSync(backupRoot)
+      .filter((fileName) => fileName.toLowerCase().endsWith(".zip"))
+      .map((fileName) => {
+        const path = join(backupRoot, fileName);
+        const stats = statSync(path);
+        return {
+          fileName,
+          path,
+          sizeBytes: stats.size,
+          modifiedAt: stats.mtime.toISOString(),
+        };
+      })
+      .sort((left, right) => right.modifiedAt.localeCompare(left.modifiedAt))
+    : [];
+  return {
+    root: usbRoot,
+    backupRoot,
+    count: backups.length,
+    latest: backups[0] ?? null,
+    backups,
+  };
+}
 
 server.listen(port, "127.0.0.1", () => {
   log(`Listening on http://127.0.0.1:${port}/`);

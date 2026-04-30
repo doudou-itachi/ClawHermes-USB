@@ -22,6 +22,7 @@ function parseArgs(argv) {
 const { usbRoot, port } = parseArgs(process.argv.slice(2));
 const portalFile = (0, node_path_1.join)(usbRoot, "portal", "index.html");
 const statusFile = (0, node_path_1.join)(usbRoot, "data", "tmp", "status.json");
+const backupRoot = (0, node_path_1.join)(usbRoot, "data", "backups");
 const logFile = (0, node_path_1.join)(usbRoot, "data", "logs", "portal.log");
 (0, node_fs_1.mkdirSync)((0, node_path_1.dirname)(logFile), { recursive: true });
 function log(message) {
@@ -40,6 +41,14 @@ const server = (0, node_http_1.createServer)((request, response) => {
                 "cache-control": "no-store",
             });
             response.end((0, node_fs_1.readFileSync)(statusFile));
+            return;
+        }
+        if (request.url === "/backups.json") {
+            response.writeHead(200, {
+                "content-type": "application/json; charset=utf-8",
+                "cache-control": "no-store",
+            });
+            response.end(JSON.stringify(backupSnapshot(), null, 2));
             return;
         }
         if (request.url !== "/" && request.url !== "/index.html") {
@@ -61,6 +70,30 @@ const server = (0, node_http_1.createServer)((request, response) => {
         response.end("Portal request failed");
     }
 });
+function backupSnapshot() {
+    const backups = (0, node_fs_1.existsSync)(backupRoot)
+        ? (0, node_fs_1.readdirSync)(backupRoot)
+            .filter((fileName) => fileName.toLowerCase().endsWith(".zip"))
+            .map((fileName) => {
+            const path = (0, node_path_1.join)(backupRoot, fileName);
+            const stats = (0, node_fs_1.statSync)(path);
+            return {
+                fileName,
+                path,
+                sizeBytes: stats.size,
+                modifiedAt: stats.mtime.toISOString(),
+            };
+        })
+            .sort((left, right) => right.modifiedAt.localeCompare(left.modifiedAt))
+        : [];
+    return {
+        root: usbRoot,
+        backupRoot,
+        count: backups.length,
+        latest: backups[0] ?? null,
+        backups,
+    };
+}
 server.listen(port, "127.0.0.1", () => {
     log(`Listening on http://127.0.0.1:${port}/`);
 });

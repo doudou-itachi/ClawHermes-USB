@@ -63,6 +63,7 @@ export function generatePortal(usbRoot: string, services: ServiceStatus[]): { pa
     <section>
       <h2>Operations</h2>
       <p>Use <code>launcher/windows/Status.bat</code> to refresh service state and <code>launcher/windows/Stop.bat</code> to stop placeholder services.</p>
+      <p>Use <code>launcher/windows/Backup.bat</code> to create a portable backup. Latest backup: <span data-backup-latest>Checking...</span></p>
     </section>
   </main>
   <script>
@@ -87,8 +88,26 @@ export function generatePortal(usbRoot: string, services: ServiceStatus[]): { pa
         // Keep the last rendered status visible when refresh fails.
       }
     }
+    async function refreshBackups() {
+      try {
+        const response = await fetch('/backups.json', { cache: 'no-store' });
+        if (!response.ok) return;
+        const payload = await response.json();
+        const target = document.querySelector('[data-backup-latest]');
+        if (!target) return;
+        if (!payload.latest) {
+          target.textContent = 'none';
+          return;
+        }
+        target.textContent = payload.latest.fileName + ' (' + Math.ceil((payload.latest.sizeBytes || 0) / 1024) + ' KB)';
+      } catch {
+        // Backup status is optional for the static portal.
+      }
+    }
     refreshStatus();
+    refreshBackups();
     window.setInterval(refreshStatus, 5000);
+    window.setInterval(refreshBackups, 15000);
   </script>
 </body>
 </html>

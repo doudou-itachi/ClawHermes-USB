@@ -988,3 +988,32 @@ Validation performed:
 Next steps:
 
 - Add portal-facing backup visibility or a richer backup status/action surface after the command-line workflow is stable.
+
+### Portal Backup Status
+
+Status: `Done`
+
+Summary:
+
+- Added a read-only `/backups.json` endpoint to the portal server.
+- The endpoint lists zip archives under `data/backups/` and reports the latest backup archive.
+- Updated the generated portal operations section to point to `launcher/windows/Backup.bat` and show latest backup status.
+- Added an integration test that creates a backup, starts the portal, and verifies the portal backup endpoint.
+
+Changed areas:
+
+- `core/node/src/portal-server.ts`
+- `core/node/src/portal.ts`
+- `core/node/dist/`
+- `tests/test_windows_core.py`
+- `docs/PROGRESS.md`
+- `docs/superpowers/plans/2026-05-01-add-portal-backup-status.md`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_portal_serves_backup_status -v`
+
+Next steps:
+
+- Update user-facing README status and command documentation so the implemented TypeScript/Node workflow is discoverable.
