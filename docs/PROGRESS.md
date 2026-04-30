@@ -1136,3 +1136,33 @@ Validation performed:
 Next steps:
 
 - Add documentation for the new `adapters` command in README and adapter contract guidance.
+
+### Adapter Guidance Documentation
+
+Status: `Done`
+
+Summary:
+
+- Added `adapters --json` and single-adapter command examples to the English and Chinese README files.
+- Documented the adapter preparation command in the English and Chinese adapter contract docs.
+- Updated contributor workflow guidance to run the adapter guidance command before marking real integration ready.
+
+Changed areas:
+
+- `README.md`
+- `README.zh-CN.md`
+- `docs/ADAPTER_CONTRACT.md`
+- `docs/ADAPTER_CONTRACT.zh-CN.md`
+- `docs/PROGRESS.md`
+- `docs/superpowers/plans/2026-05-01-document-adapter-guidance-command.md`
+
+Validation performed:
+
+- Markdown review
+- `git diff --check`
+- UTF-8 smoke check
+- Chinese README and adapter contract mojibake scans
+
+Next steps:
+
+- Start turning adapter guidance into real upstream integration preparation by adding explicit app checkout/install source metadata.

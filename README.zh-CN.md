@@ -47,6 +47,8 @@ launcher/windows/Backup.bat
 
 ```powershell
 node core/node/dist/clawhermes.js setup --json
+node core/node/dist/clawhermes.js adapters --json
+node core/node/dist/clawhermes.js adapters hermes-web-ui --json
 node core/node/dist/clawhermes.js start --json
 node core/node/dist/clawhermes.js status --json
 node core/node/dist/clawhermes.js logs openclaw --lines 50 --json

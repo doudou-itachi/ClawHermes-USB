@@ -350,7 +350,28 @@ Adapter validator 应在以下情况失败：
 - env 文件缺失
 - 默认端口被占用
 
-## 9. 贡献者工作流
+## 9. Adapter 准备命令
+
+尝试真实上游集成前，先运行 adapter 指导命令：
+
+```powershell
+node core/node/dist/clawhermes.js adapters --json
+node core/node/dist/clawhermes.js adapters hermes-web-ui --json
+```
+
+该命令会报告：
+
+- `appDir` 和 `dataDir` 是否存在
+- adapter 声明的 runtime 元数据
+- env 文件和 example 模板是否存在
+- setup/start/stop 命令
+- 依赖服务 id
+- 集成就绪度元数据
+- 标记 production-ready 前的下一步
+
+在 app 目录、env 文件、setup 命令、start 命令、健康检查和数据路径行为都经过验证前，不要把 adapter 标记为 `productionReady: true`。
+
+## 10. 贡献者工作流
 
 新增服务：
 
@@ -360,7 +381,7 @@ Adapter validator 应在以下情况失败：
 4. 在 `config/env/` 下添加 env example。
 5. 在 `apps/<new-service>/` 下添加 app 占位目录。
 6. 在 `data/<new-service>/` 下添加数据目录。
-7. 运行 adapter 校验。
+7. 运行 `node core/node/dist/clawhermes.js adapters <new-service> --json`。
 8. 如有需要，更新 portal 元数据。
 
 除非服务需要新的通用能力，否则不应修改 core 代码。

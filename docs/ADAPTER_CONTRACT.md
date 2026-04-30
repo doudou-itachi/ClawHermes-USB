@@ -350,7 +350,28 @@ Warnings should be emitted if:
 - env file is missing
 - default port is occupied
 
-## 9. Contributor Workflow
+## 9. Adapter Preparation Command
+
+Use the adapter guidance command before attempting real upstream integration:
+
+```powershell
+node core/node/dist/clawhermes.js adapters --json
+node core/node/dist/clawhermes.js adapters hermes-web-ui --json
+```
+
+The command reports:
+
+- whether `appDir` and `dataDir` exist
+- runtime metadata declared by the adapter
+- env file presence and example template presence
+- setup/start/stop commands
+- dependency ids
+- integration readiness metadata
+- next steps before production-ready startup
+
+Do not mark an adapter `productionReady: true` until the app directory, env files, setup command, start command, health check, and data path behavior have been verified.
+
+## 10. Contributor Workflow
 
 To add a new service:
 
@@ -360,7 +381,7 @@ To add a new service:
 4. Add env examples under `config/env/`.
 5. Add app placeholder under `apps/<new-service>/`.
 6. Add data directory under `data/<new-service>/`.
-7. Run adapter validation.
+7. Run `node core/node/dist/clawhermes.js adapters <new-service> --json`.
 8. Update portal metadata if needed.
 
 No core code should be changed unless the service needs a new generic capability.
