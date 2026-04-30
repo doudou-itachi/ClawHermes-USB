@@ -8,10 +8,12 @@ exports.stopSkeleton = stopSkeleton;
 const node_fs_1 = require("node:fs");
 const adapters_1 = require("./adapters");
 const diagnostics_1 = require("./diagnostics");
+const environment_1 = require("./environment");
 const lifecycle_1 = require("./lifecycle");
 const portable_1 = require("./portable");
 const portal_1 = require("./portal");
 const status_1 = require("./status");
+const wsl_adapter_1 = require("./wsl-adapter");
 var portable_2 = require("./portable");
 Object.defineProperty(exports, "dataWritable", { enumerable: true, get: function () { return portable_2.dataWritable; } });
 Object.defineProperty(exports, "getRoot", { enumerable: true, get: function () { return portable_2.getRoot; } });
@@ -34,11 +36,11 @@ var adapter_verification_1 = require("./adapter-verification");
 Object.defineProperty(exports, "verifyAdapter", { enumerable: true, get: function () { return adapter_verification_1.verifyAdapter; } });
 var backup_1 = require("./backup");
 Object.defineProperty(exports, "createBackup", { enumerable: true, get: function () { return backup_1.createBackup; } });
-var environment_1 = require("./environment");
-Object.defineProperty(exports, "envFileDiagnostics", { enumerable: true, get: function () { return environment_1.envFileDiagnostics; } });
-Object.defineProperty(exports, "initializeEnvFiles", { enumerable: true, get: function () { return environment_1.initializeEnvFiles; } });
-Object.defineProperty(exports, "resolveServiceEnvironment", { enumerable: true, get: function () { return environment_1.resolveServiceEnvironment; } });
-Object.defineProperty(exports, "serviceEnvironmentDiagnostic", { enumerable: true, get: function () { return environment_1.serviceEnvironmentDiagnostic; } });
+var environment_2 = require("./environment");
+Object.defineProperty(exports, "envFileDiagnostics", { enumerable: true, get: function () { return environment_2.envFileDiagnostics; } });
+Object.defineProperty(exports, "initializeEnvFiles", { enumerable: true, get: function () { return environment_2.initializeEnvFiles; } });
+Object.defineProperty(exports, "resolveServiceEnvironment", { enumerable: true, get: function () { return environment_2.resolveServiceEnvironment; } });
+Object.defineProperty(exports, "serviceEnvironmentDiagnostic", { enumerable: true, get: function () { return environment_2.serviceEnvironmentDiagnostic; } });
 var diagnostics_2 = require("./diagnostics");
 Object.defineProperty(exports, "pathDiagnostics", { enumerable: true, get: function () { return diagnostics_2.pathDiagnostics; } });
 Object.defineProperty(exports, "portDiagnostics", { enumerable: true, get: function () { return diagnostics_2.portDiagnostics; } });
@@ -83,16 +85,26 @@ function startSingleAdapter(usbRoot, serviceId, options) {
         throw new Error(`Unknown adapter: ${serviceId}`);
     if (!adapter.commands.start)
         throw new Error(`Adapter ${serviceId} does not declare a start command.`);
+    const wslPlan = adapter.runtime?.kind === "wsl2" ? (0, wsl_adapter_1.wslAdapterCommandPlan)(root, adapter, (0, environment_1.resolveServiceEnvironment)(root, serviceId), "start") : null;
     const result = {
         root,
         serviceId,
         displayName: adapter.displayName,
+        runner: wslPlan ? "wsl2" : "windows",
         dryRun: options.dryRun,
         confirmed: options.confirm,
         wouldModify: !options.dryRun,
         started: false,
         command: adapter.commands.start,
         appDir: (0, portable_1.resolveRelative)(root, adapter.appDir),
+        wsl: wslPlan
+            ? {
+                executablePath: wslPlan.executablePath,
+                args: wslPlan.args,
+                workingDirectory: wslPlan.workingDirectory,
+                script: wslPlan.script,
+            }
+            : null,
         metadata: null,
         message: options.dryRun ? `Would start ${serviceId}.` : `Started ${serviceId}.`,
     };
@@ -101,6 +113,10 @@ function startSingleAdapter(usbRoot, serviceId, options) {
     }
     if (options.dryRun)
         return result;
+    if (wslPlan) {
+        (0, wsl_adapter_1.assertWslReadyForAdapter)(root, serviceId);
+        throw new Error(`WSL2 start supervision for ${serviceId} is not implemented yet. Use --dry-run to inspect the command plan.`);
+    }
     const metadata = (0, lifecycle_1.startAdapter)(root, adapter, { forceManaged: true });
     return { ...result, started: true, metadata };
 }

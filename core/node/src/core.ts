@@ -2,10 +2,12 @@ import { existsSync, readFileSync, rmSync } from "node:fs";
 import type { ServiceStatus } from "./types";
 import { loadAdapters, serviceOrder } from "./adapters";
 import { setupDiagnostics, writeSetupSnapshot } from "./diagnostics";
+import { resolveServiceEnvironment } from "./environment";
 import { startAdapter, stopAdapter } from "./lifecycle";
 import { getRoot, resolveRelative } from "./portable";
 import { generatePortal, getPortalStatus, startPortalServer, stopPortalServer } from "./portal";
 import { adapterHealth, processExists, writeStatusSnapshot } from "./status";
+import { assertWslReadyForAdapter, wslAdapterCommandPlan } from "./wsl-adapter";
 
 export { dataWritable, getRoot, portableEnv } from "./portable";
 export { integrationReadiness, loadAdapters, serviceOrder, validateAdapter } from "./adapters";
@@ -42,16 +44,26 @@ export function startSingleAdapter(usbRoot: string, serviceId: string | undefine
   const adapter = loadAdapters(root).find((item) => item.id === serviceId);
   if (!adapter) throw new Error(`Unknown adapter: ${serviceId}`);
   if (!adapter.commands.start) throw new Error(`Adapter ${serviceId} does not declare a start command.`);
+  const wslPlan = adapter.runtime?.kind === "wsl2" ? wslAdapterCommandPlan(root, adapter, resolveServiceEnvironment(root, serviceId), "start") : null;
   const result = {
     root,
     serviceId,
     displayName: adapter.displayName,
+    runner: wslPlan ? "wsl2" : "windows",
     dryRun: options.dryRun,
     confirmed: options.confirm,
     wouldModify: !options.dryRun,
     started: false,
     command: adapter.commands.start,
     appDir: resolveRelative(root, adapter.appDir),
+    wsl: wslPlan
+      ? {
+        executablePath: wslPlan.executablePath,
+        args: wslPlan.args,
+        workingDirectory: wslPlan.workingDirectory,
+        script: wslPlan.script,
+      }
+      : null,
     metadata: null as ReturnType<typeof startAdapter> | null,
     message: options.dryRun ? `Would start ${serviceId}.` : `Started ${serviceId}.`,
   };
@@ -59,6 +71,10 @@ export function startSingleAdapter(usbRoot: string, serviceId: string | undefine
     throw new Error("start-adapter launches a managed process. Re-run with --confirm-start to proceed.");
   }
   if (options.dryRun) return result;
+  if (wslPlan) {
+    assertWslReadyForAdapter(root, serviceId);
+    throw new Error(`WSL2 start supervision for ${serviceId} is not implemented yet. Use --dry-run to inspect the command plan.`);
+  }
   const metadata = startAdapter(root, adapter, { forceManaged: true });
   return { ...result, started: true, metadata };
 }

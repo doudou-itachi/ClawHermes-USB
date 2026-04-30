@@ -1,15 +1,19 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.wslAdapterSetupPlan = wslAdapterSetupPlan;
+exports.wslAdapterCommandPlan = wslAdapterCommandPlan;
 exports.assertWslReadyForAdapter = assertWslReadyForAdapter;
 const portable_1 = require("./portable");
 const wsl_1 = require("./wsl");
 function wslAdapterSetupPlan(root, adapter, serviceEnv) {
+    return wslAdapterCommandPlan(root, adapter, serviceEnv, "setup");
+}
+function wslAdapterCommandPlan(root, adapter, serviceEnv, phase) {
     const diagnostics = (0, wsl_1.wslDiagnostics)(root);
     const workingDirectory = windowsPathToWslPath((0, portable_1.resolveRelative)(root, adapter.appDir));
-    const command = adapter.commands.setup;
+    const command = adapter.commands[phase];
     if (!command)
-        throw new Error(`Adapter ${adapter.id} does not declare a setup command.`);
+        throw new Error(`Adapter ${adapter.id} does not declare a ${phase} command.`);
     const script = [
         ...environmentExports(root, serviceEnv.env),
         command,

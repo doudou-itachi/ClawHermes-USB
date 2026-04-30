@@ -3,10 +3,14 @@ import { resolveRelative } from "./portable";
 import { wslDiagnostics } from "./wsl";
 
 export function wslAdapterSetupPlan(root: string, adapter: AdapterDescriptor, serviceEnv: ServiceEnvironment) {
+  return wslAdapterCommandPlan(root, adapter, serviceEnv, "setup");
+}
+
+export function wslAdapterCommandPlan(root: string, adapter: AdapterDescriptor, serviceEnv: ServiceEnvironment, phase: "setup" | "start") {
   const diagnostics = wslDiagnostics(root);
   const workingDirectory = windowsPathToWslPath(resolveRelative(root, adapter.appDir));
-  const command = adapter.commands.setup;
-  if (!command) throw new Error(`Adapter ${adapter.id} does not declare a setup command.`);
+  const command = adapter.commands[phase];
+  if (!command) throw new Error(`Adapter ${adapter.id} does not declare a ${phase} command.`);
   const script = [
     ...environmentExports(root, serviceEnv.env),
     command,

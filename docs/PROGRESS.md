@@ -1807,3 +1807,33 @@ Validation performed:
 Next steps:
 
 - Add WSL2 startup planning for `start-adapter` so Hermes Agent can be launched through WSL once a distro is available.
+
+### WSL2 Adapter Start Planning
+
+Status: `Done`
+
+Summary:
+
+- Reused the WSL2 command planner for adapter startup commands.
+- `start-adapter hermes-agent --dry-run --json` now reports `runner: wsl2`, WSL arguments, WSL working directory, and the generated `bash -lc` script without launching anything.
+- Confirmed WSL2 startup refuses when WSL diagnostics are unhealthy instead of falling back to Windows shell execution.
+- Windows-native `start-adapter` behavior remains unchanged for non-WSL adapters.
+- Real supervised WSL2 process management remains deferred until a WSL2 distro is available for integration testing.
+
+Changed areas:
+
+- `core/node/src/wsl-adapter.ts`
+- `core/node/src/core.ts`
+- `core/node/dist/`
+- `tests/test_windows_core.py`
+- `docs/PROGRESS.md`
+- `docs/superpowers/plans/2026-05-01-wsl2-adapter-start-plan.md`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_start_adapter_wsl2_dry_run_reports_wsl_command_without_running tests.test_windows_core.WindowsCoreTests.test_start_adapter_wsl2_confirm_requires_healthy_wsl tests.test_windows_core.WindowsCoreTests.test_start_adapter_confirm_launches_candidate_managed_process -v`
+
+Next steps:
+
+- Add supervised WSL2 process metadata once a WSL2 distro can be used to validate process lifetime and stop behavior.
