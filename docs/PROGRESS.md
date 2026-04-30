@@ -874,3 +874,30 @@ Validation performed:
 Next steps:
 
 - Split portal generation and portal process management into a portal-focused TypeScript module.
+
+### Portal Utilities Split
+
+Status: `Done`
+
+Summary:
+
+- Extracted portal HTML generation, portal process discovery, portal start/stop, and portal status helpers into `core/node/src/portal.ts`.
+- `core.ts` now imports portal helpers and passes current service status into portal generation to avoid a circular dependency.
+- Public portal exports remain available through the core module for CLI and test compatibility.
+
+Changed areas:
+
+- `core/node/src/portal.ts`
+- `core/node/src/core.ts`
+- `core/node/dist/`
+- `docs/PROGRESS.md`
+- `docs/superpowers/plans/2026-05-01-split-portal-utils.md`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_start_generates_portal_from_adapter_metadata tests.test_windows_core.WindowsCoreTests.test_start_serves_portal_over_localhost_and_stop_shuts_it_down tests.test_windows_core.WindowsCoreTests.test_status_removes_portal_pid_when_process_is_not_portal_server tests.test_windows_core.WindowsCoreTests.test_start_fails_when_portal_port_is_occupied_by_another_process -v`
+
+Next steps:
+
+- Split setup diagnostics, path checks, port checks, and log tail helpers into a diagnostics-focused TypeScript module.

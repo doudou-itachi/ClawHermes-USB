@@ -1,25 +1,20 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.PORTAL_URL = exports.writeStatusSnapshot = exports.runtimePreparationPlan = exports.runtimeDiagnostics = exports.loadRuntimeManifest = exports.installRuntimeFromArchive = exports.serviceEnvironmentDiagnostic = exports.resolveServiceEnvironment = exports.initializeEnvFiles = exports.envFileDiagnostics = exports.validateAdapter = exports.serviceOrder = exports.loadAdapters = exports.integrationReadiness = exports.portableEnv = exports.getRoot = exports.dataWritable = void 0;
+exports.writeStatusSnapshot = exports.runtimePreparationPlan = exports.runtimeDiagnostics = exports.loadRuntimeManifest = exports.installRuntimeFromArchive = exports.stopPortalServer = exports.startPortalServer = exports.getPortalStatus = exports.generatePortal = exports.PORTAL_URL = exports.serviceEnvironmentDiagnostic = exports.resolveServiceEnvironment = exports.initializeEnvFiles = exports.envFileDiagnostics = exports.validateAdapter = exports.serviceOrder = exports.loadAdapters = exports.integrationReadiness = exports.portableEnv = exports.getRoot = exports.dataWritable = void 0;
 exports.setupDiagnostics = setupDiagnostics;
 exports.readLogTail = readLogTail;
 exports.pathDiagnostics = pathDiagnostics;
 exports.portDiagnostics = portDiagnostics;
-exports.generatePortal = generatePortal;
-exports.startPortalServer = startPortalServer;
-exports.getPortalStatus = getPortalStatus;
-exports.stopPortalServer = stopPortalServer;
 exports.startSkeleton = startSkeleton;
 exports.getStatus = getStatus;
 exports.stopSkeleton = stopSkeleton;
 const node_child_process_1 = require("node:child_process");
-const node_net_1 = require("node:net");
 const node_fs_1 = require("node:fs");
 const node_path_1 = require("node:path");
-const node_http_1 = require("node:http");
 const adapters_1 = require("./adapters");
 const environment_1 = require("./environment");
 const portable_1 = require("./portable");
+const portal_1 = require("./portal");
 const runtimes_1 = require("./runtimes");
 const status_1 = require("./status");
 var portable_2 = require("./portable");
@@ -36,6 +31,12 @@ Object.defineProperty(exports, "envFileDiagnostics", { enumerable: true, get: fu
 Object.defineProperty(exports, "initializeEnvFiles", { enumerable: true, get: function () { return environment_2.initializeEnvFiles; } });
 Object.defineProperty(exports, "resolveServiceEnvironment", { enumerable: true, get: function () { return environment_2.resolveServiceEnvironment; } });
 Object.defineProperty(exports, "serviceEnvironmentDiagnostic", { enumerable: true, get: function () { return environment_2.serviceEnvironmentDiagnostic; } });
+var portal_2 = require("./portal");
+Object.defineProperty(exports, "PORTAL_URL", { enumerable: true, get: function () { return portal_2.PORTAL_URL; } });
+Object.defineProperty(exports, "generatePortal", { enumerable: true, get: function () { return portal_2.generatePortal; } });
+Object.defineProperty(exports, "getPortalStatus", { enumerable: true, get: function () { return portal_2.getPortalStatus; } });
+Object.defineProperty(exports, "startPortalServer", { enumerable: true, get: function () { return portal_2.startPortalServer; } });
+Object.defineProperty(exports, "stopPortalServer", { enumerable: true, get: function () { return portal_2.stopPortalServer; } });
 var runtimes_2 = require("./runtimes");
 Object.defineProperty(exports, "installRuntimeFromArchive", { enumerable: true, get: function () { return runtimes_2.installRuntimeFromArchive; } });
 Object.defineProperty(exports, "loadRuntimeManifest", { enumerable: true, get: function () { return runtimes_2.loadRuntimeManifest; } });
@@ -43,7 +44,6 @@ Object.defineProperty(exports, "runtimeDiagnostics", { enumerable: true, get: fu
 Object.defineProperty(exports, "runtimePreparationPlan", { enumerable: true, get: function () { return runtimes_2.runtimePreparationPlan; } });
 var status_2 = require("./status");
 Object.defineProperty(exports, "writeStatusSnapshot", { enumerable: true, get: function () { return status_2.writeStatusSnapshot; } });
-exports.PORTAL_URL = "http://127.0.0.1:17000/";
 function setupDiagnostics(usbRoot) {
     const root = (0, portable_1.getRoot)(usbRoot);
     const adapters = (0, adapters_1.loadAdapters)(root);
@@ -174,274 +174,6 @@ function isTcpPortAvailableSync(port) {
         return true;
     }
 }
-function escapeHtml(value) {
-    return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
-}
-function generatePortal(usbRoot) {
-    const root = (0, portable_1.getRoot)(usbRoot);
-    const portalPath = (0, node_path_1.join)(root, "portal", "index.html");
-    (0, node_fs_1.mkdirSync)((0, node_path_1.dirname)(portalPath), { recursive: true });
-    const rows = getStatus(root).services.map((service) => {
-        const logPath = service.logFile.startsWith(root)
-            ? service.logFile.slice(root.length).replace(new RegExp(`^\\${node_path_1.sep}`), "").replaceAll("\\", "/")
-            : service.logFile;
-        const url = service.portalUrl ? `<a href="${escapeHtml(service.portalUrl)}">${escapeHtml(service.portalUrl)}</a>` : "<span>Pending upstream URL</span>";
-        const healthLabel = service.health.ready ? "Ready" : "Not ready";
-        const health = `<span data-health-label>${escapeHtml(healthLabel)}</span> <span data-health-type>(${escapeHtml(service.health.type)})</span><br><small data-health-reason>${escapeHtml(service.health.reason)}</small>`;
-        return `<tr data-service-id="${escapeHtml(service.id)}"><td>${escapeHtml(service.displayName)}</td><td>${escapeHtml(service.id)}</td><td data-status-cell>${escapeHtml(service.status)}</td><td>${health}</td><td>${url}</td><td><code>${escapeHtml(logPath)}</code></td></tr>`;
-    }).join("\n          ");
-    const html = `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ClawHermes-USB Portal</title>
-  <style>
-    body { font-family: Segoe UI, Arial, sans-serif; margin: 32px; color: #202124; background: #f7f8fa; }
-    main { max-width: 1080px; margin: 0 auto; }
-    h1 { font-size: 28px; margin: 0 0 16px; }
-    section { margin-top: 24px; }
-    table { width: 100%; border-collapse: collapse; background: #fff; }
-    th, td { border: 1px solid #d8dde6; padding: 10px; text-align: left; vertical-align: top; }
-    th { background: #eef2f7; }
-    code { font-family: Consolas, monospace; }
-  </style>
-</head>
-<body>
-  <main>
-    <h1>ClawHermes-USB Portal</h1>
-    <section>
-      <p><strong>Project root:</strong> <code>${escapeHtml(root)}</code></p>
-      <p><strong>Data root:</strong> <code>${escapeHtml((0, node_path_1.join)(root, "data"))}</code></p>
-      <p><strong>Generated:</strong> <code>${new Date().toISOString()}</code></p>
-    </section>
-    <section>
-      <h2>Services</h2>
-      <table>
-        <thead><tr><th>Service</th><th>ID</th><th>Status</th><th>Health</th><th>URL</th><th>Log</th></tr></thead>
-        <tbody>
-          ${rows}
-        </tbody>
-      </table>
-    </section>
-    <section>
-      <h2>Operations</h2>
-      <p>Use <code>launcher/windows/Status.bat</code> to refresh service state and <code>launcher/windows/Stop.bat</code> to stop placeholder services.</p>
-    </section>
-  </main>
-  <script>
-    async function refreshStatus() {
-      try {
-        const response = await fetch('/status.json', { cache: 'no-store' });
-        if (!response.ok) return;
-        const payload = await response.json();
-        for (const service of payload.services || []) {
-          const row = document.querySelector('[data-service-id="' + service.id + '"]');
-          if (!row) continue;
-          const statusCell = row.querySelector('[data-status-cell]');
-          const healthLabel = row.querySelector('[data-health-label]');
-          const healthType = row.querySelector('[data-health-type]');
-          const healthReason = row.querySelector('[data-health-reason]');
-          if (statusCell) statusCell.textContent = service.status || 'unknown';
-          if (healthLabel) healthLabel.textContent = service.health && service.health.ready ? 'Ready' : 'Not ready';
-          if (healthType) healthType.textContent = '(' + ((service.health && service.health.type) || 'unknown') + ')';
-          if (healthReason) healthReason.textContent = (service.health && service.health.reason) || '';
-        }
-      } catch {
-        // Keep the last rendered status visible when refresh fails.
-      }
-    }
-    refreshStatus();
-    window.setInterval(refreshStatus, 5000);
-  </script>
-</body>
-</html>
-`;
-    (0, node_fs_1.writeFileSync)(portalPath, html, "utf8");
-    (0, portable_1.writeLog)(root, "portal", "INFO", "Generated portal/index.html.");
-    return { path: portalPath, url: exports.PORTAL_URL };
-}
-function portalPidFile(usbRoot) {
-    return (0, node_path_1.join)((0, portable_1.getRoot)(usbRoot), "data", "tmp", "pids", "portal.pid");
-}
-function portalServerPath(usbRoot) {
-    return (0, node_path_1.join)((0, portable_1.getRoot)(usbRoot), "core", "node", "dist", "portal-server.js");
-}
-function portalProcesses(usbRoot) {
-    const root = (0, portable_1.getRoot)(usbRoot);
-    try {
-        const output = (0, node_child_process_1.execFileSync)("powershell", [
-            "-NoProfile",
-            "-Command",
-            "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*portal-server.js*' } | Select-Object ProcessId,CommandLine | ConvertTo-Json -Compress",
-        ], { encoding: "utf8" }).trim();
-        if (!output)
-            return [];
-        const parsed = JSON.parse(output);
-        const rows = Array.isArray(parsed) ? parsed : [parsed];
-        return rows.filter((row) => {
-            const item = row;
-            return (typeof item.ProcessId === "number" &&
-                typeof item.CommandLine === "string" &&
-                /\bnode(?:\.exe)?\b/i.test(item.CommandLine) &&
-                item.CommandLine.includes("portal-server.js") &&
-                item.CommandLine.includes(root));
-        });
-    }
-    catch {
-        return [];
-    }
-}
-function portalProcessById(usbRoot, pid) {
-    return portalProcesses(usbRoot).find((processInfo) => processInfo.ProcessId === pid) ?? null;
-}
-async function tcpPortAvailable(port) {
-    return new Promise((resolveAvailable) => {
-        const server = (0, node_net_1.createServer)();
-        server.once("error", () => resolveAvailable(false));
-        server.listen(port, "127.0.0.1", () => server.close(() => resolveAvailable(true)));
-    });
-}
-async function portalReady(timeoutMs = 5000) {
-    const deadline = Date.now() + timeoutMs;
-    while (Date.now() < deadline) {
-        const ready = await new Promise((resolveReady) => {
-            const request = (0, node_http_1.get)(exports.PORTAL_URL, (response) => {
-                response.resume();
-                resolveReady(response.statusCode === 200);
-            });
-            request.setTimeout(500, () => {
-                request.destroy();
-                resolveReady(false);
-            });
-            request.on("error", () => resolveReady(false));
-        });
-        if (ready)
-            return true;
-        await new Promise((resolveDelay) => setTimeout(resolveDelay, 100));
-    }
-    return false;
-}
-function portalMetadata(root, processId) {
-    return {
-        serviceId: "portal",
-        displayName: "Portal",
-        status: "running",
-        processId,
-        startedAt: new Date().toISOString(),
-        url: exports.PORTAL_URL,
-        logFile: (0, node_path_1.join)(root, "data", "logs", "portal.log"),
-    };
-}
-async function startPortalServer(usbRoot) {
-    const root = (0, portable_1.getRoot)(usbRoot);
-    const pidFile = portalPidFile(root);
-    (0, node_fs_1.mkdirSync)((0, node_path_1.dirname)(pidFile), { recursive: true });
-    if ((0, node_fs_1.existsSync)(pidFile)) {
-        const existing = JSON.parse((0, node_fs_1.readFileSync)(pidFile, "utf8"));
-        if (existing.processId && portalProcessById(root, existing.processId))
-            return existing;
-        (0, node_fs_1.rmSync)(pidFile, { force: true });
-    }
-    const existingProcess = portalProcesses(root)[0];
-    if (existingProcess) {
-        const metadata = portalMetadata(root, existingProcess.ProcessId);
-        (0, node_fs_1.writeFileSync)(pidFile, JSON.stringify(metadata, null, 2), "utf8");
-        (0, portable_1.writeLog)(root, "portal", "INFO", "Reused existing portal server on http://127.0.0.1:17000/.");
-        return metadata;
-    }
-    if (!(await tcpPortAvailable(17000))) {
-        throw new Error("Port 17000 is already in use. Stop the conflicting process or change config/defaults/ports.json.");
-    }
-    const child = (0, node_child_process_1.spawn)(process.execPath, [portalServerPath(root), "--usb-root", root, "--port", "17000"], {
-        detached: true,
-        stdio: ["ignore", "ignore", "ignore"],
-        windowsHide: true,
-    });
-    child.unref();
-    if (!(await portalReady())) {
-        if (child.pid && portalProcessById(root, child.pid))
-            process.kill(child.pid);
-        throw new Error("Portal server did not become reachable at http://127.0.0.1:17000/.");
-    }
-    const metadata = portalMetadata(root, child.pid ?? 0);
-    (0, node_fs_1.writeFileSync)(pidFile, JSON.stringify(metadata, null, 2), "utf8");
-    (0, portable_1.writeLog)(root, "portal", "INFO", "Started portal server on http://127.0.0.1:17000/.");
-    return metadata;
-}
-function getPortalStatus(usbRoot) {
-    const root = (0, portable_1.getRoot)(usbRoot);
-    const pidFile = portalPidFile(root);
-    let status = "stopped";
-    let processId = null;
-    if ((0, node_fs_1.existsSync)(pidFile)) {
-        const metadata = JSON.parse((0, node_fs_1.readFileSync)(pidFile, "utf8"));
-        if (metadata.processId && portalProcessById(root, metadata.processId)) {
-            status = "running";
-            processId = metadata.processId;
-        }
-        else if (portalProcesses(root).length > 0) {
-            status = "running";
-            processId = portalProcesses(root)[0]?.ProcessId ?? null;
-        }
-        else {
-            (0, node_fs_1.rmSync)(pidFile, { force: true });
-            status = "stopped";
-        }
-    }
-    else if (portalProcesses(root).length > 0) {
-        status = "running";
-        processId = portalProcesses(root)[0]?.ProcessId ?? null;
-    }
-    return {
-        id: "portal",
-        displayName: "Portal",
-        status,
-        pidFile,
-        logFile: (0, node_path_1.join)(root, "data", "logs", "portal.log"),
-        portalUrl: exports.PORTAL_URL,
-        processId,
-        placeholder: false,
-        health: {
-            type: "http",
-            ready: status === "running",
-            reason: status === "running" ? "Portal HTTP server is running." : "Portal HTTP server is stopped.",
-        },
-    };
-}
-function stopPortalServer(usbRoot) {
-    const root = (0, portable_1.getRoot)(usbRoot);
-    const pidFile = portalPidFile(root);
-    let stopped = false;
-    if ((0, node_fs_1.existsSync)(pidFile)) {
-        const metadata = JSON.parse((0, node_fs_1.readFileSync)(pidFile, "utf8"));
-        if (metadata.processId && portalProcessById(root, metadata.processId)) {
-            killProcessTree(metadata.processId);
-            stopped = true;
-        }
-        (0, node_fs_1.rmSync)(pidFile, { force: true });
-    }
-    for (const processInfo of portalProcesses(root)) {
-        try {
-            killProcessTree(processInfo.ProcessId);
-            stopped = true;
-        }
-        catch {
-            // Already gone.
-        }
-    }
-    if (stopped)
-        (0, portable_1.writeLog)(root, "portal", "INFO", "Stopped portal server.");
-    return stopped;
-}
-function killProcessTree(pid) {
-    if (process.platform === "win32") {
-        (0, node_child_process_1.execFileSync)("taskkill", ["/PID", String(pid), "/T", "/F"], { stdio: "ignore" });
-    }
-    else {
-        process.kill(pid, "SIGTERM");
-    }
-}
 async function startSkeleton(usbRoot) {
     const root = (0, portable_1.getRoot)(usbRoot);
     const setup = setupDiagnostics(root);
@@ -475,8 +207,8 @@ async function startSkeleton(usbRoot) {
         }
         started.push(adapter.id);
     }
-    generatePortal(root);
-    const portal = await startPortalServer(root);
+    (0, portal_1.generatePortal)(root, getStatus(root).services);
+    const portal = await (0, portal_1.startPortalServer)(root);
     (0, status_1.writeStatusSnapshot)(root, getStatus(root));
     return { root, started, portal, setupMessages: setup.messages };
 }
@@ -554,13 +286,13 @@ function getStatus(usbRoot) {
             health: (0, status_1.adapterHealth)(adapter, status, placeholder),
         };
     });
-    services.push(getPortalStatus(root));
+    services.push((0, portal_1.getPortalStatus)(root));
     return { root, generatedAt: new Date().toISOString(), services };
 }
 function stopSkeleton(usbRoot) {
     const root = (0, portable_1.getRoot)(usbRoot);
     const stopped = [];
-    if (stopPortalServer(root))
+    if ((0, portal_1.stopPortalServer)(root))
         stopped.push("portal");
     for (const adapter of (0, adapters_1.serviceOrder)(root, "stop")) {
         const pidFile = (0, portable_1.resolveRelative)(root, adapter.pidFile);
@@ -568,7 +300,7 @@ function stopSkeleton(usbRoot) {
             const metadata = JSON.parse((0, node_fs_1.readFileSync)(pidFile, "utf8"));
             if (metadata.placeholder === false && metadata.processId) {
                 try {
-                    killProcessTree(metadata.processId);
+                    (0, portal_1.killProcessTree)(metadata.processId);
                 }
                 catch {
                     // Already gone.
