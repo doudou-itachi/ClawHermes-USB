@@ -427,6 +427,37 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertIn("Portable Python not found", "\n".join(payload["messages"]))
         self.assertIn("Portable Git not found", "\n".join(payload["messages"]))
 
+    def test_setup_json_reports_recommended_actions(self):
+        result = run_dispatcher("setup", "-Json")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        actions = payload["actions"]
+        categories = {action["category"] for action in actions}
+        action_ids = {action["id"] for action in actions}
+
+        self.assertIn("runtime", categories)
+        self.assertIn("adapter-integration", categories)
+        self.assertIn("env-file", categories)
+        self.assertIn("runtime:node", action_ids)
+        self.assertIn("adapter-integration:hermes-web-ui", action_ids)
+        self.assertIn("env-file:hermes-agent", action_ids)
+
+        node_action = next(action for action in actions if action["id"] == "runtime:node")
+        self.assertEqual(node_action["severity"], "warning")
+        self.assertIn("runtimes", node_action["command"])
+
+        env_action = next(action for action in actions if action["id"] == "env-file:hermes-agent")
+        self.assertIn("init-env", env_action["command"])
+        self.assertEqual(env_action["path"].replace("\\", "/"), "config/env/hermes.env")
+
+    def test_setup_text_prints_recommended_actions(self):
+        result = run_dispatcher("setup")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Recommended actions:", result.stdout)
+        self.assertIn("Review runtime preparation plan", result.stdout)
+
     def test_setup_json_reports_default_port_diagnostics(self):
         result = run_dispatcher("setup", "-Json")
 

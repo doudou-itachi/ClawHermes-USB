@@ -82,6 +82,14 @@ async function main(): Promise<void> {
         console.log(`Root: ${result.root}`);
         if (result.messages.length === 0) console.log("No setup issues found.");
         for (const message of result.messages) console.log(`- ${message}`);
+        if (result.actions.length > 0) {
+          console.log("Recommended actions:");
+          for (const action of result.actions) {
+            console.log(`- [${action.severity}] ${action.title}`);
+            if (action.command) console.log(`  command: ${action.command}`);
+            if (action.docs) console.log(`  docs: ${action.docs}`);
+          }
+        }
       }
       return;
     }

@@ -23,34 +23,93 @@ function setupDiagnostics(usbRoot) {
     const envFiles = (0, environment_1.envFileDiagnostics)(root, adapters);
     const writable = (0, portable_1.dataWritable)(root);
     const messages = [];
+    const actions = [];
     for (const runtime of runtimes) {
-        if (!runtime.found)
+        if (!runtime.found) {
             messages.push(`${runtime.label} not found at ${runtime.path}.`);
+            actions.push({
+                id: `runtime:${runtime.name}`,
+                category: "runtime",
+                severity: "warning",
+                title: `Review runtime preparation plan for ${runtime.label}`,
+                detail: `${runtime.label} is expected at ${runtime.path}. Download or place the ${runtime.packageType} package before running real services.`,
+                command: "node core/node/dist/clawhermes.js runtimes --json",
+                path: runtime.path,
+                docs: runtime.sourceUrl,
+            });
+        }
     }
     for (const adapter of adapterResults) {
         for (const error of adapter.errors)
             messages.push(`Adapter ${adapter.id}: ${error}`);
     }
     for (const item of readiness) {
-        if (!item.productionReady)
+        if (!item.productionReady) {
             messages.push(`Adapter ${item.id} integration is not production-ready: ${item.summary}`);
+            actions.push({
+                id: `adapter-integration:${item.id}`,
+                category: "adapter-integration",
+                severity: item.status === "blocked" ? "warning" : "info",
+                title: `Review ${item.id} adapter integration`,
+                detail: item.summary,
+                docs: item.sources[0],
+                serviceId: item.id,
+            });
+        }
     }
     for (const port of ports) {
-        if (!port.available)
+        if (!port.available) {
             messages.push(`Port ${port.port} is already in use for ${port.name}. Stop the conflicting process or change config/defaults/ports.json.`);
+            actions.push({
+                id: `port:${port.name}`,
+                category: "port",
+                severity: "error",
+                title: `Free port ${port.port} for ${port.name}`,
+                detail: `Port ${port.port} on ${port.host} is already in use. Stop the conflicting process or update config/defaults/ports.json.`,
+                path: "config/defaults/ports.json",
+            });
+        }
     }
     for (const path of paths) {
-        if (path.required && !path.exists)
+        if (path.required && !path.exists) {
             messages.push(`Required ${path.type} is missing: ${path.path}.`);
+            actions.push({
+                id: `path:${path.path}`,
+                category: "path",
+                severity: "error",
+                title: `Create missing ${path.type}: ${path.path}`,
+                detail: `The required ${path.type} ${path.path} is missing from the portable layout.`,
+                path: path.path,
+            });
+        }
     }
     for (const envFile of envFiles) {
         if (!envFile.exists) {
             messages.push(`Env file missing: ${envFile.path}. To configure ${envFile.serviceId}, copy ${envFile.examplePath} to ${envFile.path}.`);
+            actions.push({
+                id: `env-file:${envFile.serviceId}`,
+                category: "env-file",
+                severity: "warning",
+                title: `Initialize env file for ${envFile.serviceId}`,
+                detail: `Create ${envFile.path} from ${envFile.examplePath} before running the real service.`,
+                command: "node core/node/dist/clawhermes.js init-env --dry-run --json",
+                path: envFile.path,
+                serviceId: envFile.serviceId,
+            });
         }
     }
-    if (!writable)
+    if (!writable) {
         messages.push("Data directory is not writable.");
-    return { root, adapters: adapterResults, runtimes, readiness, ports, paths, envFiles, dataWritable: writable, messages };
+        actions.push({
+            id: "data:writable",
+            category: "data",
+            severity: "error",
+            title: "Make data directory writable",
+            detail: "The launcher must be able to write logs, PID files, env copies, status snapshots, and backups under data/.",
+            path: "data",
+        });
+    }
+    return { root, adapters: adapterResults, runtimes, readiness, ports, paths, envFiles, dataWritable: writable, messages, actions };
 }
 function readLogTail(usbRoot, target, requestedLines) {
     const root = (0, portable_1.getRoot)(usbRoot);

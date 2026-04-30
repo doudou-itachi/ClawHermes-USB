@@ -138,6 +138,18 @@ export type PathDiagnostic = {
   exists: boolean;
 };
 
+export type SetupAction = {
+  id: string;
+  category: "runtime" | "adapter-integration" | "env-file" | "port" | "path" | "data";
+  severity: "info" | "warning" | "error";
+  title: string;
+  detail: string;
+  command?: string;
+  path?: string;
+  docs?: string;
+  serviceId?: string;
+};
+
 export type EnvFileDiagnostic = {
   serviceId: string;
   path: string;

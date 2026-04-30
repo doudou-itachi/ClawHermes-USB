@@ -1044,3 +1044,33 @@ Validation performed:
 Next steps:
 
 - Continue toward real upstream adapter integration by improving adapter setup guidance and runtime readiness messages.
+
+### Setup Recommended Actions
+
+Status: `Done`
+
+Summary:
+
+- Added structured `actions` to setup diagnostics while preserving the existing `messages` array.
+- Runtime, adapter readiness, missing env file, port, path, and data writability issues now include next-step guidance.
+- Non-JSON setup output prints a `Recommended actions` section with commands and documentation links where available.
+- Added regression coverage for setup JSON actions and text output.
+
+Changed areas:
+
+- `core/node/src/diagnostics.ts`
+- `core/node/src/clawhermes.ts`
+- `core/node/src/types.ts`
+- `core/node/dist/`
+- `tests/test_windows_core.py`
+- `docs/PROGRESS.md`
+- `docs/superpowers/plans/2026-05-01-add-setup-actions.md`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_setup_json_reports_recommended_actions tests.test_windows_core.WindowsCoreTests.test_setup_text_prints_recommended_actions -v`
+
+Next steps:
+
+- Surface setup recommended actions in the portal so users can see startup blockers without opening JSON output.
