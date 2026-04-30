@@ -1907,4 +1907,28 @@ Validation performed:
 
 Next steps:
 
-- Rebuild the corrupted Chinese documentation files from the readable English documents so the project-level Chinese encoding rule is enforceable across the whole repo.
+- Audit Chinese documentation with UTF-8 reads and add a regression guard for mojibake markers.
+
+### Chinese Documentation Encoding Guard
+
+Status: `Done`
+
+Summary:
+
+- Audited the Chinese documentation files with UTF-8 reads.
+- Confirmed the files are readable as UTF-8 even when PowerShell may display Chinese as mojibake under the current console code page.
+- Added a regression test that rejects common mojibake markers in Chinese docs and verifies key readable Chinese/project terms remain present.
+- Kept the existing Chinese documents intact because the file contents are valid; the issue is display encoding, not file encoding.
+
+Changed areas:
+
+- `tests/test_windows_core.py`
+- `docs/PROGRESS.md`
+
+Validation performed:
+
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_chinese_docs_are_readable_utf8 -v`
+
+Next steps:
+
+- Continue real WSL2 adapter execution work after host preparation flow and encoding guard are in place.

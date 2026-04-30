@@ -607,6 +607,24 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertIn("prepare-wsl", action["command"])
         self.assertIn("--dry-run", action["command"])
 
+    def test_chinese_docs_are_readable_utf8(self):
+        docs = [
+            ROOT / "README.zh-CN.md",
+            ROOT / "docs" / "PRD.zh-CN.md",
+            ROOT / "docs" / "DESIGN.zh-CN.md",
+            ROOT / "docs" / "ADAPTER_CONTRACT.zh-CN.md",
+        ]
+        mojibake_markers = ["鏄", "鐨", "鍜", "锛", "銆", "鈥", "�"]
+        required_phrases = ["ClawHermes-USB", "便携"]
+
+        for doc in docs:
+            text = doc.read_text(encoding="utf-8")
+            for marker in mojibake_markers:
+                self.assertNotIn(marker, text, f"{doc} contains mojibake marker {marker}")
+            for phrase in required_phrases:
+                self.assertIn(phrase, text, f"{doc} is missing readable Chinese phrase {phrase}")
+            self.assertTrue("适配器" in text or "adapter" in text.lower(), f"{doc} is missing adapter terminology")
+
     def test_setup_json_reports_adapter_runtime_version_mismatch(self):
         temp_dir, temp_root = make_temp_usb_root()
         try:
