@@ -163,6 +163,7 @@ Adapter 禁止使用绝对路径。
 - `kind`：`node`、`python`、`git`、`binary` 或 `none`
 - `platform`：`windows`、`macos` 或 `any`
 - `requiredExecutable`：runtime 路径下预期存在的可执行文件
+- `versionRequirement`：可选的上游版本范围，例如 `>=23.0.0`
 
 ### `upstream`
 
@@ -370,6 +371,7 @@ Adapter validator 应在以下情况失败：
 
 - 服务启用但 app 目录为空
 - runtime 可执行文件缺失
+- runtime 版本不满足 `versionRequirement`
 - env 文件缺失
 - 默认端口被占用
 

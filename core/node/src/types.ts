@@ -62,6 +62,7 @@ export type AdapterDescriptor = {
     kind: string;
     platform: string;
     requiredExecutable: string;
+    versionRequirement?: string;
   };
   upstream?: {
     name: string;

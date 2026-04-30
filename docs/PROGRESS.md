@@ -1499,3 +1499,38 @@ Validation performed:
 Next steps:
 
 - Use a disposable USB root to attempt a guarded checkout of one real upstream adapter, starting with `hermes-web-ui` because its source probe is green and its setup command is already modeled as `npm install`.
+
+### Hermes Web UI Upstream Checkout Finding
+
+Status: `Done`
+
+Summary:
+
+- Performed a guarded real checkout of `EKKOLearnAI/hermes-web-ui` in a disposable USB root outside the repository.
+- Confirmed checkout of `main` succeeded without modifying the project `apps/` directory.
+- Ran `setup-adapter hermes-web-ui --dry-run --json` against the disposable root.
+- Confirmed upstream `package.json` declares `scripts.start` as `vite --host --port 8648`, so the current adapter start command `npm run start` maps to a real upstream script.
+- Confirmed upstream `package.json` declares Node engine `>=23.0.0`.
+- Recorded this requirement as `runtime.versionRequirement` on the Hermes Web UI adapter.
+
+Changed areas:
+
+- `adapters/hermes-web-ui/adapter.json`
+- `core/node/src/types.ts`
+- `tests/test_windows_core.py`
+- `docs/ADAPTER_CONTRACT.md`
+- `docs/ADAPTER_CONTRACT.zh-CN.md`
+- `docs/PROGRESS.md`
+- `docs/superpowers/plans/2026-05-01-add-adapter-runtime-version-requirement.md`
+
+Validation performed:
+
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_adapters_json_reports_runtime_version_requirement -v`
+- `npm test`
+- `git diff --check`
+- UTF-8 smoke check
+- Chinese adapter contract mojibake scan
+
+Next steps:
+
+- Add runtime version diagnostics so setup can compare installed portable runtime versions against adapter `versionRequirement` before running real setup commands.

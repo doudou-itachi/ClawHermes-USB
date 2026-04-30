@@ -163,6 +163,7 @@ Fields:
 - `kind`: `node`, `python`, `git`, `binary`, or `none`
 - `platform`: `windows`, `macos`, or `any`
 - `requiredExecutable`: executable name expected under the runtime path
+- `versionRequirement`: optional upstream version range, for example `>=23.0.0`
 
 ### `upstream`
 
@@ -370,6 +371,7 @@ Warnings should be emitted if:
 
 - service is enabled but app directory is empty
 - runtime executable is missing
+- runtime version does not satisfy `versionRequirement`
 - env file is missing
 - default port is occupied
 

@@ -8,7 +8,8 @@
   "runtime": {
     "kind": "node",
     "platform": "windows",
-    "requiredExecutable": "node.exe"
+    "requiredExecutable": "node.exe",
+    "versionRequirement": ">=23.0.0"
   },
   "upstream": {
     "name": "EKKOLearnAI/hermes-web-ui",
@@ -16,7 +17,7 @@
     "installDocs": "https://github.com/EKKOLearnAI/hermes-web-ui",
     "checkoutRef": "main",
     "installMode": "source-checkout",
-    "notes": "Portable adapter still needs source checkout versus package CLI mode verification."
+    "notes": "Real upstream checkout confirms package.json scripts start via npm run start and declares Node >=23.0.0."
   },
   "commands": {
     "setup": "npm install",
