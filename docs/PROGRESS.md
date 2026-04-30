@@ -765,3 +765,30 @@ Validation performed:
 Next steps:
 
 - Split adapter loading, validation, readiness, and service ordering into an adapter-focused TypeScript module.
+
+### Adapter Utilities Split
+
+Status: `Done`
+
+Summary:
+
+- Extracted adapter discovery, adapter validation, integration readiness, and service ordering into `core/node/src/adapters.ts`.
+- `core.ts` now imports adapter helpers and re-exports the public helper functions for compatibility.
+- This continues the staged decomposition of the TypeScript core while preserving CLI behavior.
+
+Changed areas:
+
+- `core/node/src/adapters.ts`
+- `core/node/src/core.ts`
+- `core/node/dist/`
+- `docs/PROGRESS.md`
+- `docs/superpowers/plans/2026-05-01-split-adapter-utils.md`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_setup_json_reports_runtime_diagnostics_and_valid_adapters tests.test_windows_core.WindowsCoreTests.test_setup_json_reports_adapter_integration_readiness tests.test_windows_core.WindowsCoreTests.test_start_status_stop_manage_placeholder_pid_metadata tests.test_windows_core.WindowsCoreTests.test_start_runs_production_ready_adapter_process_and_stop_kills_it -v`
+
+Next steps:
+
+- Split runtime manifest diagnostics and runtime archive installation into a runtime-focused TypeScript module.

@@ -1,13 +1,10 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.PORTAL_URL = exports.portableEnv = exports.getRoot = exports.dataWritable = void 0;
-exports.loadAdapters = loadAdapters;
-exports.validateAdapter = validateAdapter;
+exports.PORTAL_URL = exports.validateAdapter = exports.serviceOrder = exports.loadAdapters = exports.integrationReadiness = exports.portableEnv = exports.getRoot = exports.dataWritable = void 0;
 exports.runtimeDiagnostics = runtimeDiagnostics;
 exports.loadRuntimeManifest = loadRuntimeManifest;
 exports.runtimePreparationPlan = runtimePreparationPlan;
 exports.installRuntimeFromArchive = installRuntimeFromArchive;
-exports.integrationReadiness = integrationReadiness;
 exports.setupDiagnostics = setupDiagnostics;
 exports.envFileDiagnostics = envFileDiagnostics;
 exports.initializeEnvFiles = initializeEnvFiles;
@@ -30,50 +27,18 @@ const node_fs_1 = require("node:fs");
 const node_path_1 = require("node:path");
 const node_http_1 = require("node:http");
 const node_crypto_1 = require("node:crypto");
+const adapters_1 = require("./adapters");
 const portable_1 = require("./portable");
 var portable_2 = require("./portable");
 Object.defineProperty(exports, "dataWritable", { enumerable: true, get: function () { return portable_2.dataWritable; } });
 Object.defineProperty(exports, "getRoot", { enumerable: true, get: function () { return portable_2.getRoot; } });
 Object.defineProperty(exports, "portableEnv", { enumerable: true, get: function () { return portable_2.portableEnv; } });
+var adapters_2 = require("./adapters");
+Object.defineProperty(exports, "integrationReadiness", { enumerable: true, get: function () { return adapters_2.integrationReadiness; } });
+Object.defineProperty(exports, "loadAdapters", { enumerable: true, get: function () { return adapters_2.loadAdapters; } });
+Object.defineProperty(exports, "serviceOrder", { enumerable: true, get: function () { return adapters_2.serviceOrder; } });
+Object.defineProperty(exports, "validateAdapter", { enumerable: true, get: function () { return adapters_2.validateAdapter; } });
 exports.PORTAL_URL = "http://127.0.0.1:17000/";
-function loadAdapters(usbRoot) {
-    const adapterRoot = (0, node_path_1.join)((0, portable_1.getRoot)(usbRoot), "adapters");
-    return (0, node_fs_1.readdirSync)(adapterRoot, { withFileTypes: true })
-        .filter((entry) => entry.isDirectory())
-        .map((entry) => (0, node_path_1.join)(adapterRoot, entry.name, "adapter.json"))
-        .filter((file) => (0, node_fs_1.existsSync)(file))
-        .map((file) => JSON.parse((0, node_fs_1.readFileSync)(file, "utf8")))
-        .sort((a, b) => a.id.localeCompare(b.id));
-}
-function isRelativePath(value) {
-    return !value || !(0, node_path_1.isAbsolute)(value);
-}
-function validateAdapter(adapter, knownIds) {
-    const errors = [];
-    if (!adapter.id)
-        errors.push("id is required");
-    if (!isRelativePath(adapter.appDir))
-        errors.push("appDir must be relative");
-    if (!isRelativePath(adapter.dataDir))
-        errors.push("dataDir must be relative");
-    if (!isRelativePath(adapter.logFile))
-        errors.push("logFile must be relative");
-    if (adapter.logFile && !adapter.logFile.replaceAll("\\", "/").startsWith("data/logs/")) {
-        errors.push("logFile must be under data/logs");
-    }
-    if (!isRelativePath(adapter.pidFile))
-        errors.push("pidFile must be relative");
-    if (adapter.pidFile && !adapter.pidFile.replaceAll("\\", "/").startsWith("data/tmp/")) {
-        errors.push("pidFile must be under data/tmp");
-    }
-    if (!adapter.health)
-        errors.push("health is required");
-    for (const dependency of adapter.dependsOn ?? []) {
-        if (!knownIds.includes(dependency))
-            errors.push(`dependsOn references unknown service: ${dependency}`);
-    }
-    return { id: adapter.id, valid: errors.length === 0, errors };
-}
 function runtimeDiagnostics(usbRoot) {
     const root = (0, portable_1.getRoot)(usbRoot);
     const manifest = loadRuntimeManifest(root);
@@ -217,23 +182,13 @@ function copyDirectoryContents(sourceDir, targetDir) {
         }
     }
 }
-function integrationReadiness(adapters) {
-    return adapters.map((adapter) => ({
-        id: adapter.id,
-        status: adapter.integration?.status ?? "unknown",
-        productionReady: adapter.integration?.productionReady === true,
-        verifiedAt: adapter.integration?.verifiedAt ?? null,
-        summary: adapter.integration?.summary ?? "No upstream integration metadata has been recorded for this adapter.",
-        sources: adapter.integration?.sources ?? [],
-    }));
-}
 function setupDiagnostics(usbRoot) {
     const root = (0, portable_1.getRoot)(usbRoot);
-    const adapters = loadAdapters(root);
+    const adapters = (0, adapters_1.loadAdapters)(root);
     const knownIds = adapters.map((adapter) => adapter.id);
-    const adapterResults = adapters.map((adapter) => validateAdapter(adapter, knownIds));
+    const adapterResults = adapters.map((adapter) => (0, adapters_1.validateAdapter)(adapter, knownIds));
     const runtimes = runtimeDiagnostics(root);
-    const readiness = integrationReadiness(adapters);
+    const readiness = (0, adapters_1.integrationReadiness)(adapters);
     const ports = portDiagnostics(root);
     const paths = pathDiagnostics(root);
     const envFiles = envFileDiagnostics(root, adapters);
@@ -292,7 +247,7 @@ function envFileDiagnostics(usbRoot, adapters) {
 }
 function initializeEnvFiles(usbRoot, dryRun) {
     const root = (0, portable_1.getRoot)(usbRoot);
-    const diagnostics = envFileDiagnostics(root, loadAdapters(root));
+    const diagnostics = envFileDiagnostics(root, (0, adapters_1.loadAdapters)(root));
     const result = {
         root,
         dryRun,
@@ -340,7 +295,7 @@ function initializeEnvFiles(usbRoot, dryRun) {
 }
 function resolveServiceEnvironment(usbRoot, serviceId) {
     const root = (0, portable_1.getRoot)(usbRoot);
-    const adapter = loadAdapters(root).find((item) => item.id === serviceId);
+    const adapter = (0, adapters_1.loadAdapters)(root).find((item) => item.id === serviceId);
     if (!adapter) {
         throw new Error(`Unknown service: ${serviceId}`);
     }
@@ -406,7 +361,7 @@ function resolveLogTarget(usbRoot, target) {
     const root = (0, portable_1.getRoot)(usbRoot);
     if (target === "launcher")
         return (0, node_path_1.join)(root, "data", "logs", "launcher.log");
-    const adapter = loadAdapters(root).find((item) => item.id === target);
+    const adapter = (0, adapters_1.loadAdapters)(root).find((item) => item.id === target);
     if (!adapter)
         throw new Error(`Unknown log target: ${target}`);
     return (0, portable_1.resolveRelative)(root, adapter.logFile);
@@ -504,27 +459,6 @@ function isTcpPortAvailableSync(port) {
     catch {
         return true;
     }
-}
-function serviceOrder(usbRoot, order) {
-    const root = (0, portable_1.getRoot)(usbRoot);
-    const adapters = loadAdapters(root);
-    const byId = new Map(adapters.map((adapter) => [adapter.id, adapter]));
-    const configPath = (0, node_path_1.join)(root, "config", "defaults", "services.json");
-    const ordered = [];
-    if ((0, node_fs_1.existsSync)(configPath)) {
-        const config = JSON.parse((0, node_fs_1.readFileSync)(configPath, "utf8"));
-        const ids = order === "start" ? config.startOrder ?? [] : config.stopOrder ?? [];
-        for (const id of ids) {
-            const adapter = byId.get(id);
-            if (adapter)
-                ordered.push(adapter);
-        }
-    }
-    for (const adapter of adapters) {
-        if (!ordered.some((item) => item.id === adapter.id))
-            ordered.push(adapter);
-    }
-    return ordered;
 }
 function escapeHtml(value) {
     return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
@@ -798,7 +732,7 @@ async function startSkeleton(usbRoot) {
     const root = (0, portable_1.getRoot)(usbRoot);
     const setup = setupDiagnostics(root);
     const started = [];
-    for (const adapter of serviceOrder(root, "start").filter((item) => item.enabled)) {
+    for (const adapter of (0, adapters_1.serviceOrder)(root, "start").filter((item) => item.enabled)) {
         const pidFile = (0, portable_1.resolveRelative)(root, adapter.pidFile);
         const logFile = (0, portable_1.resolveRelative)(root, adapter.logFile);
         const serviceEnv = resolveServiceEnvironment(root, adapter.id);
@@ -877,7 +811,7 @@ function launchManagedAdapterProcess(root, adapter, serviceEnv) {
 }
 function getStatus(usbRoot) {
     const root = (0, portable_1.getRoot)(usbRoot);
-    const services = serviceOrder(root, "start").map((adapter) => {
+    const services = (0, adapters_1.serviceOrder)(root, "start").map((adapter) => {
         const pidFile = (0, portable_1.resolveRelative)(root, adapter.pidFile);
         let status = "stopped";
         let processId = null;
@@ -1006,7 +940,7 @@ function stopSkeleton(usbRoot) {
     const stopped = [];
     if (stopPortalServer(root))
         stopped.push("portal");
-    for (const adapter of serviceOrder(root, "stop")) {
+    for (const adapter of (0, adapters_1.serviceOrder)(root, "stop")) {
         const pidFile = (0, portable_1.resolveRelative)(root, adapter.pidFile);
         if ((0, node_fs_1.existsSync)(pidFile)) {
             const metadata = JSON.parse((0, node_fs_1.readFileSync)(pidFile, "utf8"));

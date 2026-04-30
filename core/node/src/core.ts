@@ -1,49 +1,17 @@
 import { execFileSync, spawn } from "node:child_process";
 import { createServer } from "node:net";
 import { appendFileSync, closeSync, copyFileSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { dirname, isAbsolute, join, resolve, sep } from "node:path";
+import { dirname, join, resolve, sep } from "node:path";
 import { get } from "node:http";
 import { createHash } from "node:crypto";
-import type { AdapterDescriptor, AdapterValidation, EnvFileDiagnostic, EnvInitResult, IntegrationReadiness, PathDiagnostic, PortDiagnostic, RuntimeDiagnostic, RuntimeInstallResult, RuntimeManifest, RuntimePreparationStep, ServiceEnvironment, ServiceEnvironmentDiagnostic, ServiceEnvFileResult, ServiceStatus } from "./types";
+import type { AdapterDescriptor, EnvFileDiagnostic, EnvInitResult, PathDiagnostic, PortDiagnostic, RuntimeDiagnostic, RuntimeInstallResult, RuntimeManifest, RuntimePreparationStep, ServiceEnvironment, ServiceEnvironmentDiagnostic, ServiceEnvFileResult, ServiceStatus } from "./types";
+import { integrationReadiness, loadAdapters, serviceOrder, validateAdapter } from "./adapters";
 import { dataWritable, getRoot, portableEnv, resolveRelative, writeLog } from "./portable";
 
 export { dataWritable, getRoot, portableEnv } from "./portable";
+export { integrationReadiness, loadAdapters, serviceOrder, validateAdapter } from "./adapters";
 
 export const PORTAL_URL = "http://127.0.0.1:17000/";
-
-export function loadAdapters(usbRoot: string): AdapterDescriptor[] {
-  const adapterRoot = join(getRoot(usbRoot), "adapters");
-  return readdirSync(adapterRoot, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => join(adapterRoot, entry.name, "adapter.json"))
-    .filter((file) => existsSync(file))
-    .map((file) => JSON.parse(readFileSync(file, "utf8")) as AdapterDescriptor)
-    .sort((a, b) => a.id.localeCompare(b.id));
-}
-
-function isRelativePath(value: string | null | undefined): boolean {
-  return !value || !isAbsolute(value);
-}
-
-export function validateAdapter(adapter: AdapterDescriptor, knownIds: string[]): AdapterValidation {
-  const errors: string[] = [];
-  if (!adapter.id) errors.push("id is required");
-  if (!isRelativePath(adapter.appDir)) errors.push("appDir must be relative");
-  if (!isRelativePath(adapter.dataDir)) errors.push("dataDir must be relative");
-  if (!isRelativePath(adapter.logFile)) errors.push("logFile must be relative");
-  if (adapter.logFile && !adapter.logFile.replaceAll("\\", "/").startsWith("data/logs/")) {
-    errors.push("logFile must be under data/logs");
-  }
-  if (!isRelativePath(adapter.pidFile)) errors.push("pidFile must be relative");
-  if (adapter.pidFile && !adapter.pidFile.replaceAll("\\", "/").startsWith("data/tmp/")) {
-    errors.push("pidFile must be under data/tmp");
-  }
-  if (!adapter.health) errors.push("health is required");
-  for (const dependency of adapter.dependsOn ?? []) {
-    if (!knownIds.includes(dependency)) errors.push(`dependsOn references unknown service: ${dependency}`);
-  }
-  return { id: adapter.id, valid: errors.length === 0, errors };
-}
 
 export function runtimeDiagnostics(usbRoot: string): RuntimeDiagnostic[] {
   const root = getRoot(usbRoot);
@@ -193,17 +161,6 @@ function copyDirectoryContents(sourceDir: string, targetDir: string): void {
       writeFileSync(target, readFileSync(source));
     }
   }
-}
-
-export function integrationReadiness(adapters: AdapterDescriptor[]): IntegrationReadiness[] {
-  return adapters.map((adapter) => ({
-    id: adapter.id,
-    status: adapter.integration?.status ?? "unknown",
-    productionReady: adapter.integration?.productionReady === true,
-    verifiedAt: adapter.integration?.verifiedAt ?? null,
-    summary: adapter.integration?.summary ?? "No upstream integration metadata has been recorded for this adapter.",
-    sources: adapter.integration?.sources ?? [],
-  }));
 }
 
 export function setupDiagnostics(usbRoot: string) {
@@ -495,26 +452,6 @@ function isTcpPortAvailableSync(port: number): boolean {
   } catch {
     return true;
   }
-}
-
-function serviceOrder(usbRoot: string, order: "start" | "stop"): AdapterDescriptor[] {
-  const root = getRoot(usbRoot);
-  const adapters = loadAdapters(root);
-  const byId = new Map(adapters.map((adapter) => [adapter.id, adapter]));
-  const configPath = join(root, "config", "defaults", "services.json");
-  const ordered: AdapterDescriptor[] = [];
-  if (existsSync(configPath)) {
-    const config = JSON.parse(readFileSync(configPath, "utf8")) as { startOrder?: string[]; stopOrder?: string[] };
-    const ids = order === "start" ? config.startOrder ?? [] : config.stopOrder ?? [];
-    for (const id of ids) {
-      const adapter = byId.get(id);
-      if (adapter) ordered.push(adapter);
-    }
-  }
-  for (const adapter of adapters) {
-    if (!ordered.some((item) => item.id === adapter.id)) ordered.push(adapter);
-  }
-  return ordered;
 }
 
 function escapeHtml(value: string): string {
