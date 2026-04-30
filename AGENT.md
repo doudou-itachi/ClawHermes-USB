@@ -50,6 +50,12 @@ Rules:
 
 When using multiple agents, the main agent should coordinate work through clear task boundaries.
 
+The main agent should decide whether to use multiple agents based on the actual project situation,
+current development phase, risk, and task independence. Do not ask the user for permission every
+time parallel work could be useful. Use multiple agents when the work can be split into independent
+read, review, verification, or implementation scopes. Keep work in the main agent when the next step
+is a tightly coupled blocker, a small local edit, or likely to conflict with another agent's changes.
+
 Sub-agent requirements:
 
 - Use `gpt-5.4`.

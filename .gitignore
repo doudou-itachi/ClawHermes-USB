@@ -37,3 +37,8 @@ Thumbs.db
 .DS_Store
 .vscode/
 .idea/
+__pycache__/
+*.pyc
+
+# Generated portal output
+portal/index.html

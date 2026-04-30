@@ -1,5 +1,6 @@
 @echo off
 setlocal
-echo ClawHermes-USB status placeholder.
-echo This script will later show service health, ports, logs, and process metadata.
+set SCRIPT_DIR=%~dp0
+for %%I in ("%SCRIPT_DIR%..\..") do set USB_ROOT=%%~fI
+powershell -NoProfile -ExecutionPolicy Bypass -File "%USB_ROOT%\core\windows\clawhermes.ps1" status -UsbRoot "%USB_ROOT%"
 endlocal
