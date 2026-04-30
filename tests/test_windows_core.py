@@ -103,6 +103,12 @@ def make_temp_usb_root():
     return temp_dir, temp_root
 
 
+def make_hermes_agent_app_ready(temp_root):
+    app_dir = temp_root / "apps" / "hermes-agent"
+    app_dir.mkdir(parents=True, exist_ok=True)
+    (app_dir / "pyproject.toml").write_text("[project]\nname = \"hermes-agent-test\"\n", encoding="utf-8")
+
+
 def create_local_source_repo(parent, name="source-app"):
     source_repo = parent / name
     source_repo.mkdir(parents=True)
@@ -1050,6 +1056,42 @@ class WindowsCoreTests(unittest.TestCase):
             marker_payload = json.loads(marker.read_text(encoding="utf-8"))
             self.assertEqual(marker_payload["fakeSecret"], "from-env-file")
             self.assertTrue(marker_payload["cwd"].endswith(str(Path("apps") / "fake-service")))
+        finally:
+            temp_dir.cleanup()
+
+    def test_setup_adapter_wsl2_dry_run_reports_wsl_command_without_running(self):
+        temp_dir, temp_root = make_temp_usb_root()
+        try:
+            make_hermes_agent_app_ready(temp_root)
+            missing_wsl = str(temp_root / "missing-wsl.exe")
+
+            result = run_dispatcher_for_root(temp_root, "setup-adapter", "hermes-agent", "--dry-run", "-Json", env={"CLAWHERMES_WSL_EXE": missing_wsl})
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertTrue(payload["dryRun"])
+            self.assertFalse(payload["wouldModify"])
+            self.assertFalse(payload["executed"])
+            self.assertEqual(payload["runner"], "wsl2")
+            self.assertEqual(payload["command"], "python -m pip install -e .")
+            self.assertIn("--cd", payload["wsl"]["args"])
+            self.assertTrue(payload["wsl"]["workingDirectory"].startswith("/mnt/"))
+            self.assertIn("bash", payload["wsl"]["args"])
+            self.assertIn("HERMES_HOME=", payload["wsl"]["script"])
+            self.assertIn("python -m pip install -e .", payload["wsl"]["script"])
+        finally:
+            temp_dir.cleanup()
+
+    def test_setup_adapter_wsl2_confirm_requires_healthy_wsl(self):
+        temp_dir, temp_root = make_temp_usb_root()
+        try:
+            make_hermes_agent_app_ready(temp_root)
+            missing_wsl = str(temp_root / "missing-wsl.exe")
+
+            result = run_dispatcher_for_root(temp_root, "setup-adapter", "hermes-agent", "--confirm-setup", "-Json", env={"CLAWHERMES_WSL_EXE": missing_wsl})
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("WSL2 is not ready", result.stderr)
         finally:
             temp_dir.cleanup()
 

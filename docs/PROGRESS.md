@@ -1777,3 +1777,33 @@ Validation performed:
 Next steps:
 
 - Add the guarded WSL command execution layer for Hermes Agent setup/start once a WSL2 distro is available.
+
+### WSL2 Adapter Setup Planning
+
+Status: `Done`
+
+Summary:
+
+- Added a WSL2 setup planning path for adapters with `runtime.kind: wsl2`.
+- `setup-adapter hermes-agent --dry-run --json` now reports `runner: wsl2`, WSL arguments, WSL working directory, and the generated `bash -lc` script without executing anything.
+- Windows paths are converted to `/mnt/<drive>/...` for WSL execution.
+- Resolved service environment values are exported into the WSL shell script with POSIX-safe quoting.
+- Confirmed WSL2 setup refuses to execute unless WSL diagnostics are healthy, preventing Hermes Agent setup from accidentally running through native Windows Python.
+
+Changed areas:
+
+- `core/node/src/wsl-adapter.ts`
+- `core/node/src/adapter-setup.ts`
+- `core/node/dist/`
+- `tests/test_windows_core.py`
+- `docs/PROGRESS.md`
+- `docs/superpowers/plans/2026-05-01-wsl2-adapter-setup-plan.md`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_setup_adapter_wsl2_dry_run_reports_wsl_command_without_running tests.test_windows_core.WindowsCoreTests.test_setup_adapter_wsl2_confirm_requires_healthy_wsl tests.test_windows_core.WindowsCoreTests.test_setup_adapter_confirm_runs_adapter_setup_command -v`
+
+Next steps:
+
+- Add WSL2 startup planning for `start-adapter` so Hermes Agent can be launched through WSL once a distro is available.

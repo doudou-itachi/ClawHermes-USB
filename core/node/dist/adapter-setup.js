@@ -7,6 +7,7 @@ const node_path_1 = require("node:path");
 const adapters_1 = require("./adapters");
 const environment_1 = require("./environment");
 const portable_1 = require("./portable");
+const wsl_adapter_1 = require("./wsl-adapter");
 function runAdapterSetup(usbRoot, serviceId, options) {
     const root = (0, portable_1.getRoot)(usbRoot);
     if (!serviceId)
@@ -23,10 +24,12 @@ function runAdapterSetup(usbRoot, serviceId, options) {
     }
     const serviceEnv = (0, environment_1.resolveServiceEnvironment)(root, serviceId);
     const logFile = (0, portable_1.resolveRelative)(root, `data/logs/setup-${serviceId}.log`);
+    const wslPlan = adapter.runtime?.kind === "wsl2" ? (0, wsl_adapter_1.wslAdapterSetupPlan)(root, adapter, serviceEnv) : null;
     const result = {
         root,
         serviceId,
         displayName: adapter.displayName,
+        runner: wslPlan ? "wsl2" : "windows",
         dryRun: options.dryRun,
         confirmed: options.confirm,
         wouldModify: !options.dryRun,
@@ -34,6 +37,14 @@ function runAdapterSetup(usbRoot, serviceId, options) {
         command,
         workingDirectory,
         logFile,
+        wsl: wslPlan
+            ? {
+                executablePath: wslPlan.executablePath,
+                args: wslPlan.args,
+                workingDirectory: wslPlan.workingDirectory,
+                script: wslPlan.script,
+            }
+            : null,
         exitCode: null,
         environment: {
             files: serviceEnv.files,
@@ -47,14 +58,24 @@ function runAdapterSetup(usbRoot, serviceId, options) {
     if (options.dryRun)
         return result;
     (0, node_fs_1.mkdirSync)((0, node_path_1.dirname)(logFile), { recursive: true });
-    const completed = (0, node_child_process_1.spawnSync)(command, {
-        cwd: workingDirectory,
-        env: { ...process.env, ...serviceEnv.env },
-        shell: true,
-        encoding: "utf8",
-        windowsHide: true,
-    });
-    appendSetupLog(logFile, serviceId, command, completed.stdout, completed.stderr, completed.status);
+    if (wslPlan) {
+        (0, wsl_adapter_1.assertWslReadyForAdapter)(root, serviceId);
+    }
+    const completed = wslPlan
+        ? (0, node_child_process_1.spawnSync)(wslPlan.executablePath, wslPlan.args, {
+            cwd: root,
+            env: process.env,
+            encoding: "utf8",
+            windowsHide: true,
+        })
+        : (0, node_child_process_1.spawnSync)(command, {
+            cwd: workingDirectory,
+            env: { ...process.env, ...serviceEnv.env },
+            shell: true,
+            encoding: "utf8",
+            windowsHide: true,
+        });
+    appendSetupLog(logFile, serviceId, wslPlan ? `wsl ${wslPlan.args.join(" ")}` : command, completed.stdout, completed.stderr, completed.status);
     if (completed.error)
         throw new Error(`Adapter setup failed: ${completed.error.message}`);
     if (completed.status !== 0) {
