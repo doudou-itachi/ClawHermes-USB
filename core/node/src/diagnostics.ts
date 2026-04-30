@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import type { PathDiagnostic, PortDiagnostic, SetupAction } from "./types";
 import { integrationReadiness, loadAdapters, validateAdapter } from "./adapters";
 import { envFileDiagnostics } from "./environment";
@@ -107,6 +107,14 @@ export function setupDiagnostics(usbRoot: string) {
   }
 
   return { root, adapters: adapterResults, runtimes, readiness, ports, paths, envFiles, dataWritable: writable, messages, actions };
+}
+
+export function writeSetupSnapshot(usbRoot: string, setup = setupDiagnostics(usbRoot)) {
+  const root = getRoot(usbRoot);
+  const snapshotPath = join(root, "data", "tmp", "setup.json");
+  mkdirSync(dirname(snapshotPath), { recursive: true });
+  writeFileSync(snapshotPath, JSON.stringify(setup, null, 2), "utf8");
+  return { path: snapshotPath };
 }
 
 export function readLogTail(usbRoot: string, target: string, requestedLines: number) {

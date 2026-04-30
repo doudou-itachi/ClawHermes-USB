@@ -1074,3 +1074,34 @@ Validation performed:
 Next steps:
 
 - Surface setup recommended actions in the portal so users can see startup blockers without opening JSON output.
+
+### Portal Setup Actions
+
+Status: `Done`
+
+Summary:
+
+- `start` now writes setup diagnostics to `data/tmp/setup.json` before launching the portal.
+- The portal server exposes the setup snapshot through a read-only `/setup.json` endpoint.
+- The generated portal page renders a `Setup actions` section so runtime, env file, and adapter readiness guidance is visible without opening JSON output.
+- Added integration coverage for the setup snapshot and portal endpoint.
+
+Changed areas:
+
+- `core/node/src/diagnostics.ts`
+- `core/node/src/core.ts`
+- `core/node/src/portal-server.ts`
+- `core/node/src/portal.ts`
+- `core/node/dist/`
+- `tests/test_windows_core.py`
+- `docs/PROGRESS.md`
+- `docs/superpowers/plans/2026-05-01-add-portal-setup-actions.md`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_portal_serves_setup_actions_snapshot -v`
+
+Next steps:
+
+- Add adapter-focused CLI guidance for setup commands and app directory preparation before attempting real upstream integration.

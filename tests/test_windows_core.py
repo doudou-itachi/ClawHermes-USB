@@ -49,6 +49,11 @@ def fetch_portal_status(timeout=0.5):
         return json.loads(response.read().decode("utf-8"))
 
 
+def fetch_portal_setup(timeout=0.5):
+    with urllib.request.urlopen(f"{PORTAL_URL}setup.json", timeout=timeout) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
 def fetch_portal_backups(timeout=0.5):
     with urllib.request.urlopen(f"{PORTAL_URL}backups.json", timeout=timeout) as response:
         return json.loads(response.read().decode("utf-8"))
@@ -1058,6 +1063,24 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertEqual(stop.returncode, 0, stop.stderr)
         self.assertFalse(portal_pid.exists())
         assert_portal_unreachable(self)
+
+    def test_portal_serves_setup_actions_snapshot(self):
+        try:
+            start = run_dispatcher("start", "-Json")
+            self.assertEqual(start.returncode, 0, start.stderr)
+            html = wait_for_portal()
+            self.assertIn("Setup actions", html)
+
+            setup_path = ROOT / "data" / "tmp" / "setup.json"
+            self.assertTrue(setup_path.exists())
+            setup_payload = fetch_portal_setup()
+            action_ids = {action["id"] for action in setup_payload["actions"]}
+
+            self.assertEqual(Path(setup_payload["root"]).resolve(), ROOT)
+            self.assertIn("runtime:node", action_ids)
+            self.assertIn("env-file:hermes-agent", action_ids)
+        finally:
+            run_dispatcher("stop", "-Json")
 
     def test_portal_serves_backup_status(self):
         backup = run_dispatcher("backup", "-Json")

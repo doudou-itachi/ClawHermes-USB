@@ -22,6 +22,7 @@ function parseArgs(argv) {
 const { usbRoot, port } = parseArgs(process.argv.slice(2));
 const portalFile = (0, node_path_1.join)(usbRoot, "portal", "index.html");
 const statusFile = (0, node_path_1.join)(usbRoot, "data", "tmp", "status.json");
+const setupFile = (0, node_path_1.join)(usbRoot, "data", "tmp", "setup.json");
 const backupRoot = (0, node_path_1.join)(usbRoot, "data", "backups");
 const logFile = (0, node_path_1.join)(usbRoot, "data", "logs", "portal.log");
 (0, node_fs_1.mkdirSync)((0, node_path_1.dirname)(logFile), { recursive: true });
@@ -41,6 +42,19 @@ const server = (0, node_http_1.createServer)((request, response) => {
                 "cache-control": "no-store",
             });
             response.end((0, node_fs_1.readFileSync)(statusFile));
+            return;
+        }
+        if (request.url === "/setup.json") {
+            if (!(0, node_fs_1.existsSync)(setupFile)) {
+                response.writeHead(503, { "content-type": "application/json; charset=utf-8" });
+                response.end(JSON.stringify({ error: "Setup snapshot is not available" }));
+                return;
+            }
+            response.writeHead(200, {
+                "content-type": "application/json; charset=utf-8",
+                "cache-control": "no-store",
+            });
+            response.end((0, node_fs_1.readFileSync)(setupFile));
             return;
         }
         if (request.url === "/backups.json") {

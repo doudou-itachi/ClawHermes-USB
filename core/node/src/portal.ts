@@ -65,6 +65,12 @@ export function generatePortal(usbRoot: string, services: ServiceStatus[]): { pa
       <p>Use <code>launcher/windows/Status.bat</code> to refresh service state and <code>launcher/windows/Stop.bat</code> to stop placeholder services.</p>
       <p>Use <code>launcher/windows/Backup.bat</code> to create a portable backup. Latest backup: <span data-backup-latest>Checking...</span></p>
     </section>
+    <section>
+      <h2>Setup actions</h2>
+      <ul data-setup-actions>
+        <li>Checking setup recommendations...</li>
+      </ul>
+    </section>
   </main>
   <script>
     async function refreshStatus() {
@@ -88,6 +94,36 @@ export function generatePortal(usbRoot: string, services: ServiceStatus[]): { pa
         // Keep the last rendered status visible when refresh fails.
       }
     }
+    async function refreshSetupActions() {
+      try {
+        const response = await fetch('/setup.json', { cache: 'no-store' });
+        if (!response.ok) return;
+        const payload = await response.json();
+        const target = document.querySelector('[data-setup-actions]');
+        if (!target) return;
+        const actions = (payload.actions || []).slice(0, 8);
+        if (actions.length === 0) {
+          target.innerHTML = '<li>No setup actions pending.</li>';
+          return;
+        }
+        target.innerHTML = '';
+        for (const action of actions) {
+          const item = document.createElement('li');
+          const title = document.createElement('strong');
+          title.textContent = '[' + (action.severity || 'info') + '] ' + (action.title || action.id || 'Setup action');
+          item.appendChild(title);
+          if (action.command) {
+            const command = document.createElement('code');
+            command.textContent = action.command;
+            item.appendChild(document.createTextNode(' '));
+            item.appendChild(command);
+          }
+          target.appendChild(item);
+        }
+      } catch {
+        // Keep the static placeholder if the snapshot is not available.
+      }
+    }
     async function refreshBackups() {
       try {
         const response = await fetch('/backups.json', { cache: 'no-store' });
@@ -105,8 +141,10 @@ export function generatePortal(usbRoot: string, services: ServiceStatus[]): { pa
       }
     }
     refreshStatus();
+    refreshSetupActions();
     refreshBackups();
     window.setInterval(refreshStatus, 5000);
+    window.setInterval(refreshSetupActions, 15000);
     window.setInterval(refreshBackups, 15000);
   </script>
 </body>

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.writeStatusSnapshot = exports.runtimePreparationPlan = exports.runtimeDiagnostics = exports.loadRuntimeManifest = exports.installRuntimeFromArchive = exports.stopPortalServer = exports.startPortalServer = exports.getPortalStatus = exports.generatePortal = exports.PORTAL_URL = exports.setupDiagnostics = exports.readLogTail = exports.portDiagnostics = exports.pathDiagnostics = exports.serviceEnvironmentDiagnostic = exports.resolveServiceEnvironment = exports.initializeEnvFiles = exports.envFileDiagnostics = exports.createBackup = exports.validateAdapter = exports.serviceOrder = exports.loadAdapters = exports.integrationReadiness = exports.portableEnv = exports.getRoot = exports.dataWritable = void 0;
+exports.writeStatusSnapshot = exports.runtimePreparationPlan = exports.runtimeDiagnostics = exports.loadRuntimeManifest = exports.installRuntimeFromArchive = exports.stopPortalServer = exports.startPortalServer = exports.getPortalStatus = exports.generatePortal = exports.PORTAL_URL = exports.writeSetupSnapshot = exports.setupDiagnostics = exports.readLogTail = exports.portDiagnostics = exports.pathDiagnostics = exports.serviceEnvironmentDiagnostic = exports.resolveServiceEnvironment = exports.initializeEnvFiles = exports.envFileDiagnostics = exports.createBackup = exports.validateAdapter = exports.serviceOrder = exports.loadAdapters = exports.integrationReadiness = exports.portableEnv = exports.getRoot = exports.dataWritable = void 0;
 exports.startSkeleton = startSkeleton;
 exports.getStatus = getStatus;
 exports.stopSkeleton = stopSkeleton;
@@ -32,6 +32,7 @@ Object.defineProperty(exports, "pathDiagnostics", { enumerable: true, get: funct
 Object.defineProperty(exports, "portDiagnostics", { enumerable: true, get: function () { return diagnostics_2.portDiagnostics; } });
 Object.defineProperty(exports, "readLogTail", { enumerable: true, get: function () { return diagnostics_2.readLogTail; } });
 Object.defineProperty(exports, "setupDiagnostics", { enumerable: true, get: function () { return diagnostics_2.setupDiagnostics; } });
+Object.defineProperty(exports, "writeSetupSnapshot", { enumerable: true, get: function () { return diagnostics_2.writeSetupSnapshot; } });
 var portal_2 = require("./portal");
 Object.defineProperty(exports, "PORTAL_URL", { enumerable: true, get: function () { return portal_2.PORTAL_URL; } });
 Object.defineProperty(exports, "generatePortal", { enumerable: true, get: function () { return portal_2.generatePortal; } });
@@ -48,6 +49,7 @@ Object.defineProperty(exports, "writeStatusSnapshot", { enumerable: true, get: f
 async function startSkeleton(usbRoot) {
     const root = (0, portable_1.getRoot)(usbRoot);
     const setup = (0, diagnostics_1.setupDiagnostics)(root);
+    (0, diagnostics_1.writeSetupSnapshot)(root, setup);
     const started = [];
     for (const adapter of (0, adapters_1.serviceOrder)(root, "start").filter((item) => item.enabled)) {
         (0, lifecycle_1.startAdapter)(root, adapter);

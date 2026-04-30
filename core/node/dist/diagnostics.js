@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.setupDiagnostics = setupDiagnostics;
+exports.writeSetupSnapshot = writeSetupSnapshot;
 exports.readLogTail = readLogTail;
 exports.pathDiagnostics = pathDiagnostics;
 exports.portDiagnostics = portDiagnostics;
@@ -110,6 +111,13 @@ function setupDiagnostics(usbRoot) {
         });
     }
     return { root, adapters: adapterResults, runtimes, readiness, ports, paths, envFiles, dataWritable: writable, messages, actions };
+}
+function writeSetupSnapshot(usbRoot, setup = setupDiagnostics(usbRoot)) {
+    const root = (0, portable_1.getRoot)(usbRoot);
+    const snapshotPath = (0, node_path_1.join)(root, "data", "tmp", "setup.json");
+    (0, node_fs_1.mkdirSync)((0, node_path_1.dirname)(snapshotPath), { recursive: true });
+    (0, node_fs_1.writeFileSync)(snapshotPath, JSON.stringify(setup, null, 2), "utf8");
+    return { path: snapshotPath };
 }
 function readLogTail(usbRoot, target, requestedLines) {
     const root = (0, portable_1.getRoot)(usbRoot);

@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import type { ServiceStatus } from "./types";
 import { serviceOrder } from "./adapters";
-import { setupDiagnostics } from "./diagnostics";
+import { setupDiagnostics, writeSetupSnapshot } from "./diagnostics";
 import { startAdapter, stopAdapter } from "./lifecycle";
 import { getRoot, resolveRelative } from "./portable";
 import { generatePortal, getPortalStatus, startPortalServer, stopPortalServer } from "./portal";
@@ -11,7 +11,7 @@ export { dataWritable, getRoot, portableEnv } from "./portable";
 export { integrationReadiness, loadAdapters, serviceOrder, validateAdapter } from "./adapters";
 export { createBackup } from "./backup";
 export { envFileDiagnostics, initializeEnvFiles, resolveServiceEnvironment, serviceEnvironmentDiagnostic } from "./environment";
-export { pathDiagnostics, portDiagnostics, readLogTail, setupDiagnostics } from "./diagnostics";
+export { pathDiagnostics, portDiagnostics, readLogTail, setupDiagnostics, writeSetupSnapshot } from "./diagnostics";
 export { PORTAL_URL, generatePortal, getPortalStatus, startPortalServer, stopPortalServer } from "./portal";
 export { installRuntimeFromArchive, loadRuntimeManifest, runtimeDiagnostics, runtimePreparationPlan } from "./runtimes";
 export { writeStatusSnapshot } from "./status";
@@ -19,6 +19,7 @@ export { writeStatusSnapshot } from "./status";
 export async function startSkeleton(usbRoot: string) {
   const root = getRoot(usbRoot);
   const setup = setupDiagnostics(root);
+  writeSetupSnapshot(root, setup);
   const started: string[] = [];
   for (const adapter of serviceOrder(root, "start").filter((item) => item.enabled)) {
     startAdapter(root, adapter);
