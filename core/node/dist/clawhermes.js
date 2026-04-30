@@ -14,6 +14,8 @@ function parseArgs(argv) {
     let dryRun = false;
     let confirmCheckout = false;
     let confirmSetup = false;
+    let confirmReady = false;
+    let summary;
     let lines = 50;
     for (let index = 0; index < args.length; index += 1) {
         const arg = args[index];
@@ -48,6 +50,13 @@ function parseArgs(argv) {
         else if (arg === "--confirm-setup") {
             confirmSetup = true;
         }
+        else if (arg === "--confirm-ready") {
+            confirmReady = true;
+        }
+        else if (arg === "--summary" && args[index + 1]) {
+            summary = args[index + 1];
+            index += 1;
+        }
         else if (arg === "--lines" && args[index + 1]) {
             lines = Number(args[index + 1]);
             index += 1;
@@ -56,7 +65,7 @@ function parseArgs(argv) {
             positional.push(arg);
         }
     }
-    return { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, confirmCheckout, confirmSetup, lines };
+    return { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, confirmCheckout, confirmSetup, confirmReady, summary, lines };
 }
 function parseBackupProfile(value) {
     if (value === "data-only" || value === "full")
@@ -67,7 +76,7 @@ function printJson(value) {
     process.stdout.write(`${JSON.stringify(value, null, 2)}\n`);
 }
 async function main() {
-    const { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, confirmCheckout, confirmSetup, lines } = parseArgs(process.argv.slice(2));
+    const { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, confirmCheckout, confirmSetup, confirmReady, summary, lines } = parseArgs(process.argv.slice(2));
     const root = (0, core_1.getRoot)(usbRoot);
     switch (action) {
         case "env-json":
@@ -209,6 +218,17 @@ async function main() {
                 console.log(`Production-ready candidate: ${result.productionReadyCandidate ? "yes" : "no"}`);
                 for (const item of result.checks)
                     console.log(`- [${item.status}] ${item.label}: ${item.message}`);
+            }
+            return;
+        }
+        case "mark-adapter-ready": {
+            const result = (0, core_1.markAdapterReady)(root, positional[0], { confirm: confirmReady, summary });
+            if (json) {
+                printJson(result);
+            }
+            else {
+                console.log(`Marked adapter production-ready: ${result.serviceId}`);
+                console.log(`Descriptor: ${result.adapterPath}`);
             }
             return;
         }

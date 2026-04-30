@@ -54,6 +54,7 @@ node core/node/dist/clawhermes.js sources hermes-web-ui --json
 node core/node/dist/clawhermes.js checkout-source hermes-web-ui --dry-run --json
 node core/node/dist/clawhermes.js setup-adapter hermes-web-ui --dry-run --json
 node core/node/dist/clawhermes.js verify-adapter hermes-web-ui --json
+node core/node/dist/clawhermes.js mark-adapter-ready hermes-web-ui --confirm-ready --summary "Verified locally" --json
 node core/node/dist/clawhermes.js start --json
 node core/node/dist/clawhermes.js status --json
 node core/node/dist/clawhermes.js logs openclaw --lines 50 --json

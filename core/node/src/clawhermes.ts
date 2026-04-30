@@ -1,4 +1,4 @@
-import { adapterSetupPlan, appSourcePlan, checkoutAppSource, createBackup, getRoot, getStatus, initializeEnvFiles, installRuntimeFromArchive, portableEnv, readLogTail, runAdapterSetup, runtimePreparationPlan, serviceEnvironmentDiagnostic, setupDiagnostics, startSkeleton, stopSkeleton, verifyAdapter, writeStatusSnapshot } from "./core";
+import { adapterSetupPlan, appSourcePlan, checkoutAppSource, createBackup, getRoot, getStatus, initializeEnvFiles, installRuntimeFromArchive, markAdapterReady, portableEnv, readLogTail, runAdapterSetup, runtimePreparationPlan, serviceEnvironmentDiagnostic, setupDiagnostics, startSkeleton, stopSkeleton, verifyAdapter, writeStatusSnapshot } from "./core";
 import type { BackupProfile } from "./backup";
 
 type ParsedArgs = {
@@ -13,6 +13,8 @@ type ParsedArgs = {
   dryRun: boolean;
   confirmCheckout: boolean;
   confirmSetup: boolean;
+  confirmReady: boolean;
+  summary?: string;
   lines: number;
 };
 
@@ -29,6 +31,8 @@ function parseArgs(argv: string[]): ParsedArgs {
   let dryRun = false;
   let confirmCheckout = false;
   let confirmSetup = false;
+  let confirmReady = false;
+  let summary: string | undefined;
   let lines = 50;
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
@@ -54,6 +58,11 @@ function parseArgs(argv: string[]): ParsedArgs {
       confirmCheckout = true;
     } else if (arg === "--confirm-setup") {
       confirmSetup = true;
+    } else if (arg === "--confirm-ready") {
+      confirmReady = true;
+    } else if (arg === "--summary" && args[index + 1]) {
+      summary = args[index + 1];
+      index += 1;
     } else if (arg === "--lines" && args[index + 1]) {
       lines = Number(args[index + 1]);
       index += 1;
@@ -61,7 +70,7 @@ function parseArgs(argv: string[]): ParsedArgs {
       positional.push(arg);
     }
   }
-  return { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, confirmCheckout, confirmSetup, lines };
+  return { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, confirmCheckout, confirmSetup, confirmReady, summary, lines };
 }
 
 function parseBackupProfile(value: string): BackupProfile {
@@ -74,7 +83,7 @@ function printJson(value: unknown): void {
 }
 
 async function main(): Promise<void> {
-  const { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, confirmCheckout, confirmSetup, lines } = parseArgs(process.argv.slice(2));
+  const { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, confirmCheckout, confirmSetup, confirmReady, summary, lines } = parseArgs(process.argv.slice(2));
   const root = getRoot(usbRoot);
 
   switch (action) {
@@ -197,6 +206,16 @@ async function main(): Promise<void> {
         console.log(`ClawHermes-USB adapter verification: ${result.serviceId}`);
         console.log(`Production-ready candidate: ${result.productionReadyCandidate ? "yes" : "no"}`);
         for (const item of result.checks) console.log(`- [${item.status}] ${item.label}: ${item.message}`);
+      }
+      return;
+    }
+    case "mark-adapter-ready": {
+      const result = markAdapterReady(root, positional[0], { confirm: confirmReady, summary });
+      if (json) {
+        printJson(result);
+      } else {
+        console.log(`Marked adapter production-ready: ${result.serviceId}`);
+        console.log(`Descriptor: ${result.adapterPath}`);
       }
       return;
     }

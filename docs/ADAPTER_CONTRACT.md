@@ -467,7 +467,24 @@ The verifier reports `productionReadyCandidate` and individual checks for:
 
 The command does not modify `adapter.json`. Use the result as evidence for a later explicit production-readiness metadata update.
 
-## 13. Contributor Workflow
+## 13. Adapter Readiness Metadata Command
+
+After `verify-adapter` reports `productionReadyCandidate: true`, update integration metadata with the guarded metadata command:
+
+```powershell
+node core/node/dist/clawhermes.js mark-adapter-ready hermes-web-ui --confirm-ready --summary "Verified locally" --json
+```
+
+Rules:
+
+- The command requires a single service id.
+- The command refuses to run unless `--confirm-ready` is passed.
+- `--summary` is required and should describe the verification evidence.
+- The command reruns `verify-adapter` and refuses to write metadata if verification fails.
+- Only `adapters/<service-id>/adapter.json` is updated.
+- The command sets `integration.status` to `verified`, `integration.productionReady` to `true`, and `integration.verifiedAt` to the current date.
+
+## 14. Contributor Workflow
 
 To add a new service:
 
@@ -482,6 +499,7 @@ To add a new service:
 9. Run `node core/node/dist/clawhermes.js checkout-source <new-service> --dry-run --json` before any real checkout.
 10. Run `node core/node/dist/clawhermes.js setup-adapter <new-service> --dry-run --json` before any real setup.
 11. Run `node core/node/dist/clawhermes.js verify-adapter <new-service> --json`.
-12. Update portal metadata if needed.
+12. Run `node core/node/dist/clawhermes.js mark-adapter-ready <new-service> --confirm-ready --summary "<evidence>" --json` only after verification passes.
+13. Update portal metadata if needed.
 
 No core code should be changed unless the service needs a new generic capability.

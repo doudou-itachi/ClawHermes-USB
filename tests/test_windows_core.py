@@ -128,6 +128,10 @@ def configure_fake_setup_command(temp_root):
     adapter_path = temp_root / "adapters" / "fake-service" / "adapter.json"
     adapter = json.loads(adapter_path.read_text(encoding="utf-8"))
     adapter["commands"]["setup"] = "node setup.js"
+    adapter["integration"]["status"] = "candidate"
+    adapter["integration"]["productionReady"] = False
+    adapter["integration"]["verifiedAt"] = None
+    adapter["integration"]["summary"] = "Setup command configured for verification tests."
     adapter_path.write_text(json.dumps(adapter, indent=2), encoding="utf-8")
     (temp_root / "apps" / "fake-service" / "setup.js").write_text(
         "\n".join(
@@ -943,6 +947,57 @@ class WindowsCoreTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("Unknown adapter: missing-service", result.stderr)
+
+    def test_mark_adapter_ready_requires_explicit_confirmation(self):
+        temp_dir, temp_root = make_temp_process_usb_root()
+        try:
+            configure_fake_setup_command(temp_root)
+            setup = run_dispatcher_for_root(temp_root, "setup-adapter", "fake-service", "--confirm-setup", "-Json")
+            self.assertEqual(setup.returncode, 0, setup.stderr)
+
+            result = run_dispatcher_for_root(temp_root, "mark-adapter-ready", "fake-service", "--summary", "Verified in test", "-Json")
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("--confirm-ready", result.stderr)
+            adapter = json.loads((temp_root / "adapters" / "fake-service" / "adapter.json").read_text(encoding="utf-8"))
+            self.assertFalse(adapter["integration"]["productionReady"])
+        finally:
+            temp_dir.cleanup()
+
+    def test_mark_adapter_ready_rejects_failed_verification(self):
+        temp_dir, temp_root = make_temp_process_usb_root()
+        try:
+            configure_fake_setup_command(temp_root)
+
+            result = run_dispatcher_for_root(temp_root, "mark-adapter-ready", "fake-service", "--confirm-ready", "--summary", "Verified in test", "-Json")
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("not a production-ready candidate", result.stderr)
+            adapter = json.loads((temp_root / "adapters" / "fake-service" / "adapter.json").read_text(encoding="utf-8"))
+            self.assertFalse(adapter["integration"]["productionReady"])
+        finally:
+            temp_dir.cleanup()
+
+    def test_mark_adapter_ready_updates_integration_metadata_after_verification(self):
+        temp_dir, temp_root = make_temp_process_usb_root()
+        try:
+            configure_fake_setup_command(temp_root)
+            setup = run_dispatcher_for_root(temp_root, "setup-adapter", "fake-service", "--confirm-setup", "-Json")
+            self.assertEqual(setup.returncode, 0, setup.stderr)
+
+            result = run_dispatcher_for_root(temp_root, "mark-adapter-ready", "fake-service", "--confirm-ready", "--summary", "Verified in test", "-Json")
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertTrue(payload["updated"])
+            self.assertTrue(payload["verification"]["productionReadyCandidate"])
+            adapter = json.loads((temp_root / "adapters" / "fake-service" / "adapter.json").read_text(encoding="utf-8"))
+            self.assertEqual(adapter["integration"]["status"], "verified")
+            self.assertTrue(adapter["integration"]["productionReady"])
+            self.assertEqual(adapter["integration"]["summary"], "Verified in test")
+            self.assertRegex(adapter["integration"]["verifiedAt"], r"^\d{4}-\d{2}-\d{2}$")
+        finally:
+            temp_dir.cleanup()
 
     def test_runtimes_json_outputs_preparation_steps_from_manifest(self):
         result = run_dispatcher("runtimes", "-Json")

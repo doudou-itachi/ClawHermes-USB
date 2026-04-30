@@ -467,7 +467,24 @@ node core/node/dist/clawhermes.js verify-adapter hermes-web-ui --json
 
 该命令不会修改 `adapter.json`。后续如需更新 production-ready 元数据，应把这个结果作为证据。
 
-## 13. 贡献者工作流
+## 13. Adapter 就绪元数据命令
+
+当 `verify-adapter` 报告 `productionReadyCandidate: true` 后，使用受保护的元数据命令更新集成状态：
+
+```powershell
+node core/node/dist/clawhermes.js mark-adapter-ready hermes-web-ui --confirm-ready --summary "Verified locally" --json
+```
+
+规则：
+
+- 命令必须指定单个服务 id。
+- 命令必须传入 `--confirm-ready`，否则拒绝执行。
+- 必须提供 `--summary`，并描述验证证据。
+- 命令会重新运行 `verify-adapter`；如果验证失败，则拒绝写入元数据。
+- 只会更新 `adapters/<service-id>/adapter.json`。
+- 命令会把 `integration.status` 设为 `verified`，把 `integration.productionReady` 设为 `true`，并把 `integration.verifiedAt` 设为当前日期。
+
+## 14. 贡献者工作流
 
 新增服务：
 
@@ -482,6 +499,7 @@ node core/node/dist/clawhermes.js verify-adapter hermes-web-ui --json
 9. 在任何真实 checkout 前，先运行 `node core/node/dist/clawhermes.js checkout-source <new-service> --dry-run --json`。
 10. 在任何真实 setup 前，先运行 `node core/node/dist/clawhermes.js setup-adapter <new-service> --dry-run --json`。
 11. 运行 `node core/node/dist/clawhermes.js verify-adapter <new-service> --json`。
-12. 如有需要，更新 portal 元数据。
+12. 只有验证通过后，才运行 `node core/node/dist/clawhermes.js mark-adapter-ready <new-service> --confirm-ready --summary "<evidence>" --json`。
+13. 如有需要，更新 portal 元数据。
 
 除非服务需要新的通用能力，否则不应修改 core 代码。

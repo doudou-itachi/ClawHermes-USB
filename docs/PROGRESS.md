@@ -1382,3 +1382,44 @@ Validation performed:
 Next steps:
 
 - Add an explicit metadata update command for adapter integration status that requires verifier evidence instead of editing production-ready fields by hand.
+
+### Adapter Readiness Metadata Command
+
+Status: `Done`
+
+Summary:
+
+- Added guarded `mark-adapter-ready <service-id>` for updating adapter integration metadata.
+- The command requires `--confirm-ready` and a non-empty `--summary`.
+- The command reruns `verify-adapter` and refuses to write metadata unless `productionReadyCandidate` is true.
+- Successful updates set `integration.status: verified`, `integration.productionReady: true`, `integration.verifiedAt` to the current date, and `integration.summary` to the provided evidence summary.
+- Added tests for confirmation gating, verifier gating, and successful metadata update in a temporary adapter root.
+- Documented the command in the English and Chinese README files and adapter contract.
+
+Changed areas:
+
+- `core/node/src/adapter-metadata.ts`
+- `core/node/src/clawhermes.ts`
+- `core/node/src/core.ts`
+- `core/windows/clawhermes.ps1`
+- `core/node/dist/`
+- `tests/test_windows_core.py`
+- `README.md`
+- `README.zh-CN.md`
+- `docs/ADAPTER_CONTRACT.md`
+- `docs/ADAPTER_CONTRACT.zh-CN.md`
+- `docs/PROGRESS.md`
+- `docs/superpowers/plans/2026-05-01-add-mark-adapter-ready-command.md`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_mark_adapter_ready_requires_explicit_confirmation tests.test_windows_core.WindowsCoreTests.test_mark_adapter_ready_rejects_failed_verification tests.test_windows_core.WindowsCoreTests.test_mark_adapter_ready_updates_integration_metadata_after_verification -v`
+- `npm test`
+- `git diff --check`
+- UTF-8 smoke check
+- Chinese README and adapter contract mojibake scans
+
+Next steps:
+
+- Start exercising the guarded checkout/setup/verify/mark workflow against real upstream repositories in a disposable local clone before enabling any default adapter as production-ready.
