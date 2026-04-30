@@ -48,6 +48,12 @@ powershell -NoProfile -ExecutionPolicy Bypass -File core\windows\clawhermes.ps1 
 powershell -NoProfile -ExecutionPolicy Bypass -File core\windows\clawhermes.ps1 install-runtime node --archive D:\downloads\node.zip --dry-run -UsbRoot . -Json
 ```
 
+解压前校验已知 SHA256：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File core\windows\clawhermes.ps1 install-runtime node --archive D:\downloads\node.zip --sha256 <expected-sha256> -UsbRoot .
+```
+
 `install-runtime` 当前支持 `.zip` archive。若 archive 内只有一个顶层目录，它会去掉这一层再复制内容，因此官方 `node-v*-win-x64.zip` 这类包可以干净地解压到 manifest 指定目录。
 
 ## 预期可执行文件

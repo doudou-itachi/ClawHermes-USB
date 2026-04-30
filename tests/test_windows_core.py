@@ -7,6 +7,7 @@ import unittest
 import urllib.error
 import urllib.request
 import zipfile
+import hashlib
 from pathlib import Path
 
 
@@ -223,6 +224,31 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertTrue(node_runtime["found"])
         finally:
             self._remove_runtime_test_files(install_dir)
+
+    def test_install_runtime_can_verify_explicit_sha256(self):
+        archive = ROOT / "data" / "tmp" / "node-runtime-test.zip"
+        archive.parent.mkdir(parents=True, exist_ok=True)
+        with zipfile.ZipFile(archive, "w") as package:
+            package.writestr("node-v22.0.0-win-x64/node.exe", "")
+        digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+
+        result = run_dispatcher("install-runtime", "node", "--archive", str(archive), "--sha256", digest, "--dry-run", "-Json")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["sha256"], digest)
+        self.assertTrue(payload["checksumVerified"])
+
+    def test_install_runtime_rejects_wrong_sha256(self):
+        archive = ROOT / "data" / "tmp" / "node-runtime-test.zip"
+        archive.parent.mkdir(parents=True, exist_ok=True)
+        with zipfile.ZipFile(archive, "w") as package:
+            package.writestr("node-v22.0.0-win-x64/node.exe", "")
+
+        result = run_dispatcher("install-runtime", "node", "--archive", str(archive), "--sha256", "0" * 64, "--dry-run", "-Json")
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("SHA256 mismatch", result.stderr)
 
     def _remove_runtime_test_files(self, install_dir):
         for filename in ("node.exe", "npm.cmd"):

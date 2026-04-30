@@ -24,6 +24,7 @@ const node_net_1 = require("node:net");
 const node_fs_1 = require("node:fs");
 const node_path_1 = require("node:path");
 const node_http_1 = require("node:http");
+const node_crypto_1 = require("node:crypto");
 exports.PORTAL_URL = "http://127.0.0.1:17000/";
 function getRoot(usbRoot) {
     return (0, node_path_1.resolve)(usbRoot);
@@ -144,7 +145,7 @@ function runtimePreparationPlan(usbRoot) {
         messages,
     };
 }
-function installRuntimeFromArchive(usbRoot, runtimeName, archivePath, dryRun) {
+function installRuntimeFromArchive(usbRoot, runtimeName, archivePath, dryRun, expectedSha256) {
     const root = getRoot(usbRoot);
     const manifest = loadRuntimeManifest(root);
     const runtime = manifest.runtimes.find((item) => item.name === runtimeName);
@@ -157,6 +158,10 @@ function installRuntimeFromArchive(usbRoot, runtimeName, archivePath, dryRun) {
     }
     if (!archive.toLowerCase().endsWith(".zip")) {
         throw new Error(`Only .zip runtime archives are supported right now: ${archive}`);
+    }
+    const actualSha256 = sha256File(archive);
+    if (expectedSha256 && actualSha256.toLowerCase() !== expectedSha256.toLowerCase()) {
+        throw new Error(`SHA256 mismatch for ${archive}. Expected ${expectedSha256}, got ${actualSha256}.`);
     }
     const installDir = resolveRelative(root, runtime.installDir);
     const expectedExecutables = runtime.candidates.map((candidate) => resolveRelative(root, candidate));
@@ -191,6 +196,8 @@ function installRuntimeFromArchive(usbRoot, runtimeName, archivePath, dryRun) {
         archive,
         installDir,
         expectedExecutables,
+        sha256: expectedSha256 ?? null,
+        checksumVerified: expectedSha256 ? true : null,
         wouldExtract: true,
         installed,
         message: dryRun
@@ -199,6 +206,11 @@ function installRuntimeFromArchive(usbRoot, runtimeName, archivePath, dryRun) {
                 ? `Installed ${runtime.label} into ${installDir}.`
                 : `Extracted ${archive}, but no expected executable was found under ${installDir}.`,
     };
+}
+function sha256File(file) {
+    const hash = (0, node_crypto_1.createHash)("sha256");
+    hash.update((0, node_fs_1.readFileSync)(file));
+    return hash.digest("hex");
 }
 function copyExtractedRuntime(sourceDir, installDir) {
     const entries = (0, node_fs_1.readdirSync)(sourceDir, { withFileTypes: true });

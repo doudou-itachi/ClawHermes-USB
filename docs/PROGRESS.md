@@ -294,3 +294,34 @@ Next steps:
 
 - Add checksum metadata support before automated downloads are considered.
 - Extend archive install tests for Python and Git package layouts.
+
+### Runtime Archive Checksum Verification
+
+Status: `Done`
+
+Summary:
+
+- Added `--sha256 <expected-sha256>` support to `install-runtime`.
+- The command now computes the local archive SHA256 before dry-run or extraction.
+- A mismatch fails fast before writing to runtime directories.
+- Added regression tests for matching and mismatching checksums.
+- Updated runtime documentation with checksum usage examples.
+
+Changed areas:
+
+- `core/node/src/`
+- `core/node/dist/`
+- `docs/windows-runtime.md`
+- `docs/windows-runtime.zh-CN.md`
+- `docs/PROGRESS.md`
+- `tests/test_windows_core.py`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_install_runtime_can_verify_explicit_sha256 tests.test_windows_core.WindowsCoreTests.test_install_runtime_rejects_wrong_sha256 -v`
+
+Next steps:
+
+- Add manifest-level checksum fields once exact runtime versions are pinned.
+- Extend archive installation layout tests for Python embeddable and Git Portable packages.

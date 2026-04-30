@@ -48,6 +48,12 @@ Preview without extracting:
 powershell -NoProfile -ExecutionPolicy Bypass -File core\windows\clawhermes.ps1 install-runtime node --archive D:\downloads\node.zip --dry-run -UsbRoot . -Json
 ```
 
+Verify a known SHA256 before extracting:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File core\windows\clawhermes.ps1 install-runtime node --archive D:\downloads\node.zip --sha256 <expected-sha256> -UsbRoot .
+```
+
 `install-runtime` currently supports `.zip` archives. It strips a single top-level directory when present, so official packages such as `node-v*-win-x64.zip` can be extracted into the manifest install directory cleanly.
 
 ## Expected Executables

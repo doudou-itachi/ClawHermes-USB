@@ -3,6 +3,7 @@ import { createServer } from "node:net";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve, sep } from "node:path";
 import { get } from "node:http";
+import { createHash } from "node:crypto";
 import type { AdapterDescriptor, AdapterValidation, IntegrationReadiness, RuntimeDiagnostic, RuntimeInstallResult, RuntimeManifest, RuntimePreparationStep, ServiceStatus } from "./types";
 
 export const PORTAL_URL = "http://127.0.0.1:17000/";
@@ -127,7 +128,7 @@ export function runtimePreparationPlan(usbRoot: string) {
   };
 }
 
-export function installRuntimeFromArchive(usbRoot: string, runtimeName: string, archivePath: string, dryRun: boolean): RuntimeInstallResult {
+export function installRuntimeFromArchive(usbRoot: string, runtimeName: string, archivePath: string, dryRun: boolean, expectedSha256?: string): RuntimeInstallResult {
   const root = getRoot(usbRoot);
   const manifest = loadRuntimeManifest(root);
   const runtime = manifest.runtimes.find((item) => item.name === runtimeName);
@@ -140,6 +141,10 @@ export function installRuntimeFromArchive(usbRoot: string, runtimeName: string, 
   }
   if (!archive.toLowerCase().endsWith(".zip")) {
     throw new Error(`Only .zip runtime archives are supported right now: ${archive}`);
+  }
+  const actualSha256 = sha256File(archive);
+  if (expectedSha256 && actualSha256.toLowerCase() !== expectedSha256.toLowerCase()) {
+    throw new Error(`SHA256 mismatch for ${archive}. Expected ${expectedSha256}, got ${actualSha256}.`);
   }
   const installDir = resolveRelative(root, runtime.installDir);
   const expectedExecutables = runtime.candidates.map((candidate) => resolveRelative(root, candidate));
@@ -175,6 +180,8 @@ export function installRuntimeFromArchive(usbRoot: string, runtimeName: string, 
     archive,
     installDir,
     expectedExecutables,
+    sha256: expectedSha256 ?? null,
+    checksumVerified: expectedSha256 ? true : null,
     wouldExtract: true,
     installed,
     message: dryRun
@@ -183,6 +190,12 @@ export function installRuntimeFromArchive(usbRoot: string, runtimeName: string, 
         ? `Installed ${runtime.label} into ${installDir}.`
         : `Extracted ${archive}, but no expected executable was found under ${installDir}.`,
   };
+}
+
+function sha256File(file: string): string {
+  const hash = createHash("sha256");
+  hash.update(readFileSync(file));
+  return hash.digest("hex");
 }
 
 function copyExtractedRuntime(sourceDir: string, installDir: string): void {

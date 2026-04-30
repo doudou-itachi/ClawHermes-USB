@@ -8,6 +8,7 @@ function parseArgs(argv) {
     let usbRoot = process.cwd();
     let json = false;
     let archive;
+    let sha256;
     let dryRun = false;
     for (let index = 0; index < args.length; index += 1) {
         const arg = args[index];
@@ -22,6 +23,10 @@ function parseArgs(argv) {
             archive = args[index + 1];
             index += 1;
         }
+        else if (arg === "--sha256" && args[index + 1]) {
+            sha256 = args[index + 1];
+            index += 1;
+        }
         else if (arg === "--dry-run") {
             dryRun = true;
         }
@@ -29,13 +34,13 @@ function parseArgs(argv) {
             positional.push(arg);
         }
     }
-    return { action, positional, usbRoot, json, archive, dryRun };
+    return { action, positional, usbRoot, json, archive, sha256, dryRun };
 }
 function printJson(value) {
     process.stdout.write(`${JSON.stringify(value, null, 2)}\n`);
 }
 async function main() {
-    const { action, positional, usbRoot, json, archive, dryRun } = parseArgs(process.argv.slice(2));
+    const { action, positional, usbRoot, json, archive, sha256, dryRun } = parseArgs(process.argv.slice(2));
     const root = (0, core_1.getRoot)(usbRoot);
     switch (action) {
         case "env-json":
@@ -75,7 +80,7 @@ async function main() {
                 throw new Error("Runtime name is required. Example: install-runtime node --archive path.zip");
             if (!archive)
                 throw new Error("--archive is required for install-runtime.");
-            const result = (0, core_1.installRuntimeFromArchive)(root, runtimeName, archive, dryRun);
+            const result = (0, core_1.installRuntimeFromArchive)(root, runtimeName, archive, dryRun, sha256);
             if (json) {
                 printJson(result);
             }

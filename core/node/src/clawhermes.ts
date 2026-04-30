@@ -6,6 +6,7 @@ type ParsedArgs = {
   usbRoot: string;
   json: boolean;
   archive?: string;
+  sha256?: string;
   dryRun: boolean;
 };
 
@@ -16,6 +17,7 @@ function parseArgs(argv: string[]): ParsedArgs {
   let usbRoot = process.cwd();
   let json = false;
   let archive: string | undefined;
+  let sha256: string | undefined;
   let dryRun = false;
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
@@ -27,13 +29,16 @@ function parseArgs(argv: string[]): ParsedArgs {
     } else if (arg === "--archive" && args[index + 1]) {
       archive = args[index + 1];
       index += 1;
+    } else if (arg === "--sha256" && args[index + 1]) {
+      sha256 = args[index + 1];
+      index += 1;
     } else if (arg === "--dry-run") {
       dryRun = true;
     } else {
       positional.push(arg);
     }
   }
-  return { action, positional, usbRoot, json, archive, dryRun };
+  return { action, positional, usbRoot, json, archive, sha256, dryRun };
 }
 
 function printJson(value: unknown): void {
@@ -41,7 +46,7 @@ function printJson(value: unknown): void {
 }
 
 async function main(): Promise<void> {
-  const { action, positional, usbRoot, json, archive, dryRun } = parseArgs(process.argv.slice(2));
+  const { action, positional, usbRoot, json, archive, sha256, dryRun } = parseArgs(process.argv.slice(2));
   const root = getRoot(usbRoot);
 
   switch (action) {
@@ -75,7 +80,7 @@ async function main(): Promise<void> {
       const runtimeName = positional[0];
       if (!runtimeName) throw new Error("Runtime name is required. Example: install-runtime node --archive path.zip");
       if (!archive) throw new Error("--archive is required for install-runtime.");
-      const result = installRuntimeFromArchive(root, runtimeName, archive, dryRun);
+      const result = installRuntimeFromArchive(root, runtimeName, archive, dryRun, sha256);
       if (json) {
         printJson(result);
       } else {

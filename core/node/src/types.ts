@@ -44,6 +44,8 @@ export type RuntimeInstallResult = {
   archive: string;
   installDir: string;
   expectedExecutables: string[];
+  sha256: string | null;
+  checksumVerified: boolean | null;
   wouldExtract: boolean;
   installed: boolean;
   message: string;
