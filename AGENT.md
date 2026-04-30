@@ -46,6 +46,19 @@ Rules:
 - If the commit body is needed, write it in English first, then Chinese.
 - Do not use vague messages such as `update`, `misc`, or `fix stuff`.
 
+## Chinese Text and Encoding Policy
+
+Any file, commit message, log example, or document that contains Chinese must keep the Chinese text readable.
+
+Rules:
+
+- Use UTF-8 for files that contain Chinese.
+- Do not save Chinese text through tools or shell redirection that may silently use a legacy code page.
+- After editing Chinese text, re-open the edited file and verify the Chinese is readable before committing.
+- Do not commit mojibake, replacement characters, or text that appears to be UTF-8 decoded through a legacy code page.
+- If a terminal displays Chinese incorrectly but the file content is valid UTF-8, note the display limitation and verify with a UTF-8-aware read before changing the text.
+- Prefer plain UTF-8 Markdown for bilingual documentation and keep English and Chinese statements semantically equivalent.
+
 ## Multi-Agent Work Policy
 
 When using multiple agents, the main agent should coordinate work through clear task boundaries.
