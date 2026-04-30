@@ -846,3 +846,31 @@ Validation performed:
 Next steps:
 
 - Split status, health, and snapshot helpers into a status-focused TypeScript module.
+
+### Status Helpers Split
+
+Status: `Done`
+
+Summary:
+
+- Extracted adapter health evaluation, HTTP health probing, process existence checks, and status snapshot writing into `core/node/src/status.ts`.
+- Kept `getStatus` in `core.ts` for now because it still composes adapter status with portal process status.
+- `core.ts` now imports status helpers and re-exports `writeStatusSnapshot` for CLI compatibility.
+- Status JSON, snapshots, stale PID cleanup, process health, and HTTP health behavior remain unchanged.
+
+Changed areas:
+
+- `core/node/src/status.ts`
+- `core/node/src/core.ts`
+- `core/node/dist/`
+- `docs/PROGRESS.md`
+- `docs/superpowers/plans/2026-05-01-split-status-helpers.md`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_start_status_stop_manage_placeholder_pid_metadata tests.test_windows_core.WindowsCoreTests.test_status_removes_stale_managed_adapter_pid_file tests.test_windows_core.WindowsCoreTests.test_start_runs_production_ready_adapter_process_and_stop_kills_it tests.test_windows_core.WindowsCoreTests.test_status_reports_http_adapter_ready_when_endpoint_responds tests.test_windows_core.WindowsCoreTests.test_status_reports_http_adapter_not_ready_when_endpoint_is_unreachable -v`
+
+Next steps:
+
+- Split portal generation and portal process management into a portal-focused TypeScript module.
