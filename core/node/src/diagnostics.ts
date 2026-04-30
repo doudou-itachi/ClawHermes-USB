@@ -6,6 +6,7 @@ import { integrationReadiness, loadAdapters, validateAdapter } from "./adapters"
 import { envFileDiagnostics } from "./environment";
 import { dataWritable, getRoot, resolveRelative } from "./portable";
 import { adapterRuntimeRequirementDiagnostics, runtimeDiagnostics } from "./runtimes";
+import { wslDiagnostics } from "./wsl";
 
 export function setupDiagnostics(usbRoot: string) {
   const root = getRoot(usbRoot);
@@ -18,6 +19,7 @@ export function setupDiagnostics(usbRoot: string) {
   const ports = portDiagnostics(root);
   const paths = pathDiagnostics(root);
   const envFiles = envFileDiagnostics(root, adapters);
+  const wsl = wslDiagnostics(root);
   const writable = dataWritable(root);
   const messages: string[] = [];
   const actions: SetupAction[] = [];
@@ -66,6 +68,23 @@ export function setupDiagnostics(usbRoot: string) {
         detail: item.summary,
         docs: item.sources[0],
         serviceId: item.id,
+      });
+    }
+  }
+  const wslAdapters = adapters.filter((adapter) => adapter.runtime?.kind === "wsl2" || adapter.integration?.platform === "wsl2");
+  for (const adapter of wslAdapters) {
+    if (!wsl.found || !wsl.hasWsl2Distro) {
+      const detail = wsl.messages.join(" ");
+      messages.push(`Adapter ${adapter.id} requires WSL2: ${detail}`);
+      actions.push({
+        id: `wsl2:${adapter.id}`,
+        category: "wsl2",
+        severity: "warning",
+        title: `Install or enable WSL2 for ${adapter.id}`,
+        detail,
+        command: "node core/node/dist/clawhermes.js wsl --json",
+        docs: adapter.integration?.sources?.[0] ?? adapter.upstream?.installDocs,
+        serviceId: adapter.id,
       });
     }
   }
@@ -122,7 +141,7 @@ export function setupDiagnostics(usbRoot: string) {
     });
   }
 
-  return { root, adapters: adapterResults, runtimes, adapterRuntimeRequirements, readiness, ports, paths, envFiles, dataWritable: writable, messages, actions };
+  return { root, adapters: adapterResults, runtimes, adapterRuntimeRequirements, readiness, ports, paths, envFiles, wsl, dataWritable: writable, messages, actions };
 }
 
 export function writeSetupSnapshot(usbRoot: string, setup = setupDiagnostics(usbRoot)) {

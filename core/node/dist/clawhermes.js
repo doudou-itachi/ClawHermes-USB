@@ -124,6 +124,19 @@ async function main() {
             }
             return;
         }
+        case "wsl": {
+            const result = (0, core_1.wslDiagnostics)(root);
+            if (json) {
+                printJson(result);
+            }
+            else {
+                console.log("ClawHermes-USB WSL2 diagnostics");
+                console.log(`wsl.exe: ${result.found ? result.executablePath : "not found"}`);
+                for (const message of result.messages)
+                    console.log(`- ${message}`);
+            }
+            return;
+        }
         case "init-env": {
             const result = (0, core_1.initializeEnvFiles)(root, dryRun);
             if (json) {

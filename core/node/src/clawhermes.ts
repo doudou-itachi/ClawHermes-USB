@@ -1,4 +1,4 @@
-import { adapterSetupPlan, appSourcePlan, checkoutAppSource, createBackup, getRoot, getStatus, initializeEnvFiles, installRuntimeFromArchive, markAdapterReady, portableEnv, probeAppSources, readLogTail, runAdapterSetup, runtimePreparationPlan, serviceEnvironmentDiagnostic, setupDiagnostics, startSingleAdapter, startSkeleton, stopSkeleton, verifyAdapter, writeStatusSnapshot } from "./core";
+import { adapterSetupPlan, appSourcePlan, checkoutAppSource, createBackup, getRoot, getStatus, initializeEnvFiles, installRuntimeFromArchive, markAdapterReady, portableEnv, probeAppSources, readLogTail, runAdapterSetup, runtimePreparationPlan, serviceEnvironmentDiagnostic, setupDiagnostics, startSingleAdapter, startSkeleton, stopSkeleton, verifyAdapter, writeStatusSnapshot, wslDiagnostics } from "./core";
 import type { BackupProfile } from "./backup";
 
 type ParsedArgs = {
@@ -121,6 +121,17 @@ async function main(): Promise<void> {
       } else {
         console.log("ClawHermes-USB runtime preparation plan");
         console.log(`Root: ${result.root}`);
+        for (const message of result.messages) console.log(`- ${message}`);
+      }
+      return;
+    }
+    case "wsl": {
+      const result = wslDiagnostics(root);
+      if (json) {
+        printJson(result);
+      } else {
+        console.log("ClawHermes-USB WSL2 diagnostics");
+        console.log(`wsl.exe: ${result.found ? result.executablePath : "not found"}`);
         for (const message of result.messages) console.log(`- ${message}`);
       }
       return;

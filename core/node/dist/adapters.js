@@ -53,6 +53,8 @@ function integrationReadiness(adapters) {
         verifiedAt: adapter.integration?.verifiedAt ?? null,
         summary: adapter.integration?.summary ?? "No upstream integration metadata has been recorded for this adapter.",
         sources: adapter.integration?.sources ?? [],
+        platform: adapter.integration?.platform ?? null,
+        strategy: adapter.integration?.strategy ?? null,
     }));
 }
 function serviceOrder(usbRoot, order) {

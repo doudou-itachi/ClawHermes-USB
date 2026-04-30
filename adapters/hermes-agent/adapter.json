@@ -6,9 +6,9 @@
   "enabled": true,
   "appDir": "apps/hermes-agent",
   "runtime": {
-    "kind": "python",
+    "kind": "wsl2",
     "platform": "windows",
-    "requiredExecutable": "python.exe"
+    "requiredExecutable": "wsl.exe"
   },
   "upstream": {
     "name": "NousResearch/hermes-agent",
@@ -51,6 +51,8 @@
     "productionReady": false,
     "verifiedAt": "2026-05-01",
     "summary": "Official README says native Windows is not supported and Windows users should install WSL2. Official site also describes native Windows as experimental, so the bare-Windows portable adapter remains blocked.",
+    "platform": "wsl2",
+    "strategy": "wsl2-adapter",
     "sources": [
       "https://hermes-agent.org/",
       "https://github.com/NousResearch/hermes-agent"

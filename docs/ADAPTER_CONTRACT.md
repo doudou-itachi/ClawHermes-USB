@@ -524,6 +524,36 @@ To add a new service:
 7. Run `node core/node/dist/clawhermes.js adapters <new-service> --json`.
 8. Run `node core/node/dist/clawhermes.js sources <new-service> --json`.
 9. Run `node core/node/dist/clawhermes.js probe-sources <new-service> --json`.
+
+## 16. WSL2 Adapter Diagnostics
+
+Adapters that must run inside WSL2 should declare their Windows-side launcher dependency as:
+
+```json
+{
+  "runtime": {
+    "kind": "wsl2",
+    "platform": "windows",
+    "requiredExecutable": "wsl.exe"
+  },
+  "integration": {
+    "platform": "wsl2",
+    "strategy": "wsl2-adapter"
+  }
+}
+```
+
+Before attempting WSL2 setup or startup, run:
+
+```powershell
+node core/node/dist/clawhermes.js wsl --json
+```
+
+Rules:
+
+- The diagnostic is read-only.
+- Missing `wsl.exe`, missing distributions, and missing WSL2 distributions must be reported as setup actions.
+- WSL2 adapter setup/start commands must not run until the WSL2 diagnostic is healthy.
 10. Run `node core/node/dist/clawhermes.js checkout-source <new-service> --dry-run --json` before any real checkout.
 11. Run `node core/node/dist/clawhermes.js setup-adapter <new-service> --dry-run --json` before any real setup.
 12. Run `node core/node/dist/clawhermes.js verify-adapter <new-service> --json`.

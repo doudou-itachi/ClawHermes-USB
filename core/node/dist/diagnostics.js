@@ -12,6 +12,7 @@ const adapters_1 = require("./adapters");
 const environment_1 = require("./environment");
 const portable_1 = require("./portable");
 const runtimes_1 = require("./runtimes");
+const wsl_1 = require("./wsl");
 function setupDiagnostics(usbRoot) {
     const root = (0, portable_1.getRoot)(usbRoot);
     const adapters = (0, adapters_1.loadAdapters)(root);
@@ -23,6 +24,7 @@ function setupDiagnostics(usbRoot) {
     const ports = portDiagnostics(root);
     const paths = pathDiagnostics(root);
     const envFiles = (0, environment_1.envFileDiagnostics)(root, adapters);
+    const wsl = (0, wsl_1.wslDiagnostics)(root);
     const writable = (0, portable_1.dataWritable)(root);
     const messages = [];
     const actions = [];
@@ -71,6 +73,23 @@ function setupDiagnostics(usbRoot) {
                 detail: item.summary,
                 docs: item.sources[0],
                 serviceId: item.id,
+            });
+        }
+    }
+    const wslAdapters = adapters.filter((adapter) => adapter.runtime?.kind === "wsl2" || adapter.integration?.platform === "wsl2");
+    for (const adapter of wslAdapters) {
+        if (!wsl.found || !wsl.hasWsl2Distro) {
+            const detail = wsl.messages.join(" ");
+            messages.push(`Adapter ${adapter.id} requires WSL2: ${detail}`);
+            actions.push({
+                id: `wsl2:${adapter.id}`,
+                category: "wsl2",
+                severity: "warning",
+                title: `Install or enable WSL2 for ${adapter.id}`,
+                detail,
+                command: "node core/node/dist/clawhermes.js wsl --json",
+                docs: adapter.integration?.sources?.[0] ?? adapter.upstream?.installDocs,
+                serviceId: adapter.id,
             });
         }
     }
@@ -126,7 +145,7 @@ function setupDiagnostics(usbRoot) {
             path: "data",
         });
     }
-    return { root, adapters: adapterResults, runtimes, adapterRuntimeRequirements, readiness, ports, paths, envFiles, dataWritable: writable, messages, actions };
+    return { root, adapters: adapterResults, runtimes, adapterRuntimeRequirements, readiness, ports, paths, envFiles, wsl, dataWritable: writable, messages, actions };
 }
 function writeSetupSnapshot(usbRoot, setup = setupDiagnostics(usbRoot)) {
     const root = (0, portable_1.getRoot)(usbRoot);

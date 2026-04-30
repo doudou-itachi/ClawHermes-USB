@@ -246,6 +246,8 @@ function adapterSetupItem(root, adapter, readiness, envFiles) {
             verifiedAt: null,
             summary: "No upstream integration metadata has been recorded for this adapter.",
             sources: [],
+            platform: null,
+            strategy: null,
         },
         portal: adapter.portal ?? null,
         nextSteps: adapterNextSteps(adapter, appDirExists, appDirReady, envFiles, readiness),

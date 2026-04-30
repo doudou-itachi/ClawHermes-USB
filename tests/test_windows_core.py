@@ -19,11 +19,11 @@ NODE_CLI = ROOT / "core" / "node" / "dist" / "clawhermes.js"
 PORTAL_URL = "http://127.0.0.1:17000/"
 
 
-def run_dispatcher(*args):
-    return run_dispatcher_for_root(ROOT, *args)
+def run_dispatcher(*args, env=None):
+    return run_dispatcher_for_root(ROOT, *args, env=env)
 
 
-def run_dispatcher_for_root(usb_root, *args):
+def run_dispatcher_for_root(usb_root, *args, env=None):
     command = [
         "node",
         str(NODE_CLI),
@@ -37,6 +37,7 @@ def run_dispatcher_for_root(usb_root, *args):
         text=True,
         capture_output=True,
         check=False,
+        env={**os.environ, **(env or {})},
     )
 
 
@@ -525,6 +526,35 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertIn("init-env", env_action["command"])
         self.assertEqual(env_action["path"].replace("\\", "/"), "config/env/hermes.env")
 
+    def test_wsl_json_reports_missing_host_wsl_without_throwing(self):
+        missing_wsl = str(ROOT / "data" / "tmp" / "missing-wsl.exe")
+
+        result = run_dispatcher("wsl", "-Json", env={"CLAWHERMES_WSL_EXE": missing_wsl})
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(Path(payload["root"]).resolve(), ROOT)
+        self.assertEqual(payload["executablePath"], missing_wsl)
+        self.assertFalse(payload["found"])
+        self.assertFalse(payload["hasWsl2Distro"])
+        self.assertIn("wsl.exe not found", "\n".join(payload["messages"]))
+
+    def test_setup_json_reports_wsl2_action_when_hermes_agent_needs_wsl2(self):
+        missing_wsl = str(ROOT / "data" / "tmp" / "missing-wsl.exe")
+
+        result = run_dispatcher("setup", "-Json", env={"CLAWHERMES_WSL_EXE": missing_wsl})
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertIn("wsl", payload)
+        self.assertFalse(payload["wsl"]["found"])
+        action_ids = {action["id"] for action in payload["actions"]}
+        self.assertIn("wsl2:hermes-agent", action_ids)
+        action = next(action for action in payload["actions"] if action["id"] == "wsl2:hermes-agent")
+        self.assertEqual(action["category"], "wsl2")
+        self.assertEqual(action["severity"], "warning")
+        self.assertIn("Install or enable WSL2", action["title"])
+
     def test_setup_json_reports_adapter_runtime_version_mismatch(self):
         temp_dir, temp_root = make_temp_usb_root()
         try:
@@ -816,6 +846,16 @@ class WindowsCoreTests(unittest.TestCase):
         adapter = json.loads(result.stdout)["adapters"][0]
         self.assertEqual(adapter["runtime"]["kind"], "node")
         self.assertEqual(adapter["runtime"]["versionRequirement"], ">=23.0.0")
+
+    def test_adapters_json_reports_hermes_agent_wsl2_strategy(self):
+        result = run_dispatcher("adapters", "hermes-agent", "-Json")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        adapter = json.loads(result.stdout)["adapters"][0]
+        self.assertEqual(adapter["runtime"]["kind"], "wsl2")
+        self.assertEqual(adapter["runtime"]["requiredExecutable"], "wsl.exe")
+        self.assertEqual(adapter["integration"]["platform"], "wsl2")
+        self.assertEqual(adapter["integration"]["strategy"], "wsl2-adapter")
 
     def test_adapters_unknown_service_fails_with_actionable_message(self):
         result = run_dispatcher("adapters", "missing-service", "-Json")

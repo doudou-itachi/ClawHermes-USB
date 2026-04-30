@@ -109,6 +109,8 @@ export type AdapterDescriptor = {
     verifiedAt?: string | null;
     summary?: string;
     sources?: string[];
+    platform?: string;
+    strategy?: string;
   };
   dependsOn?: string[];
 };
@@ -126,6 +128,8 @@ export type IntegrationReadiness = {
   verifiedAt: string | null;
   summary: string;
   sources: string[];
+  platform: string | null;
+  strategy: string | null;
 };
 
 export type ServiceStatus = {
@@ -162,7 +166,7 @@ export type PathDiagnostic = {
 
 export type SetupAction = {
   id: string;
-  category: "runtime" | "adapter-integration" | "env-file" | "port" | "path" | "data";
+  category: "runtime" | "adapter-integration" | "env-file" | "port" | "path" | "data" | "wsl2";
   severity: "info" | "warning" | "error";
   title: string;
   detail: string;
@@ -225,5 +229,26 @@ export type ServiceEnvironmentDiagnostic = {
   serviceId: string;
   files: ServiceEnvFileResult[];
   variables: string[];
+  messages: string[];
+};
+
+export type WslDistroDiagnostic = {
+  name: string;
+  state: string | null;
+  version: number | null;
+  default: boolean;
+};
+
+export type WslDiagnostic = {
+  root: string;
+  executablePath: string | null;
+  found: boolean;
+  statusSucceeded: boolean;
+  statusText: string | null;
+  listSucceeded: boolean;
+  listText: string | null;
+  distros: WslDistroDiagnostic[];
+  defaultDistro: string | null;
+  hasWsl2Distro: boolean;
   messages: string[];
 };

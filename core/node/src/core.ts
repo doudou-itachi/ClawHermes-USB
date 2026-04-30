@@ -19,6 +19,7 @@ export { pathDiagnostics, portDiagnostics, readLogTail, setupDiagnostics, writeS
 export { PORTAL_URL, generatePortal, getPortalStatus, startPortalServer, stopPortalServer } from "./portal";
 export { installRuntimeFromArchive, loadRuntimeManifest, runtimeDiagnostics, runtimePreparationPlan } from "./runtimes";
 export { writeStatusSnapshot } from "./status";
+export { wslDiagnostics } from "./wsl";
 
 export async function startSkeleton(usbRoot: string) {
   const root = getRoot(usbRoot);

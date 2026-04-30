@@ -1736,3 +1736,44 @@ Validation performed:
 Next steps:
 
 - Continue with OpenClaw evidence refresh, or design a future WSL2/container adapter path instead of a bare-Windows Hermes Agent adapter.
+
+### WSL2 Adapter Diagnostics
+
+Status: `Done`
+
+Summary:
+
+- Added read-only `wsl --json` diagnostics for the host WSL2 boundary.
+- The diagnostic detects `wsl.exe`, captures status/list results when available, reports registered distros, identifies the default distro, and checks for at least one WSL2 distro.
+- WSL localized install errors are normalized into readable action messages instead of leaking mojibake into JSON output.
+- `setup --json` now includes a `wsl` diagnostic block and adds `wsl2:<service-id>` actions for adapters that require WSL2.
+- Updated Hermes Agent metadata to declare `runtime.kind: wsl2`, `requiredExecutable: wsl.exe`, and `integration.strategy: wsl2-adapter`.
+- Documented the WSL2 adapter diagnostic in the README and adapter contract.
+
+Changed areas:
+
+- `core/node/src/wsl.ts`
+- `core/node/src/types.ts`
+- `core/node/src/diagnostics.ts`
+- `core/node/src/core.ts`
+- `core/node/src/clawhermes.ts`
+- `core/node/src/adapters.ts`
+- `core/node/src/adapter-guidance.ts`
+- `core/windows/clawhermes.ps1`
+- `core/node/dist/`
+- `adapters/hermes-agent/adapter.json`
+- `tests/test_windows_core.py`
+- `README.md`
+- `docs/ADAPTER_CONTRACT.md`
+- `docs/PROGRESS.md`
+- `docs/superpowers/plans/2026-05-01-wsl2-adapter-diagnostics.md`
+
+Validation performed:
+
+- `npm run build`
+- `node core/node/dist/clawhermes.js wsl --json`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_wsl_json_reports_missing_host_wsl_without_throwing tests.test_windows_core.WindowsCoreTests.test_setup_json_reports_wsl2_action_when_hermes_agent_needs_wsl2 tests.test_windows_core.WindowsCoreTests.test_adapters_json_reports_hermes_agent_wsl2_strategy -v`
+
+Next steps:
+
+- Add the guarded WSL command execution layer for Hermes Agent setup/start once a WSL2 distro is available.
