@@ -10,68 +10,25 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-Import-Module -Force (Join-Path -Path $PSScriptRoot -ChildPath "ClawHermes.Core.psm1")
-
-switch ($Action) {
-    "env-json" {
-        New-ClawHermesPortableEnvironment -UsbRoot $UsbRoot | ConvertTo-Json -Depth 6
-        exit 0
+$root = (Resolve-Path -LiteralPath $UsbRoot).Path
+$node = Join-Path -Path $root -ChildPath "runtimes\windows\node\node.exe"
+if (-not (Test-Path -LiteralPath $node -PathType Leaf)) {
+    $nodeCommand = Get-Command node -ErrorAction SilentlyContinue
+    if ($null -eq $nodeCommand) {
+        throw "Node.js not found. Place portable Node.js at runtimes\windows\node\node.exe or install Node.js for development."
     }
-    "setup" {
-        $result = Test-ClawHermesSetup -UsbRoot $UsbRoot
-        if ($Json) {
-            $result | ConvertTo-Json -Depth 8
-        }
-        else {
-            Write-Host "ClawHermes-USB setup diagnostics"
-            Write-Host "Root: $($result.root)"
-            foreach ($message in $result.messages) {
-                Write-Host "- $message"
-            }
-            if ($result.messages.Count -eq 0) {
-                Write-Host "No setup issues found."
-            }
-        }
-        exit 0
-    }
-    "start" {
-        $result = Start-ClawHermesSkeleton -UsbRoot $UsbRoot
-        if ($Json) {
-            $result | ConvertTo-Json -Depth 8
-        }
-        else {
-            Write-Host "ClawHermes-USB placeholder services started:"
-            foreach ($id in $result.started) {
-                Write-Host "- $id"
-            }
-            Write-Host "Portal target: http://127.0.0.1:17000/"
-        }
-        exit 0
-    }
-    "status" {
-        $result = Get-ClawHermesStatus -UsbRoot $UsbRoot
-        if ($Json) {
-            $result | ConvertTo-Json -Depth 8
-        }
-        else {
-            Write-Host "ClawHermes-USB status"
-            foreach ($service in $result.services) {
-                Write-Host "$($service.id): $($service.status)"
-            }
-        }
-        exit 0
-    }
-    "stop" {
-        $result = Stop-ClawHermesSkeleton -UsbRoot $UsbRoot
-        if ($Json) {
-            $result | ConvertTo-Json -Depth 8
-        }
-        else {
-            Write-Host "ClawHermes-USB placeholder services stopped:"
-            foreach ($id in $result.stopped) {
-                Write-Host "- $id"
-            }
-        }
-        exit 0
-    }
+    $node = $nodeCommand.Source
 }
+
+$cli = Join-Path -Path $root -ChildPath "core\node\dist\clawhermes.js"
+if (-not (Test-Path -LiteralPath $cli -PathType Leaf)) {
+    throw "TypeScript core is not built. Run npm run build."
+}
+
+$nodeArgs = @($cli, $Action, "--usb-root", $root)
+if ($Json) {
+    $nodeArgs += "--json"
+}
+
+& $node @nodeArgs
+exit $LASTEXITCODE

@@ -1,0 +1,29 @@
+{
+  "name": "clawhermes-usb",
+  "version": "1.0.0",
+  "description": "Windows-first portable orchestration shell for OpenClaw, Hermes Agent, and Hermes Web UI.",
+  "main": "core/node/dist/clawhermes.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "npm run build && python -m unittest tests.test_windows_core -v"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/doudou-itachi/ClawHermes-USB.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/doudou-itachi/ClawHermes-USB/issues"
+  },
+  "homepage": "https://github.com/doudou-itachi/ClawHermes-USB#readme",
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "typescript": "^6.0.3"
+  }
+}

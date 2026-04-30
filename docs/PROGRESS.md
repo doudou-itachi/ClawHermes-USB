@@ -155,3 +155,43 @@ Next steps:
 - Decide the portable runtime acquisition strategy for Node.js, Python, and Git.
 - Verify installed upstream payloads locally before marking any adapter `productionReady: true`.
 - Prefer foreground commands for services managed by ClawHermes-USB; avoid upstream service installers for portable daily startup.
+
+### TypeScript Core Migration
+
+Status: `Done`
+
+Summary:
+
+- Migrated the service-agnostic orchestration core from PowerShell module logic to TypeScript + Node.js.
+- Added `package.json`, `package-lock.json`, `tsconfig.json`, TypeScript source under `core/node/src/`, and built JavaScript under `core/node/dist/`.
+- Kept `core/windows/clawhermes.ps1` as a thin PowerShell wrapper that resolves portable or development Node.js and forwards commands to the Node CLI.
+- Replaced the PowerShell portal server with a Node HTTP server.
+- Updated behavior tests to exercise the Node CLI directly while command-level verification still covers the PowerShell wrapper and Batch-facing path.
+- Added the user's autonomous-progress rule to `AGENT.md`.
+
+Changed areas:
+
+- `core/node/`
+- `core/windows/clawhermes.ps1`
+- `core/README.md`
+- `tests/test_windows_core.py`
+- `package.json`
+- `package-lock.json`
+- `tsconfig.json`
+- `AGENT.md`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core -v`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File core\windows\clawhermes.ps1 setup -UsbRoot .`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File core\windows\clawhermes.ps1 start -UsbRoot .`
+- `Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:17000/' -TimeoutSec 5`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File core\windows\clawhermes.ps1 status -UsbRoot .`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File core\windows\clawhermes.ps1 stop -UsbRoot .`
+
+Next steps:
+
+- Keep Batch and PowerShell launchers thin.
+- Move future orchestration features into `core/node/src/`.
+- Add focused TypeScript unit tests as the core grows beyond the current command-level behavior suite.

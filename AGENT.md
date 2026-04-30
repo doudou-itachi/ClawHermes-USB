@@ -69,6 +69,11 @@ time parallel work could be useful. Use multiple agents when the work can be spl
 read, review, verification, or implementation scopes. Keep work in the main agent when the next step
 is a tightly coupled blocker, a small local edit, or likely to conflict with another agent's changes.
 
+The user will not supervise routine progress or repeatedly say "continue". The main agent should
+autonomously continue from the current project goals, progress document, and verification evidence.
+Pause only for real blockers that require user-owned decisions, credentials, unavailable external
+resources, or changes that would materially alter the product direction.
+
 Sub-agent requirements:
 
 - Use `gpt-5.4`.

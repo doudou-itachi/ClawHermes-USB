@@ -11,19 +11,16 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DISPATCHER = ROOT / "core" / "windows" / "clawhermes.ps1"
+NODE_CLI = ROOT / "core" / "node" / "dist" / "clawhermes.js"
 PORTAL_URL = "http://127.0.0.1:17000/"
 
 
 def run_dispatcher(*args):
     command = [
-        "powershell",
-        "-NoProfile",
-        "-ExecutionPolicy",
-        "Bypass",
-        "-File",
-        str(DISPATCHER),
+        "node",
+        str(NODE_CLI),
         *args,
-        "-UsbRoot",
+        "--usb-root",
         str(ROOT),
     ]
     return subprocess.run(
@@ -194,22 +191,25 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertFalse((pid_dir / f"{service_id}.pid").exists())
 
     def test_start_generates_portal_from_adapter_metadata(self):
-        start = run_dispatcher("start", "-Json")
+        try:
+            start = run_dispatcher("start", "-Json")
 
-        self.assertEqual(start.returncode, 0, start.stderr)
-        portal_index = ROOT / "portal" / "index.html"
-        self.assertTrue(portal_index.exists())
+            self.assertEqual(start.returncode, 0, start.stderr)
+            portal_index = ROOT / "portal" / "index.html"
+            self.assertTrue(portal_index.exists())
 
-        html = portal_index.read_text(encoding="utf-8")
-        self.assertIn("ClawHermes-USB Portal", html)
-        self.assertIn(str(ROOT), html)
-        self.assertIn(str(ROOT / "data"), html)
-        self.assertIn("OpenClaw", html)
-        self.assertIn("Hermes Agent", html)
-        self.assertIn("Hermes Web UI", html)
-        self.assertIn("data/logs/openclaw.log", html)
-        self.assertIn("data/logs/hermes-agent.log", html)
-        self.assertIn("data/logs/hermes-web-ui.log", html)
+            html = portal_index.read_text(encoding="utf-8")
+            self.assertIn("ClawHermes-USB Portal", html)
+            self.assertIn(str(ROOT), html)
+            self.assertIn(str(ROOT / "data"), html)
+            self.assertIn("OpenClaw", html)
+            self.assertIn("Hermes Agent", html)
+            self.assertIn("Hermes Web UI", html)
+            self.assertIn("data/logs/openclaw.log", html)
+            self.assertIn("data/logs/hermes-agent.log", html)
+            self.assertIn("data/logs/hermes-web-ui.log", html)
+        finally:
+            run_dispatcher("stop", "-Json")
 
     def test_start_serves_portal_over_localhost_and_stop_shuts_it_down(self):
         start = run_dispatcher("start", "-Json")
