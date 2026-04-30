@@ -458,7 +458,23 @@ Rules:
 - The command runs from `appDir` with the same resolved service environment used for startup.
 - JSON output lists environment variable names and env file diagnostics, not secret values.
 
-## 12. Adapter Verification Command
+## 12. Guarded Adapter Start Command
+
+Use the guarded start command in disposable integration roots when an adapter is not marked production-ready yet:
+
+```powershell
+node core/node/dist/clawhermes.js start-adapter hermes-web-ui --confirm-start --json
+```
+
+Rules:
+
+- The command requires a single service id.
+- `--dry-run` reports the command and app directory without launching anything.
+- Real startup refuses to run unless `--confirm-start` is passed.
+- The command uses the same managed lifecycle as production startup and writes standard PID metadata.
+- Normal `start` still requires `integration.productionReady: true` and a real app directory; placeholder-only app directories stay in placeholder mode.
+
+## 13. Adapter Verification Command
 
 Before marking an adapter production-ready, run the read-only verifier:
 
@@ -478,7 +494,7 @@ The verifier reports `productionReadyCandidate` and individual checks for:
 
 The command does not modify `adapter.json`. Use the result as evidence for a later explicit production-readiness metadata update.
 
-## 13. Adapter Readiness Metadata Command
+## 14. Adapter Readiness Metadata Command
 
 After `verify-adapter` reports `productionReadyCandidate: true`, update integration metadata with the guarded metadata command:
 
@@ -495,7 +511,7 @@ Rules:
 - Only `adapters/<service-id>/adapter.json` is updated.
 - The command sets `integration.status` to `verified`, `integration.productionReady` to `true`, and `integration.verifiedAt` to the current date.
 
-## 14. Contributor Workflow
+## 15. Contributor Workflow
 
 To add a new service:
 

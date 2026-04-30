@@ -14,7 +14,7 @@ function startAdapter(root, adapter, options = {}) {
     const serviceEnv = (0, environment_1.resolveServiceEnvironment)(root, adapter.id);
     (0, node_fs_1.mkdirSync)((0, node_path_1.dirname)(pidFile), { recursive: true });
     (0, node_fs_1.mkdirSync)((0, node_path_1.dirname)(logFile), { recursive: true });
-    const metadata = shouldLaunchManagedProcess(adapter, options.forceManaged === true)
+    const metadata = shouldLaunchManagedProcess(root, adapter, options.forceManaged === true)
         ? launchManagedAdapterProcess(root, adapter, serviceEnv)
         : {
             serviceId: adapter.id,
@@ -37,8 +37,17 @@ function startAdapter(root, adapter, options = {}) {
     }
     return metadata;
 }
-function shouldLaunchManagedProcess(adapter, forceManaged) {
-    return (forceManaged || adapter.integration?.productionReady === true) && Boolean(adapter.commands.start);
+function shouldLaunchManagedProcess(root, adapter, forceManaged) {
+    return (forceManaged || adapter.integration?.productionReady === true) && Boolean(adapter.commands.start) && appDirHasRealContent(root, adapter);
+}
+function appDirHasRealContent(root, adapter) {
+    const appDir = (0, portable_1.resolveRelative)(root, adapter.appDir);
+    try {
+        return (0, node_fs_1.existsSync)(appDir) && (0, node_fs_1.readdirSync)(appDir).some((entry) => entry !== ".gitkeep");
+    }
+    catch {
+        return false;
+    }
 }
 function environmentMetadata(serviceEnv) {
     return {

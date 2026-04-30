@@ -1669,3 +1669,41 @@ Validation performed:
 Next steps:
 
 - Use `start-adapter hermes-web-ui --confirm-start` in the disposable lab root, then rerun `verify-adapter hermes-web-ui --json` to validate health behavior.
+
+### Hermes Web UI Lab Promotion
+
+Status: `Done`
+
+Summary:
+
+- Verified Hermes Web UI in the disposable Windows lab root after upstream checkout, `npm install`, env initialization, and guarded adapter startup.
+- `status --json` reported Hermes Web UI as a managed process with HTTP health ready at `http://127.0.0.1:8648` and status code `200`.
+- `verify-adapter hermes-web-ui --json` reported `productionReadyCandidate: true`.
+- Updated `adapters/hermes-web-ui/adapter.json` to `integration.status: verified` and `integration.productionReady: true` with the lab evidence summary.
+- Added a lifecycle guard so default `start` does not try to launch a production-ready adapter from a placeholder-only app directory; it remains placeholder metadata until the upstream payload is checked out in the current root.
+- Documented `start-adapter` in the English adapter contract and quick-start command list.
+
+Changed areas:
+
+- `adapters/hermes-web-ui/adapter.json`
+- `core/node/src/lifecycle.ts`
+- `core/node/dist/lifecycle.js`
+- `tests/test_windows_core.py`
+- `README.md`
+- `docs/ADAPTER_CONTRACT.md`
+- `docs/PROGRESS.md`
+- `docs/superpowers/plans/2026-05-01-promote-hermes-web-ui.md`
+
+Validation performed:
+
+- Disposable lab: `start-adapter hermes-web-ui --confirm-start --json`
+- Disposable lab: `status --json` showed HTTP `200` on `http://127.0.0.1:8648`
+- Disposable lab: `verify-adapter hermes-web-ui --json` reported `productionReadyCandidate: true`
+- Disposable lab: `stop --json`
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_start_uses_placeholder_when_production_ready_app_dir_has_no_real_content tests.test_windows_core.WindowsCoreTests.test_start_adapter_confirm_launches_candidate_managed_process -v`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_setup_json_reports_recommended_actions tests.test_windows_core.WindowsCoreTests.test_setup_json_reports_adapter_integration_readiness tests.test_windows_core.WindowsCoreTests.test_adapters_json_reports_preparation_plan tests.test_windows_core.WindowsCoreTests.test_start_status_stop_manage_placeholder_pid_metadata tests.test_windows_core.WindowsCoreTests.test_start_uses_placeholder_when_production_ready_app_dir_has_no_real_content -v`
+
+Next steps:
+
+- Continue upstream integration with Hermes Agent or OpenClaw, using the same guarded checkout/setup/start/verify flow before promoting their metadata.

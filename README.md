@@ -22,7 +22,7 @@ Implemented:
 Not implemented yet:
 
 - Automatic download, vendoring, or installation of OpenClaw, Hermes Agent, or Hermes Web UI.
-- Verified real upstream service integration for the three default adapters.
+- Verified real upstream service integration for OpenClaw and Hermes Agent.
 
 ## Quick Start
 
@@ -54,6 +54,7 @@ node core/node/dist/clawhermes.js sources hermes-web-ui --json
 node core/node/dist/clawhermes.js probe-sources hermes-web-ui --json
 node core/node/dist/clawhermes.js checkout-source hermes-web-ui --dry-run --json
 node core/node/dist/clawhermes.js setup-adapter hermes-web-ui --dry-run --json
+node core/node/dist/clawhermes.js start-adapter hermes-web-ui --dry-run --json
 node core/node/dist/clawhermes.js verify-adapter hermes-web-ui --json
 node core/node/dist/clawhermes.js mark-adapter-ready hermes-web-ui --confirm-ready --summary "Verified locally" --json
 node core/node/dist/clawhermes.js start --json

@@ -1,5 +1,5 @@
 import { execFileSync, spawn } from "node:child_process";
-import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import type { AdapterDescriptor, ServiceEnvironment } from "./types";
 import { resolveServiceEnvironment } from "./environment";
@@ -11,7 +11,7 @@ export function startAdapter(root: string, adapter: AdapterDescriptor, options: 
   const serviceEnv = resolveServiceEnvironment(root, adapter.id);
   mkdirSync(dirname(pidFile), { recursive: true });
   mkdirSync(dirname(logFile), { recursive: true });
-  const metadata = shouldLaunchManagedProcess(adapter, options.forceManaged === true)
+  const metadata = shouldLaunchManagedProcess(root, adapter, options.forceManaged === true)
     ? launchManagedAdapterProcess(root, adapter, serviceEnv)
     : {
       serviceId: adapter.id,
@@ -34,8 +34,17 @@ export function startAdapter(root: string, adapter: AdapterDescriptor, options: 
   return metadata;
 }
 
-function shouldLaunchManagedProcess(adapter: AdapterDescriptor, forceManaged: boolean): boolean {
-  return (forceManaged || adapter.integration?.productionReady === true) && Boolean(adapter.commands.start);
+function shouldLaunchManagedProcess(root: string, adapter: AdapterDescriptor, forceManaged: boolean): boolean {
+  return (forceManaged || adapter.integration?.productionReady === true) && Boolean(adapter.commands.start) && appDirHasRealContent(root, adapter);
+}
+
+function appDirHasRealContent(root: string, adapter: AdapterDescriptor): boolean {
+  const appDir = resolveRelative(root, adapter.appDir);
+  try {
+    return existsSync(appDir) && readdirSync(appDir).some((entry) => entry !== ".gitkeep");
+  } catch {
+    return false;
+  }
 }
 
 function environmentMetadata(serviceEnv: ServiceEnvironment) {

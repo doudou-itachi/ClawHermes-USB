@@ -161,6 +161,14 @@ def mark_fake_service_candidate(temp_root):
     adapter_path.write_text(json.dumps(adapter, indent=2), encoding="utf-8")
 
 
+def mark_adapter_production_ready(temp_root, service_id):
+    adapter_path = temp_root / "adapters" / service_id / "adapter.json"
+    adapter = json.loads(adapter_path.read_text(encoding="utf-8"))
+    adapter["integration"]["status"] = "verified"
+    adapter["integration"]["productionReady"] = True
+    adapter_path.write_text(json.dumps(adapter, indent=2), encoding="utf-8")
+
+
 def make_temp_process_usb_root():
     temp_dir = tempfile.TemporaryDirectory()
     temp_root = Path(temp_dir.name)
@@ -505,7 +513,8 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertIn("adapter-integration", categories)
         self.assertIn("env-file", categories)
         self.assertIn("runtime:node", action_ids)
-        self.assertIn("adapter-integration:hermes-web-ui", action_ids)
+        self.assertIn("adapter-integration:openclaw", action_ids)
+        self.assertNotIn("adapter-integration:hermes-web-ui", action_ids)
         self.assertIn("env-file:hermes-agent", action_ids)
 
         node_action = next(action for action in actions if action["id"] == "runtime:node")
@@ -753,14 +762,14 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertFalse(readiness["hermes-agent"]["productionReady"])
         self.assertIn("WSL2", readiness["hermes-agent"]["summary"])
 
-        self.assertEqual(readiness["hermes-web-ui"]["status"], "candidate")
-        self.assertFalse(readiness["hermes-web-ui"]["productionReady"])
-        self.assertIn("hermes-web-ui start", readiness["hermes-web-ui"]["summary"])
+        self.assertEqual(readiness["hermes-web-ui"]["status"], "verified")
+        self.assertTrue(readiness["hermes-web-ui"]["productionReady"])
+        self.assertIn("portable Node 24.15.0", readiness["hermes-web-ui"]["summary"])
 
         messages = "\n".join(payload["messages"])
         self.assertIn("Adapter openclaw integration is not production-ready", messages)
         self.assertIn("Adapter hermes-agent integration is not production-ready", messages)
-        self.assertIn("Adapter hermes-web-ui integration is not production-ready", messages)
+        self.assertNotIn("Adapter hermes-web-ui integration is not production-ready", messages)
 
     def test_adapters_json_reports_preparation_plan(self):
         result = run_dispatcher("adapters", "-Json")
@@ -772,6 +781,7 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertEqual(set(adapters), {"openclaw", "hermes-agent", "hermes-web-ui"})
         self.assertTrue(adapters["openclaw"]["appDirExists"])
         self.assertFalse(adapters["openclaw"]["integration"]["productionReady"])
+        self.assertTrue(adapters["hermes-web-ui"]["integration"]["productionReady"])
         self.assertIn("config/env/openclaw.env", [item["path"] for item in adapters["openclaw"]["envFiles"]])
         self.assertTrue(any("init-env" in step for step in adapters["openclaw"]["nextSteps"]))
 
@@ -1301,6 +1311,36 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertEqual(json.loads(stop.stdout)["stopped"], ["portal", "fake-service"])
             self.assertFalse(pid_file.exists())
             self.assertFalse(process_exists(metadata["processId"]))
+        finally:
+            run_dispatcher_for_root(temp_root, "stop", "-Json")
+            temp_dir.cleanup()
+
+    def test_start_uses_placeholder_when_production_ready_app_dir_has_no_real_content(self):
+        temp_dir, temp_root = make_temp_usb_root()
+        try:
+            defaults = temp_root / "config" / "defaults"
+            defaults.mkdir(parents=True)
+            for config_file in (ROOT / "config" / "defaults").glob("*.json"):
+                (defaults / config_file.name).write_text(config_file.read_text(encoding="utf-8"), encoding="utf-8")
+            services = json.loads((defaults / "services.json").read_text(encoding="utf-8"))
+            services["startOrder"] = ["hermes-web-ui"]
+            services["stopOrder"] = ["hermes-web-ui"]
+            (defaults / "services.json").write_text(json.dumps(services, indent=2), encoding="utf-8")
+            app_dir = temp_root / "apps" / "hermes-web-ui"
+            app_dir.mkdir(parents=True)
+            (app_dir / ".gitkeep").write_text("\n", encoding="utf-8")
+            portal_server = temp_root / "core" / "node" / "dist" / "portal-server.js"
+            portal_server.parent.mkdir(parents=True)
+            portal_server.write_text((ROOT / "core" / "node" / "dist" / "portal-server.js").read_text(encoding="utf-8"), encoding="utf-8")
+            mark_adapter_production_ready(temp_root, "hermes-web-ui")
+
+            result = run_dispatcher_for_root(temp_root, "start", "-Json")
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            metadata = json.loads((temp_root / "data" / "tmp" / "pids" / "hermes-web-ui.pid").read_text(encoding="utf-8"))
+            self.assertTrue(metadata["placeholder"])
+            self.assertEqual(metadata["status"], "placeholder-started")
+            self.assertNotIn("processId", metadata)
         finally:
             run_dispatcher_for_root(temp_root, "stop", "-Json")
             temp_dir.cleanup()
