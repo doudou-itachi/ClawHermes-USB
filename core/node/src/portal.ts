@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import { dirname, join, sep } from "node:path";
 import { get } from "node:http";
 import type { ServiceStatus } from "./types";
+import { killProcessTree } from "./lifecycle";
 import { getRoot, writeLog } from "./portable";
 
 export const PORTAL_URL = "http://127.0.0.1:17000/";
@@ -270,12 +271,4 @@ export function stopPortalServer(usbRoot: string): boolean {
   }
   if (stopped) writeLog(root, "portal", "INFO", "Stopped portal server.");
   return stopped;
-}
-
-export function killProcessTree(pid: number): void {
-  if (process.platform === "win32") {
-    execFileSync("taskkill", ["/PID", String(pid), "/T", "/F"], { stdio: "ignore" });
-  } else {
-    process.kill(pid, "SIGTERM");
-  }
 }

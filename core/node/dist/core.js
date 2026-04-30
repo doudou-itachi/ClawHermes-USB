@@ -4,12 +4,10 @@ exports.writeStatusSnapshot = exports.runtimePreparationPlan = exports.runtimeDi
 exports.startSkeleton = startSkeleton;
 exports.getStatus = getStatus;
 exports.stopSkeleton = stopSkeleton;
-const node_child_process_1 = require("node:child_process");
 const node_fs_1 = require("node:fs");
-const node_path_1 = require("node:path");
 const adapters_1 = require("./adapters");
-const environment_1 = require("./environment");
 const diagnostics_1 = require("./diagnostics");
+const lifecycle_1 = require("./lifecycle");
 const portable_1 = require("./portable");
 const portal_1 = require("./portal");
 const status_1 = require("./status");
@@ -22,11 +20,11 @@ Object.defineProperty(exports, "integrationReadiness", { enumerable: true, get: 
 Object.defineProperty(exports, "loadAdapters", { enumerable: true, get: function () { return adapters_2.loadAdapters; } });
 Object.defineProperty(exports, "serviceOrder", { enumerable: true, get: function () { return adapters_2.serviceOrder; } });
 Object.defineProperty(exports, "validateAdapter", { enumerable: true, get: function () { return adapters_2.validateAdapter; } });
-var environment_2 = require("./environment");
-Object.defineProperty(exports, "envFileDiagnostics", { enumerable: true, get: function () { return environment_2.envFileDiagnostics; } });
-Object.defineProperty(exports, "initializeEnvFiles", { enumerable: true, get: function () { return environment_2.initializeEnvFiles; } });
-Object.defineProperty(exports, "resolveServiceEnvironment", { enumerable: true, get: function () { return environment_2.resolveServiceEnvironment; } });
-Object.defineProperty(exports, "serviceEnvironmentDiagnostic", { enumerable: true, get: function () { return environment_2.serviceEnvironmentDiagnostic; } });
+var environment_1 = require("./environment");
+Object.defineProperty(exports, "envFileDiagnostics", { enumerable: true, get: function () { return environment_1.envFileDiagnostics; } });
+Object.defineProperty(exports, "initializeEnvFiles", { enumerable: true, get: function () { return environment_1.initializeEnvFiles; } });
+Object.defineProperty(exports, "resolveServiceEnvironment", { enumerable: true, get: function () { return environment_1.resolveServiceEnvironment; } });
+Object.defineProperty(exports, "serviceEnvironmentDiagnostic", { enumerable: true, get: function () { return environment_1.serviceEnvironmentDiagnostic; } });
 var diagnostics_2 = require("./diagnostics");
 Object.defineProperty(exports, "pathDiagnostics", { enumerable: true, get: function () { return diagnostics_2.pathDiagnostics; } });
 Object.defineProperty(exports, "portDiagnostics", { enumerable: true, get: function () { return diagnostics_2.portDiagnostics; } });
@@ -50,81 +48,13 @@ async function startSkeleton(usbRoot) {
     const setup = (0, diagnostics_1.setupDiagnostics)(root);
     const started = [];
     for (const adapter of (0, adapters_1.serviceOrder)(root, "start").filter((item) => item.enabled)) {
-        const pidFile = (0, portable_1.resolveRelative)(root, adapter.pidFile);
-        const logFile = (0, portable_1.resolveRelative)(root, adapter.logFile);
-        const serviceEnv = (0, environment_1.resolveServiceEnvironment)(root, adapter.id);
-        (0, node_fs_1.mkdirSync)((0, node_path_1.dirname)(pidFile), { recursive: true });
-        (0, node_fs_1.mkdirSync)((0, node_path_1.dirname)(logFile), { recursive: true });
-        const metadata = shouldLaunchManagedProcess(adapter)
-            ? launchManagedAdapterProcess(root, adapter, serviceEnv)
-            : {
-                serviceId: adapter.id,
-                displayName: adapter.displayName,
-                status: "placeholder-started",
-                startedAt: new Date().toISOString(),
-                command: adapter.commands.start ?? null,
-                workingDirectory: (0, portable_1.resolveRelative)(root, adapter.appDir),
-                logFile,
-                environment: environmentMetadata(serviceEnv),
-                placeholder: true,
-            };
-        (0, node_fs_1.writeFileSync)(pidFile, JSON.stringify(metadata, null, 2), "utf8");
-        if (metadata.placeholder) {
-            (0, node_fs_1.appendFileSync)(logFile, `${new Date().toISOString()} [${adapter.id}] [INFO] Placeholder service started.\n`);
-            (0, portable_1.writeLog)(root, adapter.id, "INFO", "Started placeholder service.");
-        }
-        else if ("processId" in metadata) {
-            (0, portable_1.writeLog)(root, adapter.id, "INFO", `Started managed service process ${metadata.processId}.`);
-        }
+        (0, lifecycle_1.startAdapter)(root, adapter);
         started.push(adapter.id);
     }
     (0, portal_1.generatePortal)(root, getStatus(root).services);
     const portal = await (0, portal_1.startPortalServer)(root);
     (0, status_1.writeStatusSnapshot)(root, getStatus(root));
     return { root, started, portal, setupMessages: setup.messages };
-}
-function shouldLaunchManagedProcess(adapter) {
-    return adapter.integration?.productionReady === true && Boolean(adapter.commands.start);
-}
-function environmentMetadata(serviceEnv) {
-    return {
-        files: serviceEnv.files,
-        variables: Object.keys(serviceEnv.env).sort(),
-    };
-}
-function launchManagedAdapterProcess(root, adapter, serviceEnv) {
-    const command = adapter.commands.start;
-    if (!command)
-        throw new Error(`Adapter ${adapter.id} has no start command.`);
-    const workingDirectory = (0, portable_1.resolveRelative)(root, adapter.appDir);
-    const logFile = (0, portable_1.resolveRelative)(root, adapter.logFile);
-    const logFd = (0, node_fs_1.openSync)(logFile, "a");
-    try {
-        const child = (0, node_child_process_1.spawn)(command, {
-            cwd: workingDirectory,
-            env: { ...process.env, ...serviceEnv.env },
-            detached: true,
-            shell: true,
-            stdio: ["ignore", logFd, logFd],
-            windowsHide: true,
-        });
-        child.unref();
-        return {
-            serviceId: adapter.id,
-            displayName: adapter.displayName,
-            status: "running",
-            processId: child.pid ?? 0,
-            startedAt: new Date().toISOString(),
-            command,
-            workingDirectory,
-            logFile,
-            environment: environmentMetadata(serviceEnv),
-            placeholder: false,
-        };
-    }
-    finally {
-        (0, node_fs_1.closeSync)(logFd);
-    }
 }
 function getStatus(usbRoot) {
     const root = (0, portable_1.getRoot)(usbRoot);
@@ -166,21 +96,8 @@ function stopSkeleton(usbRoot) {
     if ((0, portal_1.stopPortalServer)(root))
         stopped.push("portal");
     for (const adapter of (0, adapters_1.serviceOrder)(root, "stop")) {
-        const pidFile = (0, portable_1.resolveRelative)(root, adapter.pidFile);
-        if ((0, node_fs_1.existsSync)(pidFile)) {
-            const metadata = JSON.parse((0, node_fs_1.readFileSync)(pidFile, "utf8"));
-            if (metadata.placeholder === false && metadata.processId) {
-                try {
-                    (0, portal_1.killProcessTree)(metadata.processId);
-                }
-                catch {
-                    // Already gone.
-                }
-            }
-            (0, node_fs_1.rmSync)(pidFile, { force: true });
-            (0, portable_1.writeLog)(root, adapter.id, "INFO", metadata.placeholder === false ? "Stopped managed service." : "Stopped placeholder service.");
+        if ((0, lifecycle_1.stopAdapter)(root, adapter))
             stopped.push(adapter.id);
-        }
     }
     return { root, stopped };
 }

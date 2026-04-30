@@ -5,12 +5,12 @@ exports.generatePortal = generatePortal;
 exports.startPortalServer = startPortalServer;
 exports.getPortalStatus = getPortalStatus;
 exports.stopPortalServer = stopPortalServer;
-exports.killProcessTree = killProcessTree;
 const node_child_process_1 = require("node:child_process");
 const node_net_1 = require("node:net");
 const node_fs_1 = require("node:fs");
 const node_path_1 = require("node:path");
 const node_http_1 = require("node:http");
+const lifecycle_1 = require("./lifecycle");
 const portable_1 = require("./portable");
 exports.PORTAL_URL = "http://127.0.0.1:17000/";
 function escapeHtml(value) {
@@ -255,14 +255,14 @@ function stopPortalServer(usbRoot) {
     if ((0, node_fs_1.existsSync)(pidFile)) {
         const metadata = JSON.parse((0, node_fs_1.readFileSync)(pidFile, "utf8"));
         if (metadata.processId && portalProcessById(root, metadata.processId)) {
-            killProcessTree(metadata.processId);
+            (0, lifecycle_1.killProcessTree)(metadata.processId);
             stopped = true;
         }
         (0, node_fs_1.rmSync)(pidFile, { force: true });
     }
     for (const processInfo of portalProcesses(root)) {
         try {
-            killProcessTree(processInfo.ProcessId);
+            (0, lifecycle_1.killProcessTree)(processInfo.ProcessId);
             stopped = true;
         }
         catch {
@@ -272,12 +272,4 @@ function stopPortalServer(usbRoot) {
     if (stopped)
         (0, portable_1.writeLog)(root, "portal", "INFO", "Stopped portal server.");
     return stopped;
-}
-function killProcessTree(pid) {
-    if (process.platform === "win32") {
-        (0, node_child_process_1.execFileSync)("taskkill", ["/PID", String(pid), "/T", "/F"], { stdio: "ignore" });
-    }
-    else {
-        process.kill(pid, "SIGTERM");
-    }
 }

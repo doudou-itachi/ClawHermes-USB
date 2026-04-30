@@ -928,3 +928,31 @@ Validation performed:
 Next steps:
 
 - Split managed adapter process launch and stop helpers into a lifecycle-focused TypeScript module.
+
+### Lifecycle Utilities Split
+
+Status: `Done`
+
+Summary:
+
+- Extracted adapter start metadata creation, managed process launch, placeholder start logging, adapter stop handling, and process tree termination into `core/node/src/lifecycle.ts`.
+- `core.ts` now delegates adapter start/stop details while keeping high-level start/status/stop orchestration.
+- `portal.ts` now uses the shared process tree termination helper for portal shutdown.
+
+Changed areas:
+
+- `core/node/src/lifecycle.ts`
+- `core/node/src/core.ts`
+- `core/node/src/portal.ts`
+- `core/node/dist/`
+- `docs/PROGRESS.md`
+- `docs/superpowers/plans/2026-05-01-split-lifecycle-utils.md`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_start_status_stop_manage_placeholder_pid_metadata tests.test_windows_core.WindowsCoreTests.test_start_runs_production_ready_adapter_process_and_stop_kills_it tests.test_windows_core.WindowsCoreTests.test_status_removes_stale_managed_adapter_pid_file tests.test_windows_core.WindowsCoreTests.test_start_serves_portal_over_localhost_and_stop_shuts_it_down -v`
+
+Next steps:
+
+- Review the smaller TypeScript core for remaining production gaps and prioritize the next functional improvement over further mechanical splitting.
