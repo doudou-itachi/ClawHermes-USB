@@ -567,5 +567,6 @@ Rules:
 - Missing `wsl.exe`, missing distributions, and missing WSL2 distributions must be reported as setup actions.
 - When `runtime.distro` is set, WSL commands must include `--distribution <name>` and diagnostics must verify that target distribution.
 - WSL2 adapter setup/start commands must not run until the WSL2 diagnostic is healthy.
+- Confirmed WSL2 adapter setup executes through the same WSL adapter command plan and writes `data/logs/setup-<service-id>.log`.
 - Confirmed WSL2 adapter startup launches a Windows-side managed `wsl.exe` process and writes normal PID metadata.
 - `stop` terminates the managed Windows-side process tree recorded in the PID metadata. A later adapter-specific stop hook may add graceful in-distro shutdown before process termination.

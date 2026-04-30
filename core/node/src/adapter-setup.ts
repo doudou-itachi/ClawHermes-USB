@@ -5,6 +5,7 @@ import { loadAdapters } from "./adapters";
 import { resolveServiceEnvironment } from "./environment";
 import { getRoot, resolveRelative } from "./portable";
 import { assertWslReadyForAdapterDistro, wslAdapterSetupPlan } from "./wsl-adapter";
+import { wslExecutableInvocation } from "./wsl";
 
 export function runAdapterSetup(usbRoot: string, serviceId: string | undefined, options: { dryRun: boolean; confirm: boolean }) {
   const root = getRoot(usbRoot);
@@ -59,8 +60,9 @@ export function runAdapterSetup(usbRoot: string, serviceId: string | undefined, 
   if (wslPlan) {
     assertWslReadyForAdapterDistro(root, serviceId, adapter.runtime?.distro);
   }
-  const completed = wslPlan
-    ? spawnSync(wslPlan.executablePath, wslPlan.args, {
+  const wslInvocation = wslPlan ? wslExecutableInvocation(wslPlan.executablePath, wslPlan.args) : null;
+  const completed = wslPlan && wslInvocation
+    ? spawnSync(wslInvocation.executablePath, wslInvocation.args, {
       cwd: root,
       env: process.env,
       encoding: "utf8",

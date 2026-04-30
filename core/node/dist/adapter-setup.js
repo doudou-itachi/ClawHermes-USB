@@ -8,6 +8,7 @@ const adapters_1 = require("./adapters");
 const environment_1 = require("./environment");
 const portable_1 = require("./portable");
 const wsl_adapter_1 = require("./wsl-adapter");
+const wsl_1 = require("./wsl");
 function runAdapterSetup(usbRoot, serviceId, options) {
     const root = (0, portable_1.getRoot)(usbRoot);
     if (!serviceId)
@@ -61,8 +62,9 @@ function runAdapterSetup(usbRoot, serviceId, options) {
     if (wslPlan) {
         (0, wsl_adapter_1.assertWslReadyForAdapterDistro)(root, serviceId, adapter.runtime?.distro);
     }
-    const completed = wslPlan
-        ? (0, node_child_process_1.spawnSync)(wslPlan.executablePath, wslPlan.args, {
+    const wslInvocation = wslPlan ? (0, wsl_1.wslExecutableInvocation)(wslPlan.executablePath, wslPlan.args) : null;
+    const completed = wslPlan && wslInvocation
+        ? (0, node_child_process_1.spawnSync)(wslInvocation.executablePath, wslInvocation.args, {
             cwd: root,
             env: process.env,
             encoding: "utf8",

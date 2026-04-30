@@ -109,29 +109,39 @@ def make_hermes_agent_app_ready(temp_root):
     (app_dir / "pyproject.toml").write_text("[project]\nname = \"hermes-agent-test\"\n", encoding="utf-8")
 
 
-def make_fake_wsl_cmd(temp_root):
+def make_fake_wsl_cmd(temp_root, stay_running=True, marker_path=None, args_path=None):
     fake_wsl = temp_root / "fake-wsl.cmd"
-    fake_wsl.write_text(
-        "\n".join([
-            "@echo off",
-            "if \"%~1\"==\"--status\" (",
-            "  echo Default Version: 2",
-            "  exit /b 0",
-            ")",
-            "if \"%~1\"==\"--list\" (",
-            "  echo   NAME      STATE           VERSION",
+    marker = marker_path or (temp_root / "data" / "tmp" / "fake-wsl-started.txt")
+    args = args_path or (temp_root / "data" / "tmp" / "fake-wsl-args.txt")
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    args.parent.mkdir(parents=True, exist_ok=True)
+    lines = [
+        "@echo off",
+        "if \"%~1\"==\"--status\" (",
+        "  echo Default Version: 2",
+        "  exit /b 0",
+        ")",
+        "if \"%~1\"==\"--list\" (",
+        "  echo   NAME      STATE           VERSION",
             "  echo * Ubuntu    Running         2",
             "  exit /b 0",
-            ")",
-            "echo %* > \"%FAKE_WSL_ARGS%\"",
-            "echo started > \"%FAKE_WSL_MARKER%\"",
+        ")",
+        f"echo started > \"{marker}\"",
+        f"echo %* > \"{args}\"",
+    ]
+    if stay_running:
+        lines.extend([
             ":loop",
             "ping -n 2 127.0.0.1 > nul",
             "goto loop",
-            "",
-        ]),
-        encoding="ascii",
-    )
+        ])
+    else:
+        lines.extend([
+            "echo fake wsl completed",
+            "exit /b 0",
+        ])
+    lines.append("")
+    fake_wsl.write_text("\n".join(lines), encoding="ascii")
     return fake_wsl
 
 
@@ -1188,6 +1198,34 @@ class WindowsCoreTests(unittest.TestCase):
         finally:
             temp_dir.cleanup()
 
+    def test_setup_adapter_wsl2_confirm_runs_fake_wsl_and_writes_setup_log(self):
+        temp_dir, temp_root = make_temp_usb_root()
+        try:
+            make_hermes_agent_app_ready(temp_root)
+            marker = temp_root / "data" / "tmp" / "fake-wsl-setup.txt"
+            args_file = temp_root / "data" / "tmp" / "fake-wsl-setup-args.txt"
+            fake_wsl = make_fake_wsl_cmd(temp_root, stay_running=False, marker_path=marker, args_path=args_file)
+            env = {
+                "CLAWHERMES_WSL_EXE": str(fake_wsl),
+            }
+
+            result = run_dispatcher_for_root(temp_root, "setup-adapter", "hermes-agent", "--confirm-setup", "-Json", env=env)
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["runner"], "wsl2")
+            self.assertTrue(payload["executed"])
+            self.assertEqual(payload["exitCode"], 0)
+            wait_for_file(marker)
+            self.assertIn("--distribution", payload["wsl"]["args"])
+            self.assertIn("Ubuntu", payload["wsl"]["args"])
+            self.assertIn("python -m pip install -e .", payload["wsl"]["script"])
+            log_text = Path(payload["logFile"]).read_text(encoding="utf-8")
+            self.assertIn("exitCode: 0", log_text)
+            self.assertIn("fake wsl completed", log_text)
+        finally:
+            temp_dir.cleanup()
+
     def test_verify_adapter_reports_missing_setup_output(self):
         temp_dir, temp_root = make_temp_process_usb_root()
         try:
@@ -1609,13 +1647,11 @@ class WindowsCoreTests(unittest.TestCase):
         temp_dir, temp_root = make_temp_usb_root()
         try:
             make_hermes_agent_app_ready(temp_root)
-            fake_wsl = make_fake_wsl_cmd(temp_root)
             marker = temp_root / "data" / "tmp" / "fake-wsl-started.txt"
             args_file = temp_root / "data" / "tmp" / "fake-wsl-args.txt"
+            fake_wsl = make_fake_wsl_cmd(temp_root, marker_path=marker, args_path=args_file)
             env = {
                 "CLAWHERMES_WSL_EXE": str(fake_wsl),
-                "FAKE_WSL_MARKER": str(marker),
-                "FAKE_WSL_ARGS": str(args_file),
             }
 
             result = run_dispatcher_for_root(temp_root, "start-adapter", "hermes-agent", "--confirm-start", "-Json", env=env)
@@ -1675,13 +1711,11 @@ class WindowsCoreTests(unittest.TestCase):
             portal_server.write_text((ROOT / "core" / "node" / "dist" / "portal-server.js").read_text(encoding="utf-8"), encoding="utf-8")
             make_hermes_agent_app_ready(temp_root)
             mark_adapter_production_ready(temp_root, "hermes-agent")
-            fake_wsl = make_fake_wsl_cmd(temp_root)
             marker = temp_root / "data" / "tmp" / "fake-wsl-started.txt"
             args_file = temp_root / "data" / "tmp" / "fake-wsl-args.txt"
+            fake_wsl = make_fake_wsl_cmd(temp_root, marker_path=marker, args_path=args_file)
             env = {
                 "CLAWHERMES_WSL_EXE": str(fake_wsl),
-                "FAKE_WSL_MARKER": str(marker),
-                "FAKE_WSL_ARGS": str(args_file),
             }
 
             start = run_dispatcher_for_root(temp_root, "start", "-Json", env=env)

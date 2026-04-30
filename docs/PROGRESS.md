@@ -1966,3 +1966,34 @@ Next steps:
 
 - Add graceful WSL2 in-distro stop hooks before Windows-side process-tree termination.
 - Promote confirmed WSL2 setup execution metadata so `setup-adapter hermes-agent --confirm-setup` records enough evidence for later production readiness.
+
+### WSL2 Setup Execution
+
+Status: `Done`
+
+Summary:
+
+- Hardened confirmed WSL2 adapter setup execution.
+- `setup-adapter hermes-agent --confirm-setup --json` now uses the same WSL executable invocation wrapper as diagnostics and managed startup.
+- JSON output continues to report the real WSL executable and adapter args, while the internal `.cmd` wrapper remains only a test compatibility detail.
+- Setup logs continue to write to `data/logs/setup-hermes-agent.log` with command, exit code, stdout, and stderr.
+- Added fake WSL setup coverage that exits successfully, writes a marker, and verifies the setup log without requiring real WSL2.
+
+Changed areas:
+
+- `core/node/src/adapter-setup.ts`
+- `core/node/dist/adapter-setup.js`
+- `tests/test_windows_core.py`
+- `docs/ADAPTER_CONTRACT.md`
+- `docs/PROGRESS.md`
+- `docs/superpowers/plans/2026-05-01-wsl2-setup-execution.md`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_setup_adapter_wsl2_confirm_runs_fake_wsl_and_writes_setup_log tests.test_windows_core.WindowsCoreTests.test_start_adapter_wsl2_confirm_launches_managed_wsl_process_and_stop_kills_it tests.test_windows_core.WindowsCoreTests.test_start_uses_wsl2_plan_for_production_ready_wsl_adapter -v`
+
+Next steps:
+
+- Add graceful WSL2 in-distro stop hooks before Windows-side process-tree termination.
+- Add an end-to-end WSL2 readiness checklist that ties prepare, setup, start, verify, and mark-ready into one guided workflow.
