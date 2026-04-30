@@ -228,3 +228,36 @@ Next steps:
 
 - Add an explicit setup command for copying or unpacking runtime payloads into the expected directories.
 - Keep runtime binaries ignored by git and outside normal source commits.
+
+### Runtime Preparation Command
+
+Status: `Done`
+
+Summary:
+
+- Added a `runtimes` CLI action to the TypeScript core.
+- The command reads `config/defaults/runtimes.json` and outputs download/extract guidance without downloading binaries.
+- The PowerShell wrapper now forwards the `runtimes` action.
+- Added JSON test coverage for runtime preparation steps.
+- Updated runtime documentation with human-readable and JSON command examples.
+
+Changed areas:
+
+- `core/node/src/`
+- `core/node/dist/`
+- `core/windows/clawhermes.ps1`
+- `core/README.md`
+- `docs/windows-runtime.md`
+- `docs/windows-runtime.zh-CN.md`
+- `docs/PROGRESS.md`
+- `tests/test_windows_core.py`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_runtimes_json_outputs_preparation_steps_from_manifest -v`
+
+Next steps:
+
+- Add a setup subcommand that validates a supplied local archive path and unpacks it into the manifest install directory.
+- Keep daily startup free of silent downloads.

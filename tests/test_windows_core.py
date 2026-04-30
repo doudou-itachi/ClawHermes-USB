@@ -163,6 +163,23 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertIn("Adapter hermes-agent integration is not production-ready", messages)
         self.assertIn("Adapter hermes-web-ui integration is not production-ready", messages)
 
+    def test_runtimes_json_outputs_preparation_steps_from_manifest(self):
+        result = run_dispatcher("runtimes", "-Json")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+
+        self.assertEqual(payload["platform"], "windows")
+        steps = {step["name"]: step for step in payload["steps"]}
+        self.assertEqual(set(steps), {"node", "python", "git"})
+        self.assertEqual(steps["node"]["action"], "extract")
+        self.assertIn("https://nodejs.org/en/download", steps["node"]["sourceUrl"])
+        self.assertTrue(steps["node"]["installDir"].endswith(str(Path("runtimes") / "windows" / "node")))
+        self.assertTrue(any(path.endswith("node.exe") for path in steps["node"]["expectedExecutables"]))
+        self.assertEqual("official-windows-embeddable", steps["python"]["packageType"])
+        self.assertIn("thumbdrive", steps["git"]["notes"])
+        self.assertTrue(any(message.startswith("Download Portable Node.js") for message in payload["messages"]))
+
     def test_start_status_stop_manage_placeholder_pid_metadata(self):
         start = run_dispatcher("start", "-Json")
 

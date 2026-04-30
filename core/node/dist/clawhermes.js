@@ -43,6 +43,19 @@ async function main() {
             }
             return;
         }
+        case "runtimes": {
+            const result = (0, core_1.runtimePreparationPlan)(root);
+            if (json) {
+                printJson(result);
+            }
+            else {
+                console.log("ClawHermes-USB runtime preparation plan");
+                console.log(`Root: ${result.root}`);
+                for (const message of result.messages)
+                    console.log(`- ${message}`);
+            }
+            return;
+        }
         case "start": {
             const result = await (0, core_1.startSkeleton)(root);
             if (json) {

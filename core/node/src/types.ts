@@ -25,6 +25,19 @@ export type RuntimeManifest = {
   }>;
 };
 
+export type RuntimePreparationStep = {
+  name: string;
+  label: string;
+  action: "extract";
+  versionPolicy: string;
+  packageType: string;
+  sourceUrl: string;
+  installDir: string;
+  expectedExecutables: string[];
+  notes: string;
+  found: boolean;
+};
+
 export type AdapterDescriptor = {
   id: string;
   displayName: string;

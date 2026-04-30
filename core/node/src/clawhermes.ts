@@ -1,4 +1,4 @@
-import { getRoot, getStatus, portableEnv, setupDiagnostics, startSkeleton, stopSkeleton } from "./core";
+import { getRoot, getStatus, portableEnv, runtimePreparationPlan, setupDiagnostics, startSkeleton, stopSkeleton } from "./core";
 
 type ParsedArgs = {
   action: string;
@@ -43,6 +43,17 @@ async function main(): Promise<void> {
         console.log("ClawHermes-USB setup diagnostics");
         console.log(`Root: ${result.root}`);
         if (result.messages.length === 0) console.log("No setup issues found.");
+        for (const message of result.messages) console.log(`- ${message}`);
+      }
+      return;
+    }
+    case "runtimes": {
+      const result = runtimePreparationPlan(root);
+      if (json) {
+        printJson(result);
+      } else {
+        console.log("ClawHermes-USB runtime preparation plan");
+        console.log(`Root: ${result.root}`);
         for (const message of result.messages) console.log(`- ${message}`);
       }
       return;

@@ -22,6 +22,20 @@ Windows launcher 应该：
 4. 设置便携 cache 和 home 变量。
 5. 通过 orchestrator 启动服务。
 
+可以通过以下命令查看 runtime 准备指引：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File core\windows\clawhermes.ps1 runtimes -UsbRoot .
+```
+
+结构化输出：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File core\windows\clawhermes.ps1 runtimes -UsbRoot . -Json
+```
+
+该命令不会下载二进制文件。它会读取 `config/defaults/runtimes.json`，告诉用户应该下载哪个包、解压到哪里，以及哪些可执行文件路径会被接受。
+
 ## 预期可执行文件
 
 ```text

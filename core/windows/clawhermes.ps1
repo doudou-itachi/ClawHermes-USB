@@ -1,6 +1,6 @@
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("env-json", "setup", "start", "status", "stop")]
+    [ValidateSet("env-json", "setup", "runtimes", "start", "status", "stop")]
     [string]$Action = "setup",
 
     [string]$UsbRoot = (Resolve-Path -LiteralPath (Join-Path -Path $PSScriptRoot -ChildPath "..\..")).Path,

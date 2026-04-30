@@ -6,6 +6,8 @@ exports.portableEnv = portableEnv;
 exports.loadAdapters = loadAdapters;
 exports.validateAdapter = validateAdapter;
 exports.runtimeDiagnostics = runtimeDiagnostics;
+exports.loadRuntimeManifest = loadRuntimeManifest;
+exports.runtimePreparationPlan = runtimePreparationPlan;
 exports.integrationReadiness = integrationReadiness;
 exports.dataWritable = dataWritable;
 exports.setupDiagnostics = setupDiagnostics;
@@ -87,8 +89,7 @@ function validateAdapter(adapter, knownIds) {
 }
 function runtimeDiagnostics(usbRoot) {
     const root = getRoot(usbRoot);
-    const manifestPath = (0, node_path_1.join)(root, "config", "defaults", "runtimes.json");
-    const manifest = JSON.parse((0, node_fs_1.readFileSync)(manifestPath, "utf8"));
+    const manifest = loadRuntimeManifest(root);
     return manifest.runtimes.map((runtime) => {
         const resolvedCandidates = runtime.candidates.map((candidate) => resolveRelative(root, candidate));
         const foundPath = resolvedCandidates.find((candidate) => (0, node_fs_1.existsSync)(candidate)) ?? resolvedCandidates[0];
@@ -105,6 +106,42 @@ function runtimeDiagnostics(usbRoot) {
             notes: runtime.notes,
         };
     });
+}
+function loadRuntimeManifest(usbRoot) {
+    const manifestPath = (0, node_path_1.join)(getRoot(usbRoot), "config", "defaults", "runtimes.json");
+    return JSON.parse((0, node_fs_1.readFileSync)(manifestPath, "utf8"));
+}
+function runtimePreparationPlan(usbRoot) {
+    const root = getRoot(usbRoot);
+    const manifest = loadRuntimeManifest(root);
+    const diagnosticsByName = new Map(runtimeDiagnostics(root).map((runtime) => [runtime.name, runtime]));
+    const steps = manifest.runtimes.map((runtime) => {
+        const diagnostic = diagnosticsByName.get(runtime.name);
+        return {
+            name: runtime.name,
+            label: runtime.label,
+            action: "extract",
+            versionPolicy: runtime.versionPolicy,
+            packageType: runtime.packageType,
+            sourceUrl: runtime.sourceUrl,
+            installDir: resolveRelative(root, runtime.installDir),
+            expectedExecutables: runtime.candidates.map((candidate) => resolveRelative(root, candidate)),
+            notes: runtime.notes,
+            found: diagnostic?.found === true,
+        };
+    });
+    const messages = steps.map((step) => {
+        if (step.found) {
+            return `${step.label} already present under ${step.installDir}.`;
+        }
+        return `Download ${step.label} from ${step.sourceUrl}, then extract it into ${step.installDir}. Expected executable: ${step.expectedExecutables[0]}.`;
+    });
+    return {
+        root,
+        platform: manifest.platform,
+        steps,
+        messages,
+    };
 }
 function integrationReadiness(adapters) {
     return adapters.map((adapter) => ({

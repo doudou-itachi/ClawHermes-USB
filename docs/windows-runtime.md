@@ -22,6 +22,20 @@ The Windows launcher should:
 4. Set portable cache and home variables.
 5. Start services through the orchestrator.
 
+Runtime preparation guidance is available through:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File core\windows\clawhermes.ps1 runtimes -UsbRoot .
+```
+
+For structured output:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File core\windows\clawhermes.ps1 runtimes -UsbRoot . -Json
+```
+
+The command does not download binaries. It reads `config/defaults/runtimes.json` and tells the user which package to download, where to extract it, and which executable paths will be accepted.
+
 ## Expected Executables
 
 ```text

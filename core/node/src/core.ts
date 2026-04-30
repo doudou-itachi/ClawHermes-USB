@@ -3,7 +3,7 @@ import { createServer } from "node:net";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve, sep } from "node:path";
 import { get } from "node:http";
-import type { AdapterDescriptor, AdapterValidation, IntegrationReadiness, RuntimeDiagnostic, RuntimeManifest, ServiceStatus } from "./types";
+import type { AdapterDescriptor, AdapterValidation, IntegrationReadiness, RuntimeDiagnostic, RuntimeManifest, RuntimePreparationStep, ServiceStatus } from "./types";
 
 export const PORTAL_URL = "http://127.0.0.1:17000/";
 
@@ -70,8 +70,7 @@ export function validateAdapter(adapter: AdapterDescriptor, knownIds: string[]):
 
 export function runtimeDiagnostics(usbRoot: string): RuntimeDiagnostic[] {
   const root = getRoot(usbRoot);
-  const manifestPath = join(root, "config", "defaults", "runtimes.json");
-  const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as RuntimeManifest;
+  const manifest = loadRuntimeManifest(root);
   return manifest.runtimes.map((runtime) => {
     const resolvedCandidates = runtime.candidates.map((candidate) => resolveRelative(root, candidate));
     const foundPath = resolvedCandidates.find((candidate) => existsSync(candidate)) ?? resolvedCandidates[0];
@@ -88,6 +87,44 @@ export function runtimeDiagnostics(usbRoot: string): RuntimeDiagnostic[] {
       notes: runtime.notes,
     };
   });
+}
+
+export function loadRuntimeManifest(usbRoot: string): RuntimeManifest {
+  const manifestPath = join(getRoot(usbRoot), "config", "defaults", "runtimes.json");
+  return JSON.parse(readFileSync(manifestPath, "utf8")) as RuntimeManifest;
+}
+
+export function runtimePreparationPlan(usbRoot: string) {
+  const root = getRoot(usbRoot);
+  const manifest = loadRuntimeManifest(root);
+  const diagnosticsByName = new Map(runtimeDiagnostics(root).map((runtime) => [runtime.name, runtime]));
+  const steps: RuntimePreparationStep[] = manifest.runtimes.map((runtime) => {
+    const diagnostic = diagnosticsByName.get(runtime.name);
+    return {
+      name: runtime.name,
+      label: runtime.label,
+      action: "extract",
+      versionPolicy: runtime.versionPolicy,
+      packageType: runtime.packageType,
+      sourceUrl: runtime.sourceUrl,
+      installDir: resolveRelative(root, runtime.installDir),
+      expectedExecutables: runtime.candidates.map((candidate) => resolveRelative(root, candidate)),
+      notes: runtime.notes,
+      found: diagnostic?.found === true,
+    };
+  });
+  const messages = steps.map((step) => {
+    if (step.found) {
+      return `${step.label} already present under ${step.installDir}.`;
+    }
+    return `Download ${step.label} from ${step.sourceUrl}, then extract it into ${step.installDir}. Expected executable: ${step.expectedExecutables[0]}.`;
+  });
+  return {
+    root,
+    platform: manifest.platform,
+    steps,
+    messages,
+  };
 }
 
 export function integrationReadiness(adapters: AdapterDescriptor[]): IntegrationReadiness[] {

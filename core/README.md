@@ -43,3 +43,9 @@ Run the behavior tests:
 ```powershell
 npm test
 ```
+
+Show runtime preparation guidance:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File core\windows\clawhermes.ps1 runtimes -UsbRoot .
+```
