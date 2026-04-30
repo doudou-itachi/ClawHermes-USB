@@ -1,11 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.PORTAL_URL = exports.runtimePreparationPlan = exports.runtimeDiagnostics = exports.loadRuntimeManifest = exports.installRuntimeFromArchive = exports.validateAdapter = exports.serviceOrder = exports.loadAdapters = exports.integrationReadiness = exports.portableEnv = exports.getRoot = exports.dataWritable = void 0;
+exports.PORTAL_URL = exports.runtimePreparationPlan = exports.runtimeDiagnostics = exports.loadRuntimeManifest = exports.installRuntimeFromArchive = exports.serviceEnvironmentDiagnostic = exports.resolveServiceEnvironment = exports.initializeEnvFiles = exports.envFileDiagnostics = exports.validateAdapter = exports.serviceOrder = exports.loadAdapters = exports.integrationReadiness = exports.portableEnv = exports.getRoot = exports.dataWritable = void 0;
 exports.setupDiagnostics = setupDiagnostics;
-exports.envFileDiagnostics = envFileDiagnostics;
-exports.initializeEnvFiles = initializeEnvFiles;
-exports.resolveServiceEnvironment = resolveServiceEnvironment;
-exports.serviceEnvironmentDiagnostic = serviceEnvironmentDiagnostic;
 exports.readLogTail = readLogTail;
 exports.pathDiagnostics = pathDiagnostics;
 exports.portDiagnostics = portDiagnostics;
@@ -23,6 +19,7 @@ const node_fs_1 = require("node:fs");
 const node_path_1 = require("node:path");
 const node_http_1 = require("node:http");
 const adapters_1 = require("./adapters");
+const environment_1 = require("./environment");
 const portable_1 = require("./portable");
 const runtimes_1 = require("./runtimes");
 var portable_2 = require("./portable");
@@ -34,6 +31,11 @@ Object.defineProperty(exports, "integrationReadiness", { enumerable: true, get: 
 Object.defineProperty(exports, "loadAdapters", { enumerable: true, get: function () { return adapters_2.loadAdapters; } });
 Object.defineProperty(exports, "serviceOrder", { enumerable: true, get: function () { return adapters_2.serviceOrder; } });
 Object.defineProperty(exports, "validateAdapter", { enumerable: true, get: function () { return adapters_2.validateAdapter; } });
+var environment_2 = require("./environment");
+Object.defineProperty(exports, "envFileDiagnostics", { enumerable: true, get: function () { return environment_2.envFileDiagnostics; } });
+Object.defineProperty(exports, "initializeEnvFiles", { enumerable: true, get: function () { return environment_2.initializeEnvFiles; } });
+Object.defineProperty(exports, "resolveServiceEnvironment", { enumerable: true, get: function () { return environment_2.resolveServiceEnvironment; } });
+Object.defineProperty(exports, "serviceEnvironmentDiagnostic", { enumerable: true, get: function () { return environment_2.serviceEnvironmentDiagnostic; } });
 var runtimes_2 = require("./runtimes");
 Object.defineProperty(exports, "installRuntimeFromArchive", { enumerable: true, get: function () { return runtimes_2.installRuntimeFromArchive; } });
 Object.defineProperty(exports, "loadRuntimeManifest", { enumerable: true, get: function () { return runtimes_2.loadRuntimeManifest; } });
@@ -49,7 +51,7 @@ function setupDiagnostics(usbRoot) {
     const readiness = (0, adapters_1.integrationReadiness)(adapters);
     const ports = portDiagnostics(root);
     const paths = pathDiagnostics(root);
-    const envFiles = envFileDiagnostics(root, adapters);
+    const envFiles = (0, environment_1.envFileDiagnostics)(root, adapters);
     const writable = (0, portable_1.dataWritable)(root);
     const messages = [];
     for (const runtime of runtimes) {
@@ -81,123 +83,6 @@ function setupDiagnostics(usbRoot) {
         messages.push("Data directory is not writable.");
     return { root, adapters: adapterResults, runtimes, readiness, ports, paths, envFiles, dataWritable: writable, messages };
 }
-function envFileDiagnostics(usbRoot, adapters) {
-    const root = (0, portable_1.getRoot)(usbRoot);
-    const diagnostics = [];
-    const seen = new Set();
-    for (const adapter of adapters) {
-        for (const envFile of adapter.env?.files ?? []) {
-            const key = `${adapter.id}:${envFile}`;
-            if (seen.has(key))
-                continue;
-            seen.add(key);
-            const examplePath = `${envFile}.example`;
-            diagnostics.push({
-                serviceId: adapter.id,
-                path: envFile,
-                exists: (0, node_fs_1.existsSync)((0, portable_1.resolveRelative)(root, envFile)),
-                examplePath,
-                exampleExists: (0, node_fs_1.existsSync)((0, portable_1.resolveRelative)(root, examplePath)),
-            });
-        }
-    }
-    return diagnostics.sort((a, b) => a.serviceId.localeCompare(b.serviceId) || a.path.localeCompare(b.path));
-}
-function initializeEnvFiles(usbRoot, dryRun) {
-    const root = (0, portable_1.getRoot)(usbRoot);
-    const diagnostics = envFileDiagnostics(root, (0, adapters_1.loadAdapters)(root));
-    const result = {
-        root,
-        dryRun,
-        files: [],
-        created: [],
-        skipped: [],
-        messages: [],
-    };
-    for (const envFile of diagnostics) {
-        if (envFile.exists) {
-            result.files.push({ ...envFile, action: "skipped", reason: "exists" });
-            result.skipped.push({
-                serviceId: envFile.serviceId,
-                path: envFile.path,
-                examplePath: envFile.examplePath,
-                reason: "exists",
-            });
-            result.messages.push(`Skipped existing env file: ${envFile.path}.`);
-            continue;
-        }
-        if (!envFile.exampleExists) {
-            result.files.push({ ...envFile, action: "skipped", reason: "missing-example" });
-            result.skipped.push({
-                serviceId: envFile.serviceId,
-                path: envFile.path,
-                examplePath: envFile.examplePath,
-                reason: "missing-example",
-            });
-            result.messages.push(`Cannot create ${envFile.path}; template is missing: ${envFile.examplePath}.`);
-            continue;
-        }
-        result.created.push(envFile.path);
-        if (dryRun) {
-            result.files.push({ ...envFile, action: "would-create", reason: null });
-            result.messages.push(`Would create ${envFile.path} from ${envFile.examplePath}.`);
-            continue;
-        }
-        const target = (0, portable_1.resolveRelative)(root, envFile.path);
-        (0, node_fs_1.mkdirSync)((0, node_path_1.dirname)(target), { recursive: true });
-        (0, node_fs_1.copyFileSync)((0, portable_1.resolveRelative)(root, envFile.examplePath), target);
-        result.files.push({ ...envFile, action: "created", reason: null });
-        result.messages.push(`Created ${envFile.path} from ${envFile.examplePath}.`);
-    }
-    return result;
-}
-function resolveServiceEnvironment(usbRoot, serviceId) {
-    const root = (0, portable_1.getRoot)(usbRoot);
-    const adapter = (0, adapters_1.loadAdapters)(root).find((item) => item.id === serviceId);
-    if (!adapter) {
-        throw new Error(`Unknown service: ${serviceId}`);
-    }
-    const env = { ...(0, portable_1.portableEnv)(root) };
-    const files = [];
-    const messages = [];
-    for (const envPath of adapter.env?.files ?? []) {
-        const absolutePath = (0, portable_1.resolveRelative)(root, envPath);
-        if (!(0, node_fs_1.existsSync)(absolutePath)) {
-            files.push({ path: envPath, exists: false, loaded: false, variables: [], errors: [] });
-            messages.push(`Env file missing: ${envPath}.`);
-            continue;
-        }
-        const parsed = parseEnvFile(absolutePath);
-        Object.assign(env, parsed.variables);
-        files.push({
-            path: envPath,
-            exists: true,
-            loaded: parsed.errors.length === 0,
-            variables: Object.keys(parsed.variables).sort(),
-            errors: parsed.errors,
-        });
-        if (parsed.errors.length === 0) {
-            messages.push(`Loaded env file: ${envPath}.`);
-        }
-        else {
-            messages.push(`Loaded env file with ${parsed.errors.length} parse issue(s): ${envPath}.`);
-        }
-    }
-    for (const [name, value] of Object.entries(adapter.env?.variables ?? {})) {
-        env[name] = expandEnvTemplate(value, env);
-    }
-    return { root, serviceId: adapter.id, env, files, messages };
-}
-function serviceEnvironmentDiagnostic(usbRoot, serviceId) {
-    const resolved = resolveServiceEnvironment(usbRoot, serviceId);
-    return {
-        root: resolved.root,
-        serviceId: resolved.serviceId,
-        files: resolved.files,
-        variables: Object.keys(resolved.env).sort(),
-        messages: resolved.messages,
-    };
-}
 function readLogTail(usbRoot, target, requestedLines) {
     const root = (0, portable_1.getRoot)(usbRoot);
     const lineCount = Math.max(1, Math.min(Number.isFinite(requestedLines) ? Math.floor(requestedLines) : 50, 200));
@@ -223,37 +108,6 @@ function resolveLogTarget(usbRoot, target) {
     if (!adapter)
         throw new Error(`Unknown log target: ${target}`);
     return (0, portable_1.resolveRelative)(root, adapter.logFile);
-}
-function parseEnvFile(file) {
-    const variables = {};
-    const errors = [];
-    const lines = (0, node_fs_1.readFileSync)(file, "utf8").split(/\r?\n/);
-    for (let index = 0; index < lines.length; index += 1) {
-        const rawLine = lines[index];
-        const line = rawLine.trim();
-        if (!line || line.startsWith("#"))
-            continue;
-        const match = /^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/.exec(line);
-        if (!match) {
-            errors.push(`Line ${index + 1}: expected KEY=value.`);
-            continue;
-        }
-        variables[match[1]] = unquoteEnvValue(match[2].trim());
-    }
-    return { variables, errors };
-}
-function unquoteEnvValue(value) {
-    if (value.length >= 2) {
-        const first = value[0];
-        const last = value[value.length - 1];
-        if ((first === '"' && last === '"') || (first === "'" && last === "'")) {
-            return value.slice(1, -1);
-        }
-    }
-    return value;
-}
-function expandEnvTemplate(value, env) {
-    return value.replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g, (match, name) => env[name] ?? match);
 }
 function pathDiagnostics(usbRoot) {
     const root = (0, portable_1.getRoot)(usbRoot);
@@ -593,7 +447,7 @@ async function startSkeleton(usbRoot) {
     for (const adapter of (0, adapters_1.serviceOrder)(root, "start").filter((item) => item.enabled)) {
         const pidFile = (0, portable_1.resolveRelative)(root, adapter.pidFile);
         const logFile = (0, portable_1.resolveRelative)(root, adapter.logFile);
-        const serviceEnv = resolveServiceEnvironment(root, adapter.id);
+        const serviceEnv = (0, environment_1.resolveServiceEnvironment)(root, adapter.id);
         (0, node_fs_1.mkdirSync)((0, node_path_1.dirname)(pidFile), { recursive: true });
         (0, node_fs_1.mkdirSync)((0, node_path_1.dirname)(logFile), { recursive: true });
         const metadata = shouldLaunchManagedProcess(adapter)

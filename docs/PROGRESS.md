@@ -819,3 +819,30 @@ Validation performed:
 Next steps:
 
 - Split environment file diagnostics, initialization, and service environment resolution into an environment-focused TypeScript module.
+
+### Environment Utilities Split
+
+Status: `Done`
+
+Summary:
+
+- Extracted adapter env file diagnostics, safe env initialization, `.env` parsing, service environment resolution, and redacted service environment diagnostics into `core/node/src/environment.ts`.
+- `core.ts` now imports environment helpers and re-exports public functions for compatibility.
+- Managed process environment injection and CLI env commands remain unchanged while the core module shrinks further.
+
+Changed areas:
+
+- `core/node/src/environment.ts`
+- `core/node/src/core.ts`
+- `core/node/dist/`
+- `docs/PROGRESS.md`
+- `docs/superpowers/plans/2026-05-01-split-environment-utils.md`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_setup_json_reports_env_template_diagnostics tests.test_windows_core.WindowsCoreTests.test_init_env_json_creates_missing_env_files_without_overwriting_existing_values tests.test_windows_core.WindowsCoreTests.test_init_env_dry_run_reports_missing_env_files_without_writing tests.test_windows_core.WindowsCoreTests.test_service_env_json_reports_loaded_variables_without_secret_values tests.test_windows_core.WindowsCoreTests.test_start_runs_production_ready_adapter_process_and_stop_kills_it -v`
+
+Next steps:
+
+- Split status, health, and snapshot helpers into a status-focused TypeScript module.
