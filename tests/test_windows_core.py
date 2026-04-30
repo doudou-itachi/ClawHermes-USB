@@ -141,6 +141,33 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertIn("Portable Python not found", "\n".join(payload["messages"]))
         self.assertIn("Portable Git not found", "\n".join(payload["messages"]))
 
+    def test_setup_json_reports_default_port_diagnostics(self):
+        result = run_dispatcher("setup", "-Json")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        ports = {port["name"]: port for port in payload["ports"]}
+
+        self.assertEqual(ports["portal"]["port"], 17000)
+        self.assertTrue(ports["portal"]["available"])
+        self.assertEqual(ports["hermesAgent"]["port"], 8642)
+        self.assertEqual(ports["hermesWebUi"]["port"], 8648)
+        self.assertTrue(all(port["host"] == "127.0.0.1" for port in ports.values()))
+
+    def test_setup_json_reports_occupied_port(self):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
+            listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            listener.bind(("127.0.0.1", 17000))
+            listener.listen(1)
+
+            result = run_dispatcher("setup", "-Json")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        portal = next(port for port in payload["ports"] if port["name"] == "portal")
+        self.assertFalse(portal["available"])
+        self.assertIn("Port 17000 is already in use", "\n".join(payload["messages"]))
+
     def test_setup_json_reports_adapter_integration_readiness(self):
         result = run_dispatcher("setup", "-Json")
 

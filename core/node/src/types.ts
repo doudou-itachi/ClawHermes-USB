@@ -114,3 +114,10 @@ export type ServiceStatus = {
   logFile: string;
   portalUrl: string | null;
 };
+
+export type PortDiagnostic = {
+  name: string;
+  host: string;
+  port: number;
+  available: boolean;
+};

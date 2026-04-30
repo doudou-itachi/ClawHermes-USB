@@ -4,7 +4,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSyn
 import { dirname, isAbsolute, join, resolve, sep } from "node:path";
 import { get } from "node:http";
 import { createHash } from "node:crypto";
-import type { AdapterDescriptor, AdapterValidation, IntegrationReadiness, RuntimeDiagnostic, RuntimeInstallResult, RuntimeManifest, RuntimePreparationStep, ServiceStatus } from "./types";
+import type { AdapterDescriptor, AdapterValidation, IntegrationReadiness, PortDiagnostic, RuntimeDiagnostic, RuntimeInstallResult, RuntimeManifest, RuntimePreparationStep, ServiceStatus } from "./types";
 
 export const PORTAL_URL = "http://127.0.0.1:17000/";
 
@@ -250,6 +250,7 @@ export function setupDiagnostics(usbRoot: string) {
   const adapterResults = adapters.map((adapter) => validateAdapter(adapter, knownIds));
   const runtimes = runtimeDiagnostics(root);
   const readiness = integrationReadiness(adapters);
+  const ports = portDiagnostics(root);
   const writable = dataWritable(root);
   const messages: string[] = [];
 
@@ -262,9 +263,43 @@ export function setupDiagnostics(usbRoot: string) {
   for (const item of readiness) {
     if (!item.productionReady) messages.push(`Adapter ${item.id} integration is not production-ready: ${item.summary}`);
   }
+  for (const port of ports) {
+    if (!port.available) messages.push(`Port ${port.port} is already in use for ${port.name}. Stop the conflicting process or change config/defaults/ports.json.`);
+  }
   if (!writable) messages.push("Data directory is not writable.");
 
-  return { root, adapters: adapterResults, runtimes, readiness, dataWritable: writable, messages };
+  return { root, adapters: adapterResults, runtimes, readiness, ports, dataWritable: writable, messages };
+}
+
+export function portDiagnostics(usbRoot: string): PortDiagnostic[] {
+  const root = getRoot(usbRoot);
+  const configPath = join(root, "config", "defaults", "ports.json");
+  const config = JSON.parse(readFileSync(configPath, "utf8")) as Record<string, unknown>;
+  const diagnostics: PortDiagnostic[] = [];
+  for (const [name, value] of Object.entries(config)) {
+    if (typeof value === "number") {
+      diagnostics.push({
+        name,
+        host: "127.0.0.1",
+        port: value,
+        available: isTcpPortAvailableSync(value),
+      });
+    }
+  }
+  return diagnostics;
+}
+
+function isTcpPortAvailableSync(port: number): boolean {
+  try {
+    const output = execFileSync("powershell", [
+      "-NoProfile",
+      "-Command",
+      `$client = [System.Net.Sockets.TcpClient]::new(); $async = $client.BeginConnect('127.0.0.1', ${port}, $null, $null); if ($async.AsyncWaitHandle.WaitOne(200)) { try { $client.EndConnect($async); 'true' } catch { 'false' } } else { 'false' }; $client.Close()`,
+    ], { encoding: "utf8", timeout: 3000 }).trim();
+    return output.toLowerCase() !== "true";
+  } catch {
+    return true;
+  }
 }
 
 function resolveRelative(usbRoot: string, relativePath: string): string {

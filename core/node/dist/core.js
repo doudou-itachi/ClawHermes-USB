@@ -12,6 +12,7 @@ exports.installRuntimeFromArchive = installRuntimeFromArchive;
 exports.integrationReadiness = integrationReadiness;
 exports.dataWritable = dataWritable;
 exports.setupDiagnostics = setupDiagnostics;
+exports.portDiagnostics = portDiagnostics;
 exports.generatePortal = generatePortal;
 exports.startPortalServer = startPortalServer;
 exports.getPortalStatus = getPortalStatus;
@@ -262,6 +263,7 @@ function setupDiagnostics(usbRoot) {
     const adapterResults = adapters.map((adapter) => validateAdapter(adapter, knownIds));
     const runtimes = runtimeDiagnostics(root);
     const readiness = integrationReadiness(adapters);
+    const ports = portDiagnostics(root);
     const writable = dataWritable(root);
     const messages = [];
     for (const runtime of runtimes) {
@@ -276,9 +278,43 @@ function setupDiagnostics(usbRoot) {
         if (!item.productionReady)
             messages.push(`Adapter ${item.id} integration is not production-ready: ${item.summary}`);
     }
+    for (const port of ports) {
+        if (!port.available)
+            messages.push(`Port ${port.port} is already in use for ${port.name}. Stop the conflicting process or change config/defaults/ports.json.`);
+    }
     if (!writable)
         messages.push("Data directory is not writable.");
-    return { root, adapters: adapterResults, runtimes, readiness, dataWritable: writable, messages };
+    return { root, adapters: adapterResults, runtimes, readiness, ports, dataWritable: writable, messages };
+}
+function portDiagnostics(usbRoot) {
+    const root = getRoot(usbRoot);
+    const configPath = (0, node_path_1.join)(root, "config", "defaults", "ports.json");
+    const config = JSON.parse((0, node_fs_1.readFileSync)(configPath, "utf8"));
+    const diagnostics = [];
+    for (const [name, value] of Object.entries(config)) {
+        if (typeof value === "number") {
+            diagnostics.push({
+                name,
+                host: "127.0.0.1",
+                port: value,
+                available: isTcpPortAvailableSync(value),
+            });
+        }
+    }
+    return diagnostics;
+}
+function isTcpPortAvailableSync(port) {
+    try {
+        const output = (0, node_child_process_1.execFileSync)("powershell", [
+            "-NoProfile",
+            "-Command",
+            `$client = [System.Net.Sockets.TcpClient]::new(); $async = $client.BeginConnect('127.0.0.1', ${port}, $null, $null); if ($async.AsyncWaitHandle.WaitOne(200)) { try { $client.EndConnect($async); 'true' } catch { 'false' } } else { 'false' }; $client.Close()`,
+        ], { encoding: "utf8", timeout: 3000 }).trim();
+        return output.toLowerCase() !== "true";
+    }
+    catch {
+        return true;
+    }
 }
 function resolveRelative(usbRoot, relativePath) {
     return (0, node_path_1.join)(getRoot(usbRoot), ...relativePath.replaceAll("\\", "/").split("/").filter(Boolean));

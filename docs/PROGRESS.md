@@ -325,3 +325,31 @@ Next steps:
 
 - Add manifest-level checksum fields once exact runtime versions are pinned.
 - Extend archive installation layout tests for Python embeddable and Git Portable packages.
+
+### Setup Port Diagnostics
+
+Status: `Done`
+
+Summary:
+
+- Added setup diagnostics for default TCP ports from `config/defaults/ports.json`.
+- Setup JSON now includes a `ports` array with name, host, port, and availability.
+- Occupied ports add actionable messages to setup output.
+- Added regression tests for available and occupied portal port checks.
+
+Changed areas:
+
+- `core/node/src/core.ts`
+- `core/node/src/types.ts`
+- `core/node/dist/`
+- `docs/PROGRESS.md`
+- `tests/test_windows_core.py`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_setup_json_reports_default_port_diagnostics tests.test_windows_core.WindowsCoreTests.test_setup_json_reports_occupied_port -v`
+
+Next steps:
+
+- Add directory/app/config validation to setup so first-time setup explains every missing project requirement in one pass.
