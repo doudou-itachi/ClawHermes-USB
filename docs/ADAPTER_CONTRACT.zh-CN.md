@@ -428,7 +428,26 @@ node core/node/dist/clawhermes.js checkout-source hermes-web-ui --confirm-checko
 - 真实 checkout 会拒绝已经包含真实内容的 app 目录。
 - 只包含占位内容的 app 目录可以有 `.gitkeep`；命令在 clone 前只会移除这个占位文件。
 
-## 11. 贡献者工作流
+## 11. Adapter Setup 执行命令
+
+完成来源 checkout 后，使用受保护的 setup 命令检查或运行 adapter 的 setup 命令：
+
+```powershell
+node core/node/dist/clawhermes.js setup-adapter hermes-web-ui --dry-run --json
+node core/node/dist/clawhermes.js setup-adapter hermes-web-ui --confirm-setup --json
+```
+
+规则：
+
+- 命令必须指定单个服务 id。
+- adapter 必须声明 `commands.setup`。
+- app 目录必须存在，并且包含真实内容。
+- dry-run 不会执行 setup 命令，并报告 `wouldModify: false`。
+- 真实 setup 必须传入 `--confirm-setup`，否则拒绝执行。
+- 命令会在 `appDir` 中运行，并使用与启动流程相同的服务环境解析结果。
+- JSON 输出只列出环境变量名和 env 文件诊断，不输出 secret 值。
+
+## 12. 贡献者工作流
 
 新增服务：
 
@@ -441,6 +460,7 @@ node core/node/dist/clawhermes.js checkout-source hermes-web-ui --confirm-checko
 7. 运行 `node core/node/dist/clawhermes.js adapters <new-service> --json`。
 8. 运行 `node core/node/dist/clawhermes.js sources <new-service> --json`。
 9. 在任何真实 checkout 前，先运行 `node core/node/dist/clawhermes.js checkout-source <new-service> --dry-run --json`。
-10. 如有需要，更新 portal 元数据。
+10. 在任何真实 setup 前，先运行 `node core/node/dist/clawhermes.js setup-adapter <new-service> --dry-run --json`。
+11. 如有需要，更新 portal 元数据。
 
 除非服务需要新的通用能力，否则不应修改 core 代码。

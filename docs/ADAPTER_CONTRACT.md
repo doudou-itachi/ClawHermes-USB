@@ -428,7 +428,26 @@ Rules:
 - Real checkout refuses app directories that already contain real content.
 - Placeholder-only app directories may contain `.gitkeep`; the command removes only that placeholder before cloning.
 
-## 11. Contributor Workflow
+## 11. Adapter Setup Execution Command
+
+After source checkout, use the guarded setup command to inspect or run an adapter's setup command:
+
+```powershell
+node core/node/dist/clawhermes.js setup-adapter hermes-web-ui --dry-run --json
+node core/node/dist/clawhermes.js setup-adapter hermes-web-ui --confirm-setup --json
+```
+
+Rules:
+
+- The command requires a single service id.
+- The adapter must declare `commands.setup`.
+- The app directory must exist and contain real content.
+- Dry-run does not execute the setup command and reports `wouldModify: false`.
+- Real setup refuses to run unless `--confirm-setup` is passed.
+- The command runs from `appDir` with the same resolved service environment used for startup.
+- JSON output lists environment variable names and env file diagnostics, not secret values.
+
+## 12. Contributor Workflow
 
 To add a new service:
 
@@ -441,6 +460,7 @@ To add a new service:
 7. Run `node core/node/dist/clawhermes.js adapters <new-service> --json`.
 8. Run `node core/node/dist/clawhermes.js sources <new-service> --json`.
 9. Run `node core/node/dist/clawhermes.js checkout-source <new-service> --dry-run --json` before any real checkout.
-10. Update portal metadata if needed.
+10. Run `node core/node/dist/clawhermes.js setup-adapter <new-service> --dry-run --json` before any real setup.
+11. Update portal metadata if needed.
 
 No core code should be changed unless the service needs a new generic capability.

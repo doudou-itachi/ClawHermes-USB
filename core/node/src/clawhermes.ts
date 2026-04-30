@@ -1,4 +1,4 @@
-import { adapterSetupPlan, appSourcePlan, checkoutAppSource, createBackup, getRoot, getStatus, initializeEnvFiles, installRuntimeFromArchive, portableEnv, readLogTail, runtimePreparationPlan, serviceEnvironmentDiagnostic, setupDiagnostics, startSkeleton, stopSkeleton, writeStatusSnapshot } from "./core";
+import { adapterSetupPlan, appSourcePlan, checkoutAppSource, createBackup, getRoot, getStatus, initializeEnvFiles, installRuntimeFromArchive, portableEnv, readLogTail, runAdapterSetup, runtimePreparationPlan, serviceEnvironmentDiagnostic, setupDiagnostics, startSkeleton, stopSkeleton, writeStatusSnapshot } from "./core";
 import type { BackupProfile } from "./backup";
 
 type ParsedArgs = {
@@ -12,6 +12,7 @@ type ParsedArgs = {
   includeLogs: boolean;
   dryRun: boolean;
   confirmCheckout: boolean;
+  confirmSetup: boolean;
   lines: number;
 };
 
@@ -27,6 +28,7 @@ function parseArgs(argv: string[]): ParsedArgs {
   let includeLogs = false;
   let dryRun = false;
   let confirmCheckout = false;
+  let confirmSetup = false;
   let lines = 50;
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
@@ -50,6 +52,8 @@ function parseArgs(argv: string[]): ParsedArgs {
       dryRun = true;
     } else if (arg === "--confirm-checkout" || arg === "--confirm") {
       confirmCheckout = true;
+    } else if (arg === "--confirm-setup") {
+      confirmSetup = true;
     } else if (arg === "--lines" && args[index + 1]) {
       lines = Number(args[index + 1]);
       index += 1;
@@ -57,7 +61,7 @@ function parseArgs(argv: string[]): ParsedArgs {
       positional.push(arg);
     }
   }
-  return { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, confirmCheckout, lines };
+  return { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, confirmCheckout, confirmSetup, lines };
 }
 
 function parseBackupProfile(value: string): BackupProfile {
@@ -70,7 +74,7 @@ function printJson(value: unknown): void {
 }
 
 async function main(): Promise<void> {
-  const { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, confirmCheckout, lines } = parseArgs(process.argv.slice(2));
+  const { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, confirmCheckout, confirmSetup, lines } = parseArgs(process.argv.slice(2));
   const root = getRoot(usbRoot);
 
   switch (action) {
@@ -171,6 +175,17 @@ async function main(): Promise<void> {
         console.log(`Target: ${result.appDir}`);
         console.log(`Repository: ${result.repositoryUrl}`);
         if (result.command) console.log(`Command: ${result.command}`);
+      }
+      return;
+    }
+    case "setup-adapter": {
+      const result = runAdapterSetup(root, positional[0], { dryRun, confirm: confirmSetup });
+      if (json) {
+        printJson(result);
+      } else {
+        console.log(result.message);
+        console.log(`Command: ${result.command}`);
+        console.log(`Working directory: ${result.workingDirectory}`);
       }
       return;
     }

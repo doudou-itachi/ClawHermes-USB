@@ -124,6 +124,30 @@ def rewrite_adapter_upstream(temp_root, service_id, repository_url):
     adapter_path.write_text(json.dumps(adapter, indent=2), encoding="utf-8")
 
 
+def configure_fake_setup_command(temp_root):
+    adapter_path = temp_root / "adapters" / "fake-service" / "adapter.json"
+    adapter = json.loads(adapter_path.read_text(encoding="utf-8"))
+    adapter["commands"]["setup"] = "node setup.js"
+    adapter_path.write_text(json.dumps(adapter, indent=2), encoding="utf-8")
+    (temp_root / "apps" / "fake-service" / "setup.js").write_text(
+        "\n".join(
+            [
+                "const fs = require('node:fs');",
+                "const path = require('node:path');",
+                "const root = process.env.USB_ROOT;",
+                "const out = path.join(root, 'data', 'tmp', 'fake-setup.json');",
+                "fs.writeFileSync(out, JSON.stringify({",
+                "  cwd: process.cwd(),",
+                "  fakeSecret: process.env.FAKE_SECRET,",
+                "  fakeInline: process.env.FAKE_INLINE",
+                "}, null, 2));",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+
 def make_temp_process_usb_root():
     temp_dir = tempfile.TemporaryDirectory()
     temp_root = Path(temp_dir.name)
@@ -821,6 +845,60 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertTrue((target / ".git").exists())
             self.assertTrue((target / "README.md").exists())
             self.assertFalse((target / ".gitkeep").exists())
+        finally:
+            temp_dir.cleanup()
+
+    def test_setup_adapter_requires_explicit_confirmation(self):
+        temp_dir, temp_root = make_temp_process_usb_root()
+        try:
+            configure_fake_setup_command(temp_root)
+            marker = temp_root / "data" / "tmp" / "fake-setup.json"
+
+            result = run_dispatcher_for_root(temp_root, "setup-adapter", "fake-service", "-Json")
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("--confirm-setup", result.stderr)
+            self.assertFalse(marker.exists())
+        finally:
+            temp_dir.cleanup()
+
+    def test_setup_adapter_dry_run_reports_command_without_running(self):
+        temp_dir, temp_root = make_temp_process_usb_root()
+        try:
+            configure_fake_setup_command(temp_root)
+            marker = temp_root / "data" / "tmp" / "fake-setup.json"
+
+            result = run_dispatcher_for_root(temp_root, "setup-adapter", "fake-service", "--dry-run", "-Json")
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertTrue(payload["dryRun"])
+            self.assertFalse(payload["wouldModify"])
+            self.assertFalse(payload["executed"])
+            self.assertEqual(payload["command"], "node setup.js")
+            self.assertIn("FAKE_SECRET", payload["environment"]["variables"])
+            self.assertNotIn("from-env-file", result.stdout)
+            self.assertFalse(marker.exists())
+        finally:
+            temp_dir.cleanup()
+
+    def test_setup_adapter_confirm_runs_adapter_setup_command(self):
+        temp_dir, temp_root = make_temp_process_usb_root()
+        try:
+            configure_fake_setup_command(temp_root)
+            marker = temp_root / "data" / "tmp" / "fake-setup.json"
+
+            result = run_dispatcher_for_root(temp_root, "setup-adapter", "fake-service", "--confirm-setup", "-Json")
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertFalse(payload["dryRun"])
+            self.assertTrue(payload["wouldModify"])
+            self.assertTrue(payload["executed"])
+            self.assertEqual(payload["exitCode"], 0)
+            marker_payload = json.loads(marker.read_text(encoding="utf-8"))
+            self.assertEqual(marker_payload["fakeSecret"], "from-env-file")
+            self.assertTrue(marker_payload["cwd"].endswith(str(Path("apps") / "fake-service")))
         finally:
             temp_dir.cleanup()
 

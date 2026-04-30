@@ -1300,3 +1300,45 @@ Validation performed:
 Next steps:
 
 - Add install/setup execution planning after source checkout so adapter setup commands can be run with the same dry-run and explicit-confirmation pattern.
+
+### Guarded Setup Adapter Command
+
+Status: `Done`
+
+Summary:
+
+- Added `setup-adapter <service-id>` for one-adapter setup command execution.
+- The command supports `--dry-run` with `wouldModify: false`.
+- Real setup refuses to run unless `--confirm-setup` is passed.
+- Setup runs from the adapter `appDir` with the resolved service environment.
+- JSON output reports env file diagnostics and variable names without exposing secret values.
+- Added tests for confirmation gating, dry-run safety, and confirmed setup execution using a local fake adapter.
+- Documented the command in the English and Chinese README files and adapter contract.
+
+Changed areas:
+
+- `core/node/src/adapter-setup.ts`
+- `core/node/src/clawhermes.ts`
+- `core/node/src/core.ts`
+- `core/windows/clawhermes.ps1`
+- `core/node/dist/`
+- `tests/test_windows_core.py`
+- `README.md`
+- `README.zh-CN.md`
+- `docs/ADAPTER_CONTRACT.md`
+- `docs/ADAPTER_CONTRACT.zh-CN.md`
+- `docs/PROGRESS.md`
+- `docs/superpowers/plans/2026-05-01-add-setup-adapter-command.md`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_setup_adapter_requires_explicit_confirmation tests.test_windows_core.WindowsCoreTests.test_setup_adapter_dry_run_reports_command_without_running tests.test_windows_core.WindowsCoreTests.test_setup_adapter_confirm_runs_adapter_setup_command -v`
+- `npm test`
+- `git diff --check`
+- UTF-8 smoke check
+- Chinese README and adapter contract mojibake scans
+
+Next steps:
+
+- Add a guarded adapter verification command that checks setup output, start command readiness, and health endpoint behavior before any adapter can be marked production-ready.
