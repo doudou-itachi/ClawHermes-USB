@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import type { ServiceStatus } from "./types";
-import { serviceOrder } from "./adapters";
+import { loadAdapters, serviceOrder } from "./adapters";
 import { setupDiagnostics, writeSetupSnapshot } from "./diagnostics";
 import { startAdapter, stopAdapter } from "./lifecycle";
 import { getRoot, resolveRelative } from "./portable";
@@ -33,6 +33,33 @@ export async function startSkeleton(usbRoot: string) {
   const portal = await startPortalServer(root);
   writeStatusSnapshot(root, getStatus(root));
   return { root, started, portal, setupMessages: setup.messages };
+}
+
+export function startSingleAdapter(usbRoot: string, serviceId: string | undefined, options: { dryRun: boolean; confirm: boolean }) {
+  const root = getRoot(usbRoot);
+  if (!serviceId) throw new Error("Service id is required. Example: start-adapter hermes-web-ui --confirm-start");
+  const adapter = loadAdapters(root).find((item) => item.id === serviceId);
+  if (!adapter) throw new Error(`Unknown adapter: ${serviceId}`);
+  if (!adapter.commands.start) throw new Error(`Adapter ${serviceId} does not declare a start command.`);
+  const result = {
+    root,
+    serviceId,
+    displayName: adapter.displayName,
+    dryRun: options.dryRun,
+    confirmed: options.confirm,
+    wouldModify: !options.dryRun,
+    started: false,
+    command: adapter.commands.start,
+    appDir: resolveRelative(root, adapter.appDir),
+    metadata: null as ReturnType<typeof startAdapter> | null,
+    message: options.dryRun ? `Would start ${serviceId}.` : `Started ${serviceId}.`,
+  };
+  if (!options.dryRun && !options.confirm) {
+    throw new Error("start-adapter launches a managed process. Re-run with --confirm-start to proceed.");
+  }
+  if (options.dryRun) return result;
+  const metadata = startAdapter(root, adapter, { forceManaged: true });
+  return { ...result, started: true, metadata };
 }
 
 export function getStatus(usbRoot: string) {

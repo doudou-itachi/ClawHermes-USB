@@ -153,6 +153,14 @@ def configure_fake_setup_command(temp_root):
     )
 
 
+def mark_fake_service_candidate(temp_root):
+    adapter_path = temp_root / "adapters" / "fake-service" / "adapter.json"
+    adapter = json.loads(adapter_path.read_text(encoding="utf-8"))
+    adapter["integration"]["status"] = "candidate"
+    adapter["integration"]["productionReady"] = False
+    adapter_path.write_text(json.dumps(adapter, indent=2), encoding="utf-8")
+
+
 def make_temp_process_usb_root():
     temp_dir = tempfile.TemporaryDirectory()
     temp_root = Path(temp_dir.name)
@@ -1114,22 +1122,33 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertIn("requires node >=23.0.0", requirements["hermes-web-ui"]["message"])
 
     def test_install_runtime_dry_run_reports_archive_plan(self):
-        archive = ROOT / "data" / "tmp" / "node-runtime-test.zip"
-        archive.parent.mkdir(parents=True, exist_ok=True)
-        with zipfile.ZipFile(archive, "w") as package:
-            package.writestr("node-v22.0.0-win-x64/node.exe", "")
+        temp_dir = tempfile.TemporaryDirectory()
+        temp_root = Path(temp_dir.name)
+        try:
+            defaults_dir = temp_root / "config" / "defaults"
+            defaults_dir.mkdir(parents=True)
+            (defaults_dir / "runtimes.json").write_text(
+                (ROOT / "config" / "defaults" / "runtimes.json").read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
+            archive = temp_root / "data" / "tmp" / "node-runtime-test.zip"
+            archive.parent.mkdir(parents=True, exist_ok=True)
+            with zipfile.ZipFile(archive, "w") as package:
+                package.writestr("node-v22.0.0-win-x64/node.exe", "")
 
-        result = run_dispatcher("install-runtime", "node", "--archive", str(archive), "--dry-run", "-Json")
+            result = run_dispatcher_for_root(temp_root, "install-runtime", "node", "--archive", str(archive), "--dry-run", "-Json")
 
-        self.assertEqual(result.returncode, 0, result.stderr)
-        payload = json.loads(result.stdout)
-        self.assertEqual(payload["runtime"], "node")
-        self.assertTrue(payload["dryRun"])
-        self.assertEqual(payload["archive"], str(archive))
-        self.assertTrue(payload["installDir"].endswith(str(Path("runtimes") / "windows" / "node")))
-        self.assertTrue(payload["wouldExtract"])
-        self.assertFalse(payload["installed"])
-        self.assertTrue(any(path.endswith("node.exe") for path in payload["expectedExecutables"]))
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["runtime"], "node")
+            self.assertTrue(payload["dryRun"])
+            self.assertEqual(payload["archive"], str(archive))
+            self.assertTrue(payload["installDir"].endswith(str(Path("runtimes") / "windows" / "node")))
+            self.assertTrue(payload["wouldExtract"])
+            self.assertFalse(payload["installed"])
+            self.assertTrue(any(path.endswith("node.exe") for path in payload["expectedExecutables"]))
+        finally:
+            temp_dir.cleanup()
 
     def test_install_runtime_extracts_local_archive_and_setup_detects_it(self):
         archive = ROOT / "data" / "tmp" / "node-runtime-test.zip"
@@ -1282,6 +1301,55 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertEqual(json.loads(stop.stdout)["stopped"], ["portal", "fake-service"])
             self.assertFalse(pid_file.exists())
             self.assertFalse(process_exists(metadata["processId"]))
+        finally:
+            run_dispatcher_for_root(temp_root, "stop", "-Json")
+            temp_dir.cleanup()
+
+    def test_start_adapter_requires_explicit_confirmation(self):
+        temp_dir, temp_root = make_temp_process_usb_root()
+        try:
+            mark_fake_service_candidate(temp_root)
+
+            result = run_dispatcher_for_root(temp_root, "start-adapter", "fake-service", "-Json")
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("--confirm-start", result.stderr)
+            self.assertFalse((temp_root / "data" / "tmp" / "pids" / "fake-service.pid").exists())
+        finally:
+            temp_dir.cleanup()
+
+    def test_start_adapter_dry_run_reports_command_without_running(self):
+        temp_dir, temp_root = make_temp_process_usb_root()
+        try:
+            mark_fake_service_candidate(temp_root)
+
+            result = run_dispatcher_for_root(temp_root, "start-adapter", "fake-service", "--dry-run", "-Json")
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertTrue(payload["dryRun"])
+            self.assertFalse(payload["wouldModify"])
+            self.assertFalse(payload["started"])
+            self.assertEqual(payload["command"], "node service.js")
+            self.assertFalse((temp_root / "data" / "tmp" / "pids" / "fake-service.pid").exists())
+        finally:
+            temp_dir.cleanup()
+
+    def test_start_adapter_confirm_launches_candidate_managed_process(self):
+        temp_dir, temp_root = make_temp_process_usb_root()
+        try:
+            mark_fake_service_candidate(temp_root)
+
+            result = run_dispatcher_for_root(temp_root, "start-adapter", "fake-service", "--confirm-start", "-Json")
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertFalse(payload["dryRun"])
+            self.assertTrue(payload["wouldModify"])
+            self.assertTrue(payload["started"])
+            self.assertFalse(payload["metadata"]["placeholder"])
+            self.assertTrue((temp_root / "data" / "tmp" / "pids" / "fake-service.pid").exists())
+            wait_for_file(temp_root / "data" / "tmp" / "fake-service-env.json")
         finally:
             run_dispatcher_for_root(temp_root, "stop", "-Json")
             temp_dir.cleanup()

@@ -8,13 +8,13 @@ const node_fs_1 = require("node:fs");
 const node_path_1 = require("node:path");
 const environment_1 = require("./environment");
 const portable_1 = require("./portable");
-function startAdapter(root, adapter) {
+function startAdapter(root, adapter, options = {}) {
     const pidFile = (0, portable_1.resolveRelative)(root, adapter.pidFile);
     const logFile = (0, portable_1.resolveRelative)(root, adapter.logFile);
     const serviceEnv = (0, environment_1.resolveServiceEnvironment)(root, adapter.id);
     (0, node_fs_1.mkdirSync)((0, node_path_1.dirname)(pidFile), { recursive: true });
     (0, node_fs_1.mkdirSync)((0, node_path_1.dirname)(logFile), { recursive: true });
-    const metadata = shouldLaunchManagedProcess(adapter)
+    const metadata = shouldLaunchManagedProcess(adapter, options.forceManaged === true)
         ? launchManagedAdapterProcess(root, adapter, serviceEnv)
         : {
             serviceId: adapter.id,
@@ -37,8 +37,8 @@ function startAdapter(root, adapter) {
     }
     return metadata;
 }
-function shouldLaunchManagedProcess(adapter) {
-    return adapter.integration?.productionReady === true && Boolean(adapter.commands.start);
+function shouldLaunchManagedProcess(adapter, forceManaged) {
+    return (forceManaged || adapter.integration?.productionReady === true) && Boolean(adapter.commands.start);
 }
 function environmentMetadata(serviceEnv) {
     return {

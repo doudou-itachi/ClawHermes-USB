@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.writeStatusSnapshot = exports.runtimePreparationPlan = exports.runtimeDiagnostics = exports.loadRuntimeManifest = exports.installRuntimeFromArchive = exports.stopPortalServer = exports.startPortalServer = exports.getPortalStatus = exports.generatePortal = exports.PORTAL_URL = exports.writeSetupSnapshot = exports.setupDiagnostics = exports.readLogTail = exports.portDiagnostics = exports.pathDiagnostics = exports.serviceEnvironmentDiagnostic = exports.resolveServiceEnvironment = exports.initializeEnvFiles = exports.envFileDiagnostics = exports.createBackup = exports.verifyAdapter = exports.runAdapterSetup = exports.markAdapterReady = exports.probeAppSources = exports.checkoutAppSource = exports.appSourcePlan = exports.adapterSetupPlan = exports.validateAdapter = exports.serviceOrder = exports.loadAdapters = exports.integrationReadiness = exports.portableEnv = exports.getRoot = exports.dataWritable = void 0;
 exports.startSkeleton = startSkeleton;
+exports.startSingleAdapter = startSingleAdapter;
 exports.getStatus = getStatus;
 exports.stopSkeleton = stopSkeleton;
 const node_fs_1 = require("node:fs");
@@ -70,6 +71,36 @@ async function startSkeleton(usbRoot) {
     const portal = await (0, portal_1.startPortalServer)(root);
     (0, status_1.writeStatusSnapshot)(root, getStatus(root));
     return { root, started, portal, setupMessages: setup.messages };
+}
+function startSingleAdapter(usbRoot, serviceId, options) {
+    const root = (0, portable_1.getRoot)(usbRoot);
+    if (!serviceId)
+        throw new Error("Service id is required. Example: start-adapter hermes-web-ui --confirm-start");
+    const adapter = (0, adapters_1.loadAdapters)(root).find((item) => item.id === serviceId);
+    if (!adapter)
+        throw new Error(`Unknown adapter: ${serviceId}`);
+    if (!adapter.commands.start)
+        throw new Error(`Adapter ${serviceId} does not declare a start command.`);
+    const result = {
+        root,
+        serviceId,
+        displayName: adapter.displayName,
+        dryRun: options.dryRun,
+        confirmed: options.confirm,
+        wouldModify: !options.dryRun,
+        started: false,
+        command: adapter.commands.start,
+        appDir: (0, portable_1.resolveRelative)(root, adapter.appDir),
+        metadata: null,
+        message: options.dryRun ? `Would start ${serviceId}.` : `Started ${serviceId}.`,
+    };
+    if (!options.dryRun && !options.confirm) {
+        throw new Error("start-adapter launches a managed process. Re-run with --confirm-start to proceed.");
+    }
+    if (options.dryRun)
+        return result;
+    const metadata = (0, lifecycle_1.startAdapter)(root, adapter, { forceManaged: true });
+    return { ...result, started: true, metadata };
 }
 function getStatus(usbRoot) {
     const root = (0, portable_1.getRoot)(usbRoot);

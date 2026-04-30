@@ -5,13 +5,13 @@ import type { AdapterDescriptor, ServiceEnvironment } from "./types";
 import { resolveServiceEnvironment } from "./environment";
 import { resolveRelative, writeLog } from "./portable";
 
-export function startAdapter(root: string, adapter: AdapterDescriptor) {
+export function startAdapter(root: string, adapter: AdapterDescriptor, options: { forceManaged?: boolean } = {}) {
   const pidFile = resolveRelative(root, adapter.pidFile);
   const logFile = resolveRelative(root, adapter.logFile);
   const serviceEnv = resolveServiceEnvironment(root, adapter.id);
   mkdirSync(dirname(pidFile), { recursive: true });
   mkdirSync(dirname(logFile), { recursive: true });
-  const metadata = shouldLaunchManagedProcess(adapter)
+  const metadata = shouldLaunchManagedProcess(adapter, options.forceManaged === true)
     ? launchManagedAdapterProcess(root, adapter, serviceEnv)
     : {
       serviceId: adapter.id,
@@ -34,8 +34,8 @@ export function startAdapter(root: string, adapter: AdapterDescriptor) {
   return metadata;
 }
 
-function shouldLaunchManagedProcess(adapter: AdapterDescriptor): boolean {
-  return adapter.integration?.productionReady === true && Boolean(adapter.commands.start);
+function shouldLaunchManagedProcess(adapter: AdapterDescriptor, forceManaged: boolean): boolean {
+  return (forceManaged || adapter.integration?.productionReady === true) && Boolean(adapter.commands.start);
 }
 
 function environmentMetadata(serviceEnv: ServiceEnvironment) {

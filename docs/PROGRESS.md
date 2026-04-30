@@ -1634,3 +1634,38 @@ Validation performed:
 Next steps:
 
 - Add a guarded single-adapter integration start command so non-production-ready adapters can be launched in disposable lab roots for health verification without marking them production-ready first.
+
+### Guarded Start Adapter Command
+
+Status: `Done`
+
+Summary:
+
+- Added `start-adapter <service-id>` for launching one adapter in integration labs before it is marked production-ready.
+- Real startup requires `--confirm-start`.
+- `--dry-run` reports command and app directory without writing PID metadata or launching a process.
+- Normal `start` behavior remains unchanged and still only launches production-ready adapters as managed processes.
+- Added tests for confirmation gating, dry-run safety, and confirmed managed launch of a candidate fake adapter.
+
+Changed areas:
+
+- `core/node/src/lifecycle.ts`
+- `core/node/src/core.ts`
+- `core/node/src/clawhermes.ts`
+- `core/windows/clawhermes.ps1`
+- `core/node/dist/`
+- `tests/test_windows_core.py`
+- `docs/PROGRESS.md`
+- `docs/superpowers/plans/2026-05-01-add-start-adapter-command.md`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_start_adapter_requires_explicit_confirmation tests.test_windows_core.WindowsCoreTests.test_start_adapter_dry_run_reports_command_without_running tests.test_windows_core.WindowsCoreTests.test_start_adapter_confirm_launches_candidate_managed_process -v`
+- `npm test`
+- `git diff --check`
+- UTF-8 smoke check
+
+Next steps:
+
+- Use `start-adapter hermes-web-ui --confirm-start` in the disposable lab root, then rerun `verify-adapter hermes-web-ui --json` to validate health behavior.

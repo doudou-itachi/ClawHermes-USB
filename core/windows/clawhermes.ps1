@@ -1,6 +1,6 @@
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("env-json", "setup", "runtimes", "install-runtime", "init-env", "service-env", "adapters", "sources", "probe-sources", "checkout-source", "setup-adapter", "verify-adapter", "mark-adapter-ready", "logs", "backup", "start", "status", "stop")]
+    [ValidateSet("env-json", "setup", "runtimes", "install-runtime", "init-env", "service-env", "adapters", "sources", "probe-sources", "checkout-source", "setup-adapter", "verify-adapter", "mark-adapter-ready", "logs", "backup", "start", "start-adapter", "status", "stop")]
     [string]$Action = "setup",
 
     [Parameter(ValueFromRemainingArguments = $true)]
