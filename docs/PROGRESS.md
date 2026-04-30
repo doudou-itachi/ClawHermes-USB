@@ -737,3 +737,31 @@ Validation performed:
 Next steps:
 
 - Split the growing TypeScript core into smaller modules once the current orchestration behavior stabilizes.
+
+### Portable Utilities Split
+
+Status: `Done`
+
+Summary:
+
+- Extracted portable root resolution, relative path resolution, process-local environment construction, data writability checks, and launcher log writing into `core/node/src/portable.ts`.
+- `core.ts` now imports these shared helpers and re-exports public helpers used by the CLI.
+- This is the first low-risk step toward splitting the growing TypeScript core into smaller modules.
+- Behavior is unchanged; existing CLI actions continue to use the same public core exports.
+
+Changed areas:
+
+- `core/node/src/portable.ts`
+- `core/node/src/core.ts`
+- `core/node/dist/`
+- `docs/PROGRESS.md`
+- `docs/superpowers/plans/2026-05-01-split-portable-utils.md`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_env_json_resolves_root_and_portable_environment tests.test_windows_core.WindowsCoreTests.test_setup_json_reports_runtime_diagnostics_and_valid_adapters tests.test_windows_core.WindowsCoreTests.test_start_status_stop_manage_placeholder_pid_metadata tests.test_windows_core.WindowsCoreTests.test_logs_json_tails_known_service_log -v`
+
+Next steps:
+
+- Split adapter loading, validation, readiness, and service ordering into an adapter-focused TypeScript module.

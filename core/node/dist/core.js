@@ -1,8 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.PORTAL_URL = void 0;
-exports.getRoot = getRoot;
-exports.portableEnv = portableEnv;
+exports.PORTAL_URL = exports.portableEnv = exports.getRoot = exports.dataWritable = void 0;
 exports.loadAdapters = loadAdapters;
 exports.validateAdapter = validateAdapter;
 exports.runtimeDiagnostics = runtimeDiagnostics;
@@ -10,7 +8,6 @@ exports.loadRuntimeManifest = loadRuntimeManifest;
 exports.runtimePreparationPlan = runtimePreparationPlan;
 exports.installRuntimeFromArchive = installRuntimeFromArchive;
 exports.integrationReadiness = integrationReadiness;
-exports.dataWritable = dataWritable;
 exports.setupDiagnostics = setupDiagnostics;
 exports.envFileDiagnostics = envFileDiagnostics;
 exports.initializeEnvFiles = initializeEnvFiles;
@@ -33,34 +30,14 @@ const node_fs_1 = require("node:fs");
 const node_path_1 = require("node:path");
 const node_http_1 = require("node:http");
 const node_crypto_1 = require("node:crypto");
+const portable_1 = require("./portable");
+var portable_2 = require("./portable");
+Object.defineProperty(exports, "dataWritable", { enumerable: true, get: function () { return portable_2.dataWritable; } });
+Object.defineProperty(exports, "getRoot", { enumerable: true, get: function () { return portable_2.getRoot; } });
+Object.defineProperty(exports, "portableEnv", { enumerable: true, get: function () { return portable_2.portableEnv; } });
 exports.PORTAL_URL = "http://127.0.0.1:17000/";
-function getRoot(usbRoot) {
-    return (0, node_path_1.resolve)(usbRoot);
-}
-function portableEnv(usbRoot) {
-    const root = getRoot(usbRoot);
-    return {
-        USB_ROOT: root,
-        HOME: (0, node_path_1.join)(root, "data", "home"),
-        USERPROFILE: (0, node_path_1.join)(root, "data", "home"),
-        APPDATA: (0, node_path_1.join)(root, "data", "home", "AppData", "Roaming"),
-        LOCALAPPDATA: (0, node_path_1.join)(root, "data", "home", "AppData", "Local"),
-        TEMP: (0, node_path_1.join)(root, "data", "tmp"),
-        TMP: (0, node_path_1.join)(root, "data", "tmp"),
-        HERMES_HOME: (0, node_path_1.join)(root, "data", "hermes"),
-        npm_config_cache: (0, node_path_1.join)(root, "data", "cache", "npm"),
-        PIP_CACHE_DIR: (0, node_path_1.join)(root, "data", "cache", "pip"),
-        UV_CACHE_DIR: (0, node_path_1.join)(root, "data", "cache", "uv"),
-        PATH: [
-            (0, node_path_1.join)(root, "runtimes", "windows", "node"),
-            (0, node_path_1.join)(root, "runtimes", "windows", "python"),
-            (0, node_path_1.join)(root, "runtimes", "windows", "git", "cmd"),
-            process.env.PATH ?? "",
-        ].join(";"),
-    };
-}
 function loadAdapters(usbRoot) {
-    const adapterRoot = (0, node_path_1.join)(getRoot(usbRoot), "adapters");
+    const adapterRoot = (0, node_path_1.join)((0, portable_1.getRoot)(usbRoot), "adapters");
     return (0, node_fs_1.readdirSync)(adapterRoot, { withFileTypes: true })
         .filter((entry) => entry.isDirectory())
         .map((entry) => (0, node_path_1.join)(adapterRoot, entry.name, "adapter.json"))
@@ -98,10 +75,10 @@ function validateAdapter(adapter, knownIds) {
     return { id: adapter.id, valid: errors.length === 0, errors };
 }
 function runtimeDiagnostics(usbRoot) {
-    const root = getRoot(usbRoot);
+    const root = (0, portable_1.getRoot)(usbRoot);
     const manifest = loadRuntimeManifest(root);
     return manifest.runtimes.map((runtime) => {
-        const resolvedCandidates = runtime.candidates.map((candidate) => resolveRelative(root, candidate));
+        const resolvedCandidates = runtime.candidates.map((candidate) => (0, portable_1.resolveRelative)(root, candidate));
         const foundPath = resolvedCandidates.find((candidate) => (0, node_fs_1.existsSync)(candidate)) ?? resolvedCandidates[0];
         return {
             name: runtime.name,
@@ -111,18 +88,18 @@ function runtimeDiagnostics(usbRoot) {
             versionPolicy: runtime.versionPolicy,
             packageType: runtime.packageType,
             sourceUrl: runtime.sourceUrl,
-            installDir: resolveRelative(root, runtime.installDir),
+            installDir: (0, portable_1.resolveRelative)(root, runtime.installDir),
             candidates: resolvedCandidates,
             notes: runtime.notes,
         };
     });
 }
 function loadRuntimeManifest(usbRoot) {
-    const manifestPath = (0, node_path_1.join)(getRoot(usbRoot), "config", "defaults", "runtimes.json");
+    const manifestPath = (0, node_path_1.join)((0, portable_1.getRoot)(usbRoot), "config", "defaults", "runtimes.json");
     return JSON.parse((0, node_fs_1.readFileSync)(manifestPath, "utf8"));
 }
 function runtimePreparationPlan(usbRoot) {
-    const root = getRoot(usbRoot);
+    const root = (0, portable_1.getRoot)(usbRoot);
     const manifest = loadRuntimeManifest(root);
     const diagnosticsByName = new Map(runtimeDiagnostics(root).map((runtime) => [runtime.name, runtime]));
     const steps = manifest.runtimes.map((runtime) => {
@@ -134,8 +111,8 @@ function runtimePreparationPlan(usbRoot) {
             versionPolicy: runtime.versionPolicy,
             packageType: runtime.packageType,
             sourceUrl: runtime.sourceUrl,
-            installDir: resolveRelative(root, runtime.installDir),
-            expectedExecutables: runtime.candidates.map((candidate) => resolveRelative(root, candidate)),
+            installDir: (0, portable_1.resolveRelative)(root, runtime.installDir),
+            expectedExecutables: runtime.candidates.map((candidate) => (0, portable_1.resolveRelative)(root, candidate)),
             notes: runtime.notes,
             found: diagnostic?.found === true,
         };
@@ -154,7 +131,7 @@ function runtimePreparationPlan(usbRoot) {
     };
 }
 function installRuntimeFromArchive(usbRoot, runtimeName, archivePath, dryRun, expectedSha256) {
-    const root = getRoot(usbRoot);
+    const root = (0, portable_1.getRoot)(usbRoot);
     const manifest = loadRuntimeManifest(root);
     const runtime = manifest.runtimes.find((item) => item.name === runtimeName);
     if (!runtime) {
@@ -171,8 +148,8 @@ function installRuntimeFromArchive(usbRoot, runtimeName, archivePath, dryRun, ex
     if (expectedSha256 && actualSha256.toLowerCase() !== expectedSha256.toLowerCase()) {
         throw new Error(`SHA256 mismatch for ${archive}. Expected ${expectedSha256}, got ${actualSha256}.`);
     }
-    const installDir = resolveRelative(root, runtime.installDir);
-    const expectedExecutables = runtime.candidates.map((candidate) => resolveRelative(root, candidate));
+    const installDir = (0, portable_1.resolveRelative)(root, runtime.installDir);
+    const expectedExecutables = runtime.candidates.map((candidate) => (0, portable_1.resolveRelative)(root, candidate));
     if (!dryRun) {
         (0, node_fs_1.mkdirSync)(installDir, { recursive: true });
         const tempDir = (0, node_path_1.join)(root, "data", "tmp", "runtime-extract", `${runtime.name}-${Date.now()}`);
@@ -250,21 +227,8 @@ function integrationReadiness(adapters) {
         sources: adapter.integration?.sources ?? [],
     }));
 }
-function dataWritable(usbRoot) {
-    const tmp = (0, node_path_1.join)(getRoot(usbRoot), "data", "tmp");
-    (0, node_fs_1.mkdirSync)(tmp, { recursive: true });
-    const probe = (0, node_path_1.join)(tmp, "write-probe.tmp");
-    try {
-        (0, node_fs_1.writeFileSync)(probe, "ok");
-        (0, node_fs_1.rmSync)(probe, { force: true });
-        return true;
-    }
-    catch {
-        return false;
-    }
-}
 function setupDiagnostics(usbRoot) {
-    const root = getRoot(usbRoot);
+    const root = (0, portable_1.getRoot)(usbRoot);
     const adapters = loadAdapters(root);
     const knownIds = adapters.map((adapter) => adapter.id);
     const adapterResults = adapters.map((adapter) => validateAdapter(adapter, knownIds));
@@ -273,7 +237,7 @@ function setupDiagnostics(usbRoot) {
     const ports = portDiagnostics(root);
     const paths = pathDiagnostics(root);
     const envFiles = envFileDiagnostics(root, adapters);
-    const writable = dataWritable(root);
+    const writable = (0, portable_1.dataWritable)(root);
     const messages = [];
     for (const runtime of runtimes) {
         if (!runtime.found)
@@ -305,7 +269,7 @@ function setupDiagnostics(usbRoot) {
     return { root, adapters: adapterResults, runtimes, readiness, ports, paths, envFiles, dataWritable: writable, messages };
 }
 function envFileDiagnostics(usbRoot, adapters) {
-    const root = getRoot(usbRoot);
+    const root = (0, portable_1.getRoot)(usbRoot);
     const diagnostics = [];
     const seen = new Set();
     for (const adapter of adapters) {
@@ -318,16 +282,16 @@ function envFileDiagnostics(usbRoot, adapters) {
             diagnostics.push({
                 serviceId: adapter.id,
                 path: envFile,
-                exists: (0, node_fs_1.existsSync)(resolveRelative(root, envFile)),
+                exists: (0, node_fs_1.existsSync)((0, portable_1.resolveRelative)(root, envFile)),
                 examplePath,
-                exampleExists: (0, node_fs_1.existsSync)(resolveRelative(root, examplePath)),
+                exampleExists: (0, node_fs_1.existsSync)((0, portable_1.resolveRelative)(root, examplePath)),
             });
         }
     }
     return diagnostics.sort((a, b) => a.serviceId.localeCompare(b.serviceId) || a.path.localeCompare(b.path));
 }
 function initializeEnvFiles(usbRoot, dryRun) {
-    const root = getRoot(usbRoot);
+    const root = (0, portable_1.getRoot)(usbRoot);
     const diagnostics = envFileDiagnostics(root, loadAdapters(root));
     const result = {
         root,
@@ -366,25 +330,25 @@ function initializeEnvFiles(usbRoot, dryRun) {
             result.messages.push(`Would create ${envFile.path} from ${envFile.examplePath}.`);
             continue;
         }
-        const target = resolveRelative(root, envFile.path);
+        const target = (0, portable_1.resolveRelative)(root, envFile.path);
         (0, node_fs_1.mkdirSync)((0, node_path_1.dirname)(target), { recursive: true });
-        (0, node_fs_1.copyFileSync)(resolveRelative(root, envFile.examplePath), target);
+        (0, node_fs_1.copyFileSync)((0, portable_1.resolveRelative)(root, envFile.examplePath), target);
         result.files.push({ ...envFile, action: "created", reason: null });
         result.messages.push(`Created ${envFile.path} from ${envFile.examplePath}.`);
     }
     return result;
 }
 function resolveServiceEnvironment(usbRoot, serviceId) {
-    const root = getRoot(usbRoot);
+    const root = (0, portable_1.getRoot)(usbRoot);
     const adapter = loadAdapters(root).find((item) => item.id === serviceId);
     if (!adapter) {
         throw new Error(`Unknown service: ${serviceId}`);
     }
-    const env = { ...portableEnv(root) };
+    const env = { ...(0, portable_1.portableEnv)(root) };
     const files = [];
     const messages = [];
     for (const envPath of adapter.env?.files ?? []) {
-        const absolutePath = resolveRelative(root, envPath);
+        const absolutePath = (0, portable_1.resolveRelative)(root, envPath);
         if (!(0, node_fs_1.existsSync)(absolutePath)) {
             files.push({ path: envPath, exists: false, loaded: false, variables: [], errors: [] });
             messages.push(`Env file missing: ${envPath}.`);
@@ -422,7 +386,7 @@ function serviceEnvironmentDiagnostic(usbRoot, serviceId) {
     };
 }
 function readLogTail(usbRoot, target, requestedLines) {
-    const root = getRoot(usbRoot);
+    const root = (0, portable_1.getRoot)(usbRoot);
     const lineCount = Math.max(1, Math.min(Number.isFinite(requestedLines) ? Math.floor(requestedLines) : 50, 200));
     const logPath = resolveLogTarget(root, target);
     const exists = (0, node_fs_1.existsSync)(logPath);
@@ -439,13 +403,13 @@ function readLogTail(usbRoot, target, requestedLines) {
     };
 }
 function resolveLogTarget(usbRoot, target) {
-    const root = getRoot(usbRoot);
+    const root = (0, portable_1.getRoot)(usbRoot);
     if (target === "launcher")
         return (0, node_path_1.join)(root, "data", "logs", "launcher.log");
     const adapter = loadAdapters(root).find((item) => item.id === target);
     if (!adapter)
         throw new Error(`Unknown log target: ${target}`);
-    return resolveRelative(root, adapter.logFile);
+    return (0, portable_1.resolveRelative)(root, adapter.logFile);
 }
 function parseEnvFile(file) {
     const variables = {};
@@ -479,7 +443,7 @@ function expandEnvTemplate(value, env) {
     return value.replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g, (match, name) => env[name] ?? match);
 }
 function pathDiagnostics(usbRoot) {
-    const root = getRoot(usbRoot);
+    const root = (0, portable_1.getRoot)(usbRoot);
     const required = [
         { path: "adapters", type: "directory" },
         { path: "apps/openclaw", type: "directory" },
@@ -493,7 +457,7 @@ function pathDiagnostics(usbRoot) {
         { path: "portal", type: "directory" },
     ];
     return required.map((item) => {
-        const absolute = resolveRelative(root, item.path);
+        const absolute = (0, portable_1.resolveRelative)(root, item.path);
         const exists = (0, node_fs_1.existsSync)(absolute);
         return {
             path: item.path,
@@ -512,7 +476,7 @@ function isDirectory(path) {
     }
 }
 function portDiagnostics(usbRoot) {
-    const root = getRoot(usbRoot);
+    const root = (0, portable_1.getRoot)(usbRoot);
     const configPath = (0, node_path_1.join)(root, "config", "defaults", "ports.json");
     const config = JSON.parse((0, node_fs_1.readFileSync)(configPath, "utf8"));
     const diagnostics = [];
@@ -541,16 +505,8 @@ function isTcpPortAvailableSync(port) {
         return true;
     }
 }
-function resolveRelative(usbRoot, relativePath) {
-    return (0, node_path_1.join)(getRoot(usbRoot), ...relativePath.replaceAll("\\", "/").split("/").filter(Boolean));
-}
-function writeLog(usbRoot, serviceId, level, message) {
-    const logDir = (0, node_path_1.join)(getRoot(usbRoot), "data", "logs");
-    (0, node_fs_1.mkdirSync)(logDir, { recursive: true });
-    (0, node_fs_1.appendFileSync)((0, node_path_1.join)(logDir, "launcher.log"), `${new Date().toISOString()} [${serviceId}] [${level}] ${message}\n`);
-}
 function serviceOrder(usbRoot, order) {
-    const root = getRoot(usbRoot);
+    const root = (0, portable_1.getRoot)(usbRoot);
     const adapters = loadAdapters(root);
     const byId = new Map(adapters.map((adapter) => [adapter.id, adapter]));
     const configPath = (0, node_path_1.join)(root, "config", "defaults", "services.json");
@@ -574,7 +530,7 @@ function escapeHtml(value) {
     return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 }
 function generatePortal(usbRoot) {
-    const root = getRoot(usbRoot);
+    const root = (0, portable_1.getRoot)(usbRoot);
     const portalPath = (0, node_path_1.join)(root, "portal", "index.html");
     (0, node_fs_1.mkdirSync)((0, node_path_1.dirname)(portalPath), { recursive: true });
     const rows = getStatus(root).services.map((service) => {
@@ -654,17 +610,17 @@ function generatePortal(usbRoot) {
 </html>
 `;
     (0, node_fs_1.writeFileSync)(portalPath, html, "utf8");
-    writeLog(root, "portal", "INFO", "Generated portal/index.html.");
+    (0, portable_1.writeLog)(root, "portal", "INFO", "Generated portal/index.html.");
     return { path: portalPath, url: exports.PORTAL_URL };
 }
 function portalPidFile(usbRoot) {
-    return (0, node_path_1.join)(getRoot(usbRoot), "data", "tmp", "pids", "portal.pid");
+    return (0, node_path_1.join)((0, portable_1.getRoot)(usbRoot), "data", "tmp", "pids", "portal.pid");
 }
 function portalServerPath(usbRoot) {
-    return (0, node_path_1.join)(getRoot(usbRoot), "core", "node", "dist", "portal-server.js");
+    return (0, node_path_1.join)((0, portable_1.getRoot)(usbRoot), "core", "node", "dist", "portal-server.js");
 }
 function portalProcesses(usbRoot) {
-    const root = getRoot(usbRoot);
+    const root = (0, portable_1.getRoot)(usbRoot);
     try {
         const output = (0, node_child_process_1.execFileSync)("powershell", [
             "-NoProfile",
@@ -730,7 +686,7 @@ function portalMetadata(root, processId) {
     };
 }
 async function startPortalServer(usbRoot) {
-    const root = getRoot(usbRoot);
+    const root = (0, portable_1.getRoot)(usbRoot);
     const pidFile = portalPidFile(root);
     (0, node_fs_1.mkdirSync)((0, node_path_1.dirname)(pidFile), { recursive: true });
     if ((0, node_fs_1.existsSync)(pidFile)) {
@@ -743,7 +699,7 @@ async function startPortalServer(usbRoot) {
     if (existingProcess) {
         const metadata = portalMetadata(root, existingProcess.ProcessId);
         (0, node_fs_1.writeFileSync)(pidFile, JSON.stringify(metadata, null, 2), "utf8");
-        writeLog(root, "portal", "INFO", "Reused existing portal server on http://127.0.0.1:17000/.");
+        (0, portable_1.writeLog)(root, "portal", "INFO", "Reused existing portal server on http://127.0.0.1:17000/.");
         return metadata;
     }
     if (!(await tcpPortAvailable(17000))) {
@@ -762,11 +718,11 @@ async function startPortalServer(usbRoot) {
     }
     const metadata = portalMetadata(root, child.pid ?? 0);
     (0, node_fs_1.writeFileSync)(pidFile, JSON.stringify(metadata, null, 2), "utf8");
-    writeLog(root, "portal", "INFO", "Started portal server on http://127.0.0.1:17000/.");
+    (0, portable_1.writeLog)(root, "portal", "INFO", "Started portal server on http://127.0.0.1:17000/.");
     return metadata;
 }
 function getPortalStatus(usbRoot) {
-    const root = getRoot(usbRoot);
+    const root = (0, portable_1.getRoot)(usbRoot);
     const pidFile = portalPidFile(root);
     let status = "stopped";
     let processId = null;
@@ -806,7 +762,7 @@ function getPortalStatus(usbRoot) {
     };
 }
 function stopPortalServer(usbRoot) {
-    const root = getRoot(usbRoot);
+    const root = (0, portable_1.getRoot)(usbRoot);
     const pidFile = portalPidFile(root);
     let stopped = false;
     if ((0, node_fs_1.existsSync)(pidFile)) {
@@ -827,7 +783,7 @@ function stopPortalServer(usbRoot) {
         }
     }
     if (stopped)
-        writeLog(root, "portal", "INFO", "Stopped portal server.");
+        (0, portable_1.writeLog)(root, "portal", "INFO", "Stopped portal server.");
     return stopped;
 }
 function killProcessTree(pid) {
@@ -839,12 +795,12 @@ function killProcessTree(pid) {
     }
 }
 async function startSkeleton(usbRoot) {
-    const root = getRoot(usbRoot);
+    const root = (0, portable_1.getRoot)(usbRoot);
     const setup = setupDiagnostics(root);
     const started = [];
     for (const adapter of serviceOrder(root, "start").filter((item) => item.enabled)) {
-        const pidFile = resolveRelative(root, adapter.pidFile);
-        const logFile = resolveRelative(root, adapter.logFile);
+        const pidFile = (0, portable_1.resolveRelative)(root, adapter.pidFile);
+        const logFile = (0, portable_1.resolveRelative)(root, adapter.logFile);
         const serviceEnv = resolveServiceEnvironment(root, adapter.id);
         (0, node_fs_1.mkdirSync)((0, node_path_1.dirname)(pidFile), { recursive: true });
         (0, node_fs_1.mkdirSync)((0, node_path_1.dirname)(logFile), { recursive: true });
@@ -856,7 +812,7 @@ async function startSkeleton(usbRoot) {
                 status: "placeholder-started",
                 startedAt: new Date().toISOString(),
                 command: adapter.commands.start ?? null,
-                workingDirectory: resolveRelative(root, adapter.appDir),
+                workingDirectory: (0, portable_1.resolveRelative)(root, adapter.appDir),
                 logFile,
                 environment: environmentMetadata(serviceEnv),
                 placeholder: true,
@@ -864,10 +820,10 @@ async function startSkeleton(usbRoot) {
         (0, node_fs_1.writeFileSync)(pidFile, JSON.stringify(metadata, null, 2), "utf8");
         if (metadata.placeholder) {
             (0, node_fs_1.appendFileSync)(logFile, `${new Date().toISOString()} [${adapter.id}] [INFO] Placeholder service started.\n`);
-            writeLog(root, adapter.id, "INFO", "Started placeholder service.");
+            (0, portable_1.writeLog)(root, adapter.id, "INFO", "Started placeholder service.");
         }
         else if ("processId" in metadata) {
-            writeLog(root, adapter.id, "INFO", `Started managed service process ${metadata.processId}.`);
+            (0, portable_1.writeLog)(root, adapter.id, "INFO", `Started managed service process ${metadata.processId}.`);
         }
         started.push(adapter.id);
     }
@@ -889,8 +845,8 @@ function launchManagedAdapterProcess(root, adapter, serviceEnv) {
     const command = adapter.commands.start;
     if (!command)
         throw new Error(`Adapter ${adapter.id} has no start command.`);
-    const workingDirectory = resolveRelative(root, adapter.appDir);
-    const logFile = resolveRelative(root, adapter.logFile);
+    const workingDirectory = (0, portable_1.resolveRelative)(root, adapter.appDir);
+    const logFile = (0, portable_1.resolveRelative)(root, adapter.logFile);
     const logFd = (0, node_fs_1.openSync)(logFile, "a");
     try {
         const child = (0, node_child_process_1.spawn)(command, {
@@ -920,9 +876,9 @@ function launchManagedAdapterProcess(root, adapter, serviceEnv) {
     }
 }
 function getStatus(usbRoot) {
-    const root = getRoot(usbRoot);
+    const root = (0, portable_1.getRoot)(usbRoot);
     const services = serviceOrder(root, "start").map((adapter) => {
-        const pidFile = resolveRelative(root, adapter.pidFile);
+        const pidFile = (0, portable_1.resolveRelative)(root, adapter.pidFile);
         let status = "stopped";
         let processId = null;
         let placeholder = null;
@@ -943,7 +899,7 @@ function getStatus(usbRoot) {
             displayName: adapter.displayName,
             status,
             pidFile,
-            logFile: resolveRelative(root, adapter.logFile),
+            logFile: (0, portable_1.resolveRelative)(root, adapter.logFile),
             portalUrl: adapter.portal?.url ?? null,
             processId,
             placeholder,
@@ -954,7 +910,7 @@ function getStatus(usbRoot) {
     return { root, generatedAt: new Date().toISOString(), services };
 }
 function writeStatusSnapshot(usbRoot, status) {
-    const root = getRoot(usbRoot);
+    const root = (0, portable_1.getRoot)(usbRoot);
     const snapshotPath = (0, node_path_1.join)(root, "data", "tmp", "status.json");
     (0, node_fs_1.mkdirSync)((0, node_path_1.dirname)(snapshotPath), { recursive: true });
     (0, node_fs_1.writeFileSync)(snapshotPath, `${JSON.stringify(status, null, 2)}\n`, "utf8");
@@ -1046,12 +1002,12 @@ function processExists(pid) {
     }
 }
 function stopSkeleton(usbRoot) {
-    const root = getRoot(usbRoot);
+    const root = (0, portable_1.getRoot)(usbRoot);
     const stopped = [];
     if (stopPortalServer(root))
         stopped.push("portal");
     for (const adapter of serviceOrder(root, "stop")) {
-        const pidFile = resolveRelative(root, adapter.pidFile);
+        const pidFile = (0, portable_1.resolveRelative)(root, adapter.pidFile);
         if ((0, node_fs_1.existsSync)(pidFile)) {
             const metadata = JSON.parse((0, node_fs_1.readFileSync)(pidFile, "utf8"));
             if (metadata.placeholder === false && metadata.processId) {
@@ -1063,7 +1019,7 @@ function stopSkeleton(usbRoot) {
                 }
             }
             (0, node_fs_1.rmSync)(pidFile, { force: true });
-            writeLog(root, adapter.id, "INFO", metadata.placeholder === false ? "Stopped managed service." : "Stopped placeholder service.");
+            (0, portable_1.writeLog)(root, adapter.id, "INFO", metadata.placeholder === false ? "Stopped managed service." : "Stopped placeholder service.");
             stopped.push(adapter.id);
         }
     }
