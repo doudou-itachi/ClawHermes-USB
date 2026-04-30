@@ -556,6 +556,39 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertFalse(payload["hasDesiredDistro"])
         self.assertIsNone(payload["desiredDistroVersion"])
 
+    def test_prepare_wsl_dry_run_reports_guarded_host_install_plan(self):
+        missing_wsl = str(ROOT / "data" / "tmp" / "missing-wsl.exe")
+
+        result = run_dispatcher("prepare-wsl", "--distro", "Ubuntu", "--dry-run", "-Json", env={"CLAWHERMES_WSL_EXE": missing_wsl})
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertTrue(payload["dryRun"])
+        self.assertFalse(payload["confirmedInstall"])
+        self.assertFalse(payload["executed"])
+        self.assertEqual(payload["distro"], "Ubuntu")
+        self.assertTrue(payload["wouldModifyHost"])
+        self.assertIn("host-level", "\n".join(payload["hostChanges"]))
+        self.assertGreaterEqual(len(payload["commands"]), 1)
+        command = payload["commands"][0]
+        self.assertEqual(command["id"], "install-distro")
+        self.assertIn("--install", command["args"])
+        self.assertIn("-d", command["args"])
+        self.assertIn("Ubuntu", command["args"])
+        self.assertTrue(command["requiresUserConsent"])
+        self.assertTrue(command["mayRequireAdmin"])
+        self.assertTrue(command["mayRequireReboot"])
+        self.assertFalse(payload["portableImport"]["automatic"])
+        self.assertIn("wsl --import", payload["portableImport"]["summary"])
+
+    def test_prepare_wsl_requires_confirm_install_without_dry_run(self):
+        missing_wsl = str(ROOT / "data" / "tmp" / "missing-wsl.exe")
+
+        result = run_dispatcher("prepare-wsl", "--distro", "Ubuntu", "-Json", env={"CLAWHERMES_WSL_EXE": missing_wsl})
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--confirm-install", result.stderr)
+
     def test_setup_json_reports_wsl2_action_when_hermes_agent_needs_wsl2(self):
         missing_wsl = str(ROOT / "data" / "tmp" / "missing-wsl.exe")
 
@@ -571,6 +604,8 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertEqual(action["category"], "wsl2")
         self.assertEqual(action["severity"], "warning")
         self.assertIn("Install or enable WSL2", action["title"])
+        self.assertIn("prepare-wsl", action["command"])
+        self.assertIn("--dry-run", action["command"])
 
     def test_setup_json_reports_adapter_runtime_version_mismatch(self):
         temp_dir, temp_root = make_temp_usb_root()

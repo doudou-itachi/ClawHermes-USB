@@ -1873,3 +1873,38 @@ Validation performed:
 Next steps:
 
 - Add user-facing WSL2 readiness guidance around `wsl.exe --install -d Ubuntu`, while keeping installation user-owned and outside automatic setup.
+
+### WSL2 Preparation Command
+
+Status: `Done`
+
+Summary:
+
+- Added a guarded `prepare-wsl` command for host-level WSL2 preparation planning.
+- `prepare-wsl --distro Ubuntu --dry-run --json` reports the target distro, required `wsl.exe` command, host-change warnings, and the portable import limitation without modifying the host.
+- Real host preparation is blocked unless `--confirm-install` is supplied.
+- `setup --json` now recommends the dry-run preparation plan for WSL2 adapters instead of jumping straight to a diagnostic-only command.
+- Documented that `wsl --import` can put distro files under a USB/project path, but Windows still registers the distro on the current host.
+
+Changed areas:
+
+- `core/node/src/wsl.ts`
+- `core/node/src/diagnostics.ts`
+- `core/node/src/clawhermes.ts`
+- `core/node/src/core.ts`
+- `core/node/src/types.ts`
+- `core/node/dist/`
+- `tests/test_windows_core.py`
+- `README.md`
+- `docs/ADAPTER_CONTRACT.md`
+- `docs/PROGRESS.md`
+- `docs/superpowers/plans/2026-05-01-wsl2-preparation-command.md`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_prepare_wsl_dry_run_reports_guarded_host_install_plan tests.test_windows_core.WindowsCoreTests.test_prepare_wsl_requires_confirm_install_without_dry_run tests.test_windows_core.WindowsCoreTests.test_setup_json_reports_wsl2_action_when_hermes_agent_needs_wsl2 -v`
+
+Next steps:
+
+- Rebuild the corrupted Chinese documentation files from the readable English documents so the project-level Chinese encoding rule is enforceable across the whole repo.

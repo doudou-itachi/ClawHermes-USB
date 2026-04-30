@@ -86,7 +86,7 @@ export function setupDiagnostics(usbRoot: string) {
         severity: "warning",
         title: `Install or enable WSL2 for ${adapter.id}`,
         detail,
-        command: "node core/node/dist/clawhermes.js wsl --json",
+        command: wslPreparationCommand(adapter.runtime?.distro),
         docs: adapter.integration?.sources?.[0] ?? adapter.upstream?.installDocs,
         serviceId: adapter.id,
       });
@@ -146,6 +146,13 @@ export function setupDiagnostics(usbRoot: string) {
   }
 
   return { root, adapters: adapterResults, runtimes, adapterRuntimeRequirements, readiness, ports, paths, envFiles, wsl, dataWritable: writable, messages, actions };
+}
+
+function wslPreparationCommand(distro: string | undefined): string {
+  const target = distro?.trim();
+  return target
+    ? `node core/node/dist/clawhermes.js prepare-wsl --distro ${target} --dry-run --json`
+    : "node core/node/dist/clawhermes.js prepare-wsl --dry-run --json";
 }
 
 export function writeSetupSnapshot(usbRoot: string, setup = setupDiagnostics(usbRoot)) {

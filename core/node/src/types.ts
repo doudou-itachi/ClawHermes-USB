@@ -256,3 +256,40 @@ export type WslDiagnostic = {
   desiredDistroVersion: number | null;
   messages: string[];
 };
+
+export type WslPreparationCommand = {
+  id: "install-distro" | "convert-distro";
+  description: string;
+  executablePath: string;
+  args: string[];
+  commandLine: string;
+  modifiesHost: boolean;
+  requiresUserConsent: boolean;
+  mayRequireAdmin: boolean;
+  mayRequireReboot: boolean;
+  docs: string;
+};
+
+export type WslPortableImportPlan = {
+  automatic: boolean;
+  supported: boolean;
+  installLocation: string;
+  sourceArchive: string;
+  summary: string;
+  exampleArgs: string[];
+  docs: string;
+};
+
+export type WslPreparationResult = {
+  root: string;
+  distro: string;
+  dryRun: boolean;
+  confirmedInstall: boolean;
+  diagnostics: WslDiagnostic;
+  wouldModifyHost: boolean;
+  hostChanges: string[];
+  commands: WslPreparationCommand[];
+  portableImport: WslPortableImportPlan;
+  executed: boolean;
+  messages: string[];
+};

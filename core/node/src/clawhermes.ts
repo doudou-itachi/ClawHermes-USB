@@ -1,4 +1,4 @@
-import { adapterSetupPlan, appSourcePlan, checkoutAppSource, createBackup, getRoot, getStatus, initializeEnvFiles, installRuntimeFromArchive, markAdapterReady, portableEnv, probeAppSources, readLogTail, runAdapterSetup, runtimePreparationPlan, serviceEnvironmentDiagnostic, setupDiagnostics, startSingleAdapter, startSkeleton, stopSkeleton, verifyAdapter, writeStatusSnapshot, wslDiagnostics } from "./core";
+import { adapterSetupPlan, appSourcePlan, checkoutAppSource, createBackup, getRoot, getStatus, initializeEnvFiles, installRuntimeFromArchive, markAdapterReady, portableEnv, prepareWsl, probeAppSources, readLogTail, runAdapterSetup, runtimePreparationPlan, serviceEnvironmentDiagnostic, setupDiagnostics, startSingleAdapter, startSkeleton, stopSkeleton, verifyAdapter, writeStatusSnapshot, wslDiagnostics } from "./core";
 import type { BackupProfile } from "./backup";
 
 type ParsedArgs = {
@@ -13,6 +13,7 @@ type ParsedArgs = {
   dryRun: boolean;
   confirmCheckout: boolean;
   confirmSetup: boolean;
+  confirmInstall: boolean;
   confirmReady: boolean;
   confirmStart: boolean;
   distro?: string;
@@ -33,6 +34,7 @@ function parseArgs(argv: string[]): ParsedArgs {
   let dryRun = false;
   let confirmCheckout = false;
   let confirmSetup = false;
+  let confirmInstall = false;
   let confirmReady = false;
   let confirmStart = false;
   let distro: string | undefined;
@@ -62,6 +64,8 @@ function parseArgs(argv: string[]): ParsedArgs {
       confirmCheckout = true;
     } else if (arg === "--confirm-setup") {
       confirmSetup = true;
+    } else if (arg === "--confirm-install") {
+      confirmInstall = true;
     } else if (arg === "--confirm-ready") {
       confirmReady = true;
     } else if (arg === "--confirm-start") {
@@ -79,7 +83,7 @@ function parseArgs(argv: string[]): ParsedArgs {
       positional.push(arg);
     }
   }
-  return { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, confirmCheckout, confirmSetup, confirmReady, confirmStart, distro, summary, lines };
+  return { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, confirmCheckout, confirmSetup, confirmInstall, confirmReady, confirmStart, distro, summary, lines };
 }
 
 function parseBackupProfile(value: string): BackupProfile {
@@ -92,7 +96,7 @@ function printJson(value: unknown): void {
 }
 
 async function main(): Promise<void> {
-  const { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, confirmCheckout, confirmSetup, confirmReady, confirmStart, distro, summary, lines } = parseArgs(process.argv.slice(2));
+  const { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, confirmCheckout, confirmSetup, confirmInstall, confirmReady, confirmStart, distro, summary, lines } = parseArgs(process.argv.slice(2));
   const root = getRoot(usbRoot);
 
   switch (action) {
@@ -138,6 +142,19 @@ async function main(): Promise<void> {
         console.log("ClawHermes-USB WSL2 diagnostics");
         console.log(`wsl.exe: ${result.found ? result.executablePath : "not found"}`);
         for (const message of result.messages) console.log(`- ${message}`);
+      }
+      return;
+    }
+    case "prepare-wsl": {
+      const result = prepareWsl(root, { distro, dryRun, confirmInstall });
+      if (json) {
+        printJson(result);
+      } else {
+        console.log(dryRun ? "ClawHermes-USB WSL2 preparation plan" : "ClawHermes-USB WSL2 preparation");
+        for (const message of result.messages) console.log(`- ${message}`);
+        for (const change of result.hostChanges) console.log(`- ${change}`);
+        for (const command of result.commands) console.log(`Command: ${command.commandLine}`);
+        console.log(`Portable import note: ${result.portableImport.summary}`);
       }
       return;
     }

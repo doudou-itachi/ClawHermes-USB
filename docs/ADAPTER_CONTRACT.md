@@ -524,6 +524,13 @@ To add a new service:
 7. Run `node core/node/dist/clawhermes.js adapters <new-service> --json`.
 8. Run `node core/node/dist/clawhermes.js sources <new-service> --json`.
 9. Run `node core/node/dist/clawhermes.js probe-sources <new-service> --json`.
+10. Run `node core/node/dist/clawhermes.js checkout-source <new-service> --dry-run --json` before any real checkout.
+11. Run `node core/node/dist/clawhermes.js setup-adapter <new-service> --dry-run --json` before any real setup.
+12. Run `node core/node/dist/clawhermes.js verify-adapter <new-service> --json`.
+13. Run `node core/node/dist/clawhermes.js mark-adapter-ready <new-service> --confirm-ready --summary "<evidence>" --json` only after verification passes.
+14. Update portal metadata if needed.
+
+No core code should be changed unless the service needs a new generic capability.
 
 ## 16. WSL2 Adapter Diagnostics
 
@@ -552,15 +559,11 @@ node core/node/dist/clawhermes.js wsl --distro Ubuntu --json
 Rules:
 
 - The diagnostic is read-only.
-- Users must install and initialize WSL2 themselves before WSL2 adapters can run; ClawHermes-USB does not silently enable Windows features or install Linux distributions.
-- A typical user-owned installation command is `wsl.exe --install -d Ubuntu`, followed by the standard WSL first-run initialization.
+- Users must explicitly approve WSL2 preparation before WSL2 adapters can run; ClawHermes-USB must not silently enable Windows features or install Linux distributions.
+- Inspect the host-level preparation plan with `node core/node/dist/clawhermes.js prepare-wsl --distro Ubuntu --dry-run --json`.
+- A typical explicit installation command is `wsl.exe --install -d Ubuntu`, followed by the standard WSL first-run initialization.
+- Real host preparation must require `--confirm-install`.
+- A future `wsl --import` workflow may store distro files under the USB/project path, but the imported distro is still registered on the current Windows host.
 - Missing `wsl.exe`, missing distributions, and missing WSL2 distributions must be reported as setup actions.
 - When `runtime.distro` is set, WSL commands must include `--distribution <name>` and diagnostics must verify that target distribution.
 - WSL2 adapter setup/start commands must not run until the WSL2 diagnostic is healthy.
-10. Run `node core/node/dist/clawhermes.js checkout-source <new-service> --dry-run --json` before any real checkout.
-11. Run `node core/node/dist/clawhermes.js setup-adapter <new-service> --dry-run --json` before any real setup.
-12. Run `node core/node/dist/clawhermes.js verify-adapter <new-service> --json`.
-13. Run `node core/node/dist/clawhermes.js mark-adapter-ready <new-service> --confirm-ready --summary "<evidence>" --json` only after verification passes.
-14. Update portal metadata if needed.
-
-No core code should be changed unless the service needs a new generic capability.

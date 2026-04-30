@@ -14,6 +14,7 @@ function parseArgs(argv) {
     let dryRun = false;
     let confirmCheckout = false;
     let confirmSetup = false;
+    let confirmInstall = false;
     let confirmReady = false;
     let confirmStart = false;
     let distro;
@@ -52,6 +53,9 @@ function parseArgs(argv) {
         else if (arg === "--confirm-setup") {
             confirmSetup = true;
         }
+        else if (arg === "--confirm-install") {
+            confirmInstall = true;
+        }
         else if (arg === "--confirm-ready") {
             confirmReady = true;
         }
@@ -74,7 +78,7 @@ function parseArgs(argv) {
             positional.push(arg);
         }
     }
-    return { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, confirmCheckout, confirmSetup, confirmReady, confirmStart, distro, summary, lines };
+    return { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, confirmCheckout, confirmSetup, confirmInstall, confirmReady, confirmStart, distro, summary, lines };
 }
 function parseBackupProfile(value) {
     if (value === "data-only" || value === "full")
@@ -85,7 +89,7 @@ function printJson(value) {
     process.stdout.write(`${JSON.stringify(value, null, 2)}\n`);
 }
 async function main() {
-    const { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, confirmCheckout, confirmSetup, confirmReady, confirmStart, distro, summary, lines } = parseArgs(process.argv.slice(2));
+    const { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, confirmCheckout, confirmSetup, confirmInstall, confirmReady, confirmStart, distro, summary, lines } = parseArgs(process.argv.slice(2));
     const root = (0, core_1.getRoot)(usbRoot);
     switch (action) {
         case "env-json":
@@ -139,6 +143,23 @@ async function main() {
                 console.log(`wsl.exe: ${result.found ? result.executablePath : "not found"}`);
                 for (const message of result.messages)
                     console.log(`- ${message}`);
+            }
+            return;
+        }
+        case "prepare-wsl": {
+            const result = (0, core_1.prepareWsl)(root, { distro, dryRun, confirmInstall });
+            if (json) {
+                printJson(result);
+            }
+            else {
+                console.log(dryRun ? "ClawHermes-USB WSL2 preparation plan" : "ClawHermes-USB WSL2 preparation");
+                for (const message of result.messages)
+                    console.log(`- ${message}`);
+                for (const change of result.hostChanges)
+                    console.log(`- ${change}`);
+                for (const command of result.commands)
+                    console.log(`Command: ${command.commandLine}`);
+                console.log(`Portable import note: ${result.portableImport.summary}`);
             }
             return;
         }

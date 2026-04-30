@@ -48,6 +48,7 @@ Run the Node CLI directly:
 ```powershell
 node core/node/dist/clawhermes.js setup --json
 node core/node/dist/clawhermes.js wsl --distro Ubuntu --json
+node core/node/dist/clawhermes.js prepare-wsl --distro Ubuntu --dry-run --json
 node core/node/dist/clawhermes.js adapters --json
 node core/node/dist/clawhermes.js adapters hermes-web-ui --json
 node core/node/dist/clawhermes.js sources --json
@@ -69,6 +70,8 @@ Run verification:
 ```powershell
 npm test
 ```
+
+WSL2 note: `prepare-wsl` is guarded because enabling WSL2 and registering a Linux distribution modify the current Windows host. The command only prints a plan by default; real host preparation requires `--confirm-install`.
 
 ## Core Documents
 

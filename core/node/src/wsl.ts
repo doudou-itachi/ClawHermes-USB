@@ -1,7 +1,11 @@
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import type { WslDiagnostic, WslDistroDiagnostic } from "./types";
+import { join } from "node:path";
+import type { WslDiagnostic, WslDistroDiagnostic, WslPreparationCommand, WslPreparationResult } from "./types";
 import { getRoot } from "./portable";
+
+const WSL_INSTALL_DOCS = "https://learn.microsoft.com/en-us/windows/wsl/install";
+const WSL_COMMAND_DOCS = "https://learn.microsoft.com/en-us/windows/wsl/basic-commands";
 
 export function wslDiagnostics(usbRoot: string, desiredDistro?: string): WslDiagnostic {
   const root = getRoot(usbRoot);
@@ -57,6 +61,99 @@ export function wslDiagnostics(usbRoot: string, desiredDistro?: string): WslDiag
     desiredDistroVersion: desired?.version ?? null,
     messages,
   };
+}
+
+export function prepareWsl(usbRoot: string, options: { distro?: string; dryRun: boolean; confirmInstall: boolean }): WslPreparationResult {
+  const root = getRoot(usbRoot);
+  const distro = normalizeDesiredDistro(options.distro) ?? "Ubuntu";
+  const diagnostics = wslDiagnostics(root, distro);
+  const commands = preparationCommands(diagnostics, distro);
+  const portableImport = {
+    automatic: false,
+    supported: true,
+    installLocation: join(root, "data", "wsl", `ClawHermes-${distro}`),
+    sourceArchive: join(root, "runtimes", "wsl", `${distro.toLowerCase()}-rootfs.tar`),
+    summary: "wsl --import can place distro files under the USB/project path, but the distro is still registered on the current Windows host.",
+    exampleArgs: ["--import", `ClawHermes-${distro}`, join(root, "data", "wsl", `ClawHermes-${distro}`), join(root, "runtimes", "wsl", `${distro.toLowerCase()}-rootfs.tar`), "--version", "2"],
+    docs: WSL_COMMAND_DOCS,
+  };
+  const hostChanges = [
+    "WSL2 enablement and Linux distribution registration are host-level Windows changes, not fully portable USB state.",
+    "The install flow may require administrator approval, network access, first-run Linux user initialization, and a Windows restart.",
+    "ClawHermes-USB will not run these commands unless --confirm-install is provided.",
+  ];
+  const wouldModifyHost = commands.length > 0;
+  const messages = commands.length === 0
+    ? [`WSL2 target distribution is already ready: ${distro}.`]
+    : [`WSL2 preparation is required for target distribution: ${distro}.`];
+
+  const result: WslPreparationResult = {
+    root,
+    distro,
+    dryRun: options.dryRun,
+    confirmedInstall: options.confirmInstall,
+    diagnostics,
+    wouldModifyHost,
+    hostChanges,
+    commands,
+    portableImport,
+    executed: false,
+    messages,
+  };
+
+  if (options.dryRun || commands.length === 0) return result;
+  if (!options.confirmInstall) {
+    throw new Error("prepare-wsl modifies the Windows host. Re-run with --confirm-install to proceed.");
+  }
+
+  for (const command of commands) {
+    execFileSync(command.executablePath, command.args, { stdio: "inherit", windowsHide: true });
+  }
+  return { ...result, executed: true };
+}
+
+function preparationCommands(diagnostics: WslDiagnostic, distro: string): WslPreparationCommand[] {
+  const executablePath = diagnostics.executablePath ?? "wsl.exe";
+  const desired = diagnostics.distros.find((item) => item.name.toLowerCase() === distro.toLowerCase()) ?? null;
+  if (!desired) {
+    const args = ["--install", "-d", distro];
+    return [{
+      id: "install-distro",
+      description: `Install WSL2 and the ${distro} distribution on this Windows host.`,
+      executablePath,
+      args,
+      commandLine: commandLine(executablePath, args),
+      modifiesHost: true,
+      requiresUserConsent: true,
+      mayRequireAdmin: true,
+      mayRequireReboot: true,
+      docs: WSL_INSTALL_DOCS,
+    }];
+  }
+  if (desired.version !== 2) {
+    const args = ["--set-version", distro, "2"];
+    return [{
+      id: "convert-distro",
+      description: `Convert the ${distro} distribution to WSL2 on this Windows host.`,
+      executablePath,
+      args,
+      commandLine: commandLine(executablePath, args),
+      modifiesHost: true,
+      requiresUserConsent: true,
+      mayRequireAdmin: false,
+      mayRequireReboot: false,
+      docs: WSL_COMMAND_DOCS,
+    }];
+  }
+  return [];
+}
+
+function commandLine(executablePath: string, args: string[]): string {
+  return [executablePath, ...args].map(quoteCommandArg).join(" ");
+}
+
+function quoteCommandArg(value: string): string {
+  return /\s/.test(value) ? `"${value.replaceAll('"', '\\"')}"` : value;
 }
 
 function normalizeDesiredDistro(value: string | undefined): string | null {
