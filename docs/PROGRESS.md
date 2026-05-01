@@ -159,6 +159,33 @@ Next steps:
 
 - Ask users to reopen the GUI after pulling this fix so the updated click handlers are loaded.
 
+### Windows GUI Hidden Runner Compatibility
+
+Status: `Done`
+
+Summary:
+
+- Fixed the GUI operation buttons failing with `You cannot call a method on a null-valued expression` on Windows PowerShell 5.1.
+- Root cause: Windows PowerShell 5.1 exposes `System.Diagnostics.ProcessStartInfo.ArgumentList` as null, so using `.ArgumentList.Add(...)` is not portable across the supported Windows runtime.
+- Replaced `ArgumentList.Add` with a Windows-compatible `$startInfo.Arguments` command line builder and argument quoting helper.
+- Added a hidden runner self-test that executes `model-config-status` through the same hidden process path used by GUI buttons.
+
+Changed areas:
+
+- `launcher/windows/ClawHermes-Control.ps1`
+- `tests/test_windows_core.py`
+- `docs/PROGRESS.md`
+
+Validation performed:
+
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_gui_control_hidden_runner_works_on_windows_powershell -v`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_gui_control_launcher_calls_powershell_gui tests.test_windows_core.WindowsCoreTests.test_gui_control_script_exposes_left_nav_theme_and_hidden_runner tests.test_windows_core.WindowsCoreTests.test_gui_control_script_wires_pages_to_dispatcher_actions tests.test_windows_core.WindowsCoreTests.test_gui_control_theme_preference_and_docs_are_user_facing tests.test_windows_core.WindowsCoreTests.test_gui_control_click_handlers_change_pages tests.test_windows_core.WindowsCoreTests.test_gui_control_hidden_runner_works_on_windows_powershell -v`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File launcher\windows\ClawHermes-Control.ps1 -UsbRoot . -HiddenSelfTest`
+
+Next steps:
+
+- Ask users to reopen the GUI after pulling this fix so the hidden runner uses the updated implementation.
+
 ## 2026-04-30
 
 ### Initial Project Foundation

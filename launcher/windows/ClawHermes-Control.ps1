@@ -1,7 +1,8 @@
 ﻿param(
     [string]$UsbRoot,
     [switch]$SelfTest,
-    [switch]$ClickSelfTest
+    [switch]$ClickSelfTest,
+    [switch]$HiddenSelfTest
 )
 
 $ErrorActionPreference = "Stop"
@@ -90,6 +91,45 @@ function Get-ThemePalette {
     }
 }
 
+function ConvertTo-ProcessArgument {
+    param([AllowNull()][string]$Argument)
+
+    if ($null -eq $Argument) {
+        return '""'
+    }
+    if ($Argument -notmatch '[\s"]') {
+        return $Argument
+    }
+
+    $builder = New-Object System.Text.StringBuilder
+    [void]$builder.Append('"')
+    $backslashes = 0
+    foreach ($character in $Argument.ToCharArray()) {
+        if ($character -eq '\') {
+            $backslashes += 1
+            continue
+        }
+        if ($character -eq '"') {
+            if ($backslashes -gt 0) {
+                [void]$builder.Append('\' * ($backslashes * 2))
+                $backslashes = 0
+            }
+            [void]$builder.Append('\"')
+            continue
+        }
+        if ($backslashes -gt 0) {
+            [void]$builder.Append('\' * $backslashes)
+            $backslashes = 0
+        }
+        [void]$builder.Append($character)
+    }
+    if ($backslashes -gt 0) {
+        [void]$builder.Append('\' * ($backslashes * 2))
+    }
+    [void]$builder.Append('"')
+    return $builder.ToString()
+}
+
 function Invoke-ClawHermesHidden {
     param(
         [Parameter(Mandatory = $true)]
@@ -114,10 +154,8 @@ function Invoke-ClawHermesHidden {
     }
 
     $startInfo = New-Object System.Diagnostics.ProcessStartInfo
-    $startInfo.FileName = "powershell"
-    foreach ($argument in $argumentList) {
-        [void]$startInfo.ArgumentList.Add($argument)
-    }
+    $startInfo.FileName = "powershell.exe"
+    $startInfo.Arguments = (($argumentList | ForEach-Object { ConvertTo-ProcessArgument -Argument $_ }) -join " ")
     $startInfo.CreateNoWindow = $true
     $startInfo.UseShellExecute = $false
     $startInfo.RedirectStandardOutput = $true
@@ -559,6 +597,11 @@ if ($SelfTest) {
 
 if ($ClickSelfTest) {
     Show-ClawHermesControl -Root $root -ClickSelfTest | ConvertTo-Json -Compress
+    exit 0
+}
+
+if ($HiddenSelfTest) {
+    Invoke-ClawHermesHidden -Root $root -Action "model-config-status" -Json | ConvertTo-Json -Compress
     exit 0
 }
 

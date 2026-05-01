@@ -856,6 +856,30 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertEqual(payload["afterThemeClick"], "dark")
         self.assertGreaterEqual(payload["contentLeft"], payload["navWidth"])
 
+    def test_gui_control_hidden_runner_works_on_windows_powershell(self):
+        result = subprocess.run(
+            [
+                "powershell",
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                str(ROOT / "launcher" / "windows" / "ClawHermes-Control.ps1"),
+                "-UsbRoot",
+                str(ROOT),
+                "-HiddenSelfTest",
+            ],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("Null", result.stdout + result.stderr)
+        self.assertIn("exists", result.stdout)
+
     def test_user_guide_script_exposes_safe_modes_and_noninteractive_switches(self):
         text = (ROOT / "launcher" / "windows" / "UserGuide.ps1").read_text(encoding="utf-8")
 
