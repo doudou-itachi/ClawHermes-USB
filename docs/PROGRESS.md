@@ -2976,6 +2976,35 @@ Next steps:
 - Keep Hermes Web UI as an ignored payload in normal source control.
 - Include this app payload in guarded export packages when operators intentionally run `payload-export --confirm-export`.
 
+### Upstream Payload Cleanliness
+
+Status: `Done`
+
+Summary:
+
+- Inspected the nested Hermes Agent checkout and confirmed the only dirty path was the generated `setup-hermes.sh` line-ending normalization from prior setup validation.
+- Restored `apps/hermes-agent/setup-hermes.sh` inside the nested upstream repository.
+- Added a local-only nested Web UI git exclude for `.gitkeep`, preserving the parent repository placeholder without making the upstream checkout dirty.
+- Re-ran `payloads --json` and confirmed Hermes Agent, Hermes Web UI, and OpenClaw all report clean nested git status.
+
+Changed areas:
+
+- `docs/PROGRESS.md`
+- local ignored nested payload metadata under `apps/hermes-web-ui/.git/info/exclude`
+
+Validation performed:
+
+- `git -C apps\hermes-agent status --short`
+- `git -C apps\hermes-agent diff -- setup-hermes.sh`
+- `git -C apps\hermes-agent restore -- setup-hermes.sh`
+- `git -C apps\hermes-web-ui status --short`
+- `node core\node\dist\clawhermes.js payloads --json`
+
+Next steps:
+
+- Keep `.gitkeep` placeholders tracked only by the parent repository.
+- Keep nested payload git status clean before running export or release packaging.
+
 ### Real WSL2 Payload Host Preparation
 
 Status: `Done`

@@ -42,10 +42,10 @@
 **Files:**
 - Modify: `docs/PROGRESS.md`
 
-- [ ] Inspect nested `apps/hermes-agent` diff.
-- [ ] Restore only the generated `setup-hermes.sh` CRLF-normalization change in the nested checkout.
-- [ ] Re-run `payloads --json` and confirm Hermes Agent git status is clean.
-- [ ] Record the cleanup in progress docs and commit if tracked docs changed.
+- [x] Inspect nested `apps/hermes-agent` diff.
+- [x] Restore only the generated `setup-hermes.sh` CRLF-normalization change in the nested checkout.
+- [x] Re-run `payloads --json` and confirm Hermes Agent git status is clean.
+- [x] Record the cleanup in progress docs and commit if tracked docs changed.
 
 ### Task 4: Automatic Port Remapping
 
