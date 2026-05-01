@@ -74,6 +74,13 @@ function generatePortal(usbRoot, services) {
         <li>Checking setup recommendations...</li>
       </ul>
     </section>
+    <section>
+      <h2>WSL2 readiness</h2>
+      <ul data-wsl2-readiness>
+        <li>Check Hermes Agent with <code>node core/node/dist/clawhermes.js wsl-workflow hermes-agent --json</code> and <code>node core/node/dist/clawhermes.js verify-adapter hermes-agent --json</code>.</li>
+        <li>Check OpenClaw with <code>node core/node/dist/clawhermes.js wsl-workflow openclaw --json</code> and <code>node core/node/dist/clawhermes.js verify-adapter openclaw --json</code>.</li>
+      </ul>
+    </section>
   </main>
   <script>
     async function refreshStatus() {
@@ -123,8 +130,33 @@ function generatePortal(usbRoot, services) {
           }
           target.appendChild(item);
         }
+        refreshWslReadiness(payload);
       } catch {
         // Keep the static placeholder if the snapshot is not available.
+      }
+    }
+    function refreshWslReadiness(payload) {
+      const target = document.querySelector('[data-wsl2-readiness]');
+      if (!target) return;
+      const artifacts = payload.wslArtifacts || [];
+      if (artifacts.length === 0) return;
+      target.innerHTML = '';
+      for (const artifact of artifacts) {
+        const item = document.createElement('li');
+        const serviceId = artifact.serviceId || 'unknown-service';
+        const status = artifact.sourceArchiveExists ? 'rootfs archive present' : 'rootfs archive missing';
+        const label = document.createElement('strong');
+        label.textContent = serviceId + ': ' + status;
+        item.appendChild(label);
+        item.appendChild(document.createTextNode(' '));
+        const workflow = document.createElement('code');
+        workflow.textContent = 'node core/node/dist/clawhermes.js wsl-workflow ' + serviceId + ' --json';
+        item.appendChild(workflow);
+        item.appendChild(document.createTextNode(' '));
+        const verify = document.createElement('code');
+        verify.textContent = 'node core/node/dist/clawhermes.js verify-adapter ' + serviceId + ' --json';
+        item.appendChild(verify);
+        target.appendChild(item);
       }
     }
     async function refreshBackups() {

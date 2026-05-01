@@ -2684,3 +2684,35 @@ Next steps:
 
 - Add a portal surface for WSL2 workflow/verification readiness so operators do not need to memorize CLI commands.
 - Continue real OpenClaw/Hermes Agent WSL2 payload verification when a prepared WSL2 distro is available.
+
+### Portal WSL2 Readiness Surface
+
+Status: `Done`
+
+Summary:
+
+- Added a WSL2 readiness section to the generated local portal.
+- The portal now exposes `wsl-workflow` and `verify-adapter` commands for Hermes Agent and OpenClaw.
+- The setup snapshot refresh now turns WSL2 artifact diagnostics into per-adapter rootfs readiness rows.
+- Added regression coverage so the portal continues to surface WSL2 workflow and verification guidance.
+
+Changed areas:
+
+- `core/node/src/portal.ts`
+- `core/node/dist/portal.js`
+- `docs/PROGRESS.md`
+- `tests/test_windows_core.py`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_start_generates_portal_from_adapter_metadata tests.test_windows_core.WindowsCoreTests.test_portal_serves_setup_actions_snapshot -v`
+- `npm test`
+- `git diff --check`
+- UTF-8 smoke check
+- C temp cleanup check
+
+Next steps:
+
+- Add a structured portal endpoint for adapter verification snapshots so operators can see WSL2 gate status without running CLI commands manually.
+- Continue real Hermes Agent and OpenClaw WSL2 payload verification when a prepared WSL2 distro is available.

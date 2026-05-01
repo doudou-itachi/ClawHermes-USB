@@ -2588,6 +2588,10 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertIn("data-health-label", html)
             self.assertIn("data-health-reason", html)
             self.assertIn("fetch('/status.json'", html)
+            self.assertIn("WSL2 readiness", html)
+            self.assertIn("data-wsl2-readiness", html)
+            self.assertIn("wsl-workflow", html)
+            self.assertIn("verify-adapter", html)
         finally:
             run_dispatcher("stop", "-Json")
 
@@ -2627,6 +2631,7 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertEqual(start.returncode, 0, start.stderr)
             html = wait_for_portal()
             self.assertIn("Setup actions", html)
+            self.assertIn("WSL2 readiness", html)
 
             setup_path = ROOT / "data" / "tmp" / "setup.json"
             self.assertTrue(setup_path.exists())
@@ -2636,6 +2641,7 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertEqual(Path(setup_payload["root"]).resolve(), ROOT)
             self.assertIn("runtime:node", action_ids)
             self.assertIn("env-file:hermes-agent", action_ids)
+            self.assertTrue(any(item["serviceId"] == "openclaw" for item in setup_payload["wslArtifacts"]))
         finally:
             run_dispatcher("stop", "-Json")
 
