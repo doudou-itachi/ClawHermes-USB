@@ -8,14 +8,15 @@ This document records the current upstream startup facts that affect ClawHermes-
 
 Source:
 
-- <https://github.com/openclaw/openclaw/blob/main/docs/platforms/windows.md>
+- <https://docs.openclaw.ai/platforms/windows>
+- <https://docs.openclaw.kr/cli/gateway>
 
 Current conclusion:
 
-- WSL2 is the recommended Windows path for the full OpenClaw experience.
+- WSL2 is the more stable and recommended Windows path for the full OpenClaw experience.
 - Native Windows CLI and gateway flows exist, but upstream still documents caveats around onboarding, gateway install, Scheduled Tasks, and fallback Startup-folder behavior.
 - For portable USB use, `openclaw gateway run` is the safest candidate because it avoids installing a managed service.
-- `commands.start` remains `null` in `adapters/openclaw/adapter.json` until OpenClaw data path variables, gateway port, Control UI URL, and WebChat URL are verified from an installed payload.
+- `adapters/openclaw/adapter.json` now models OpenClaw as a WSL2 adapter, but `commands.start` remains `null` until OpenClaw data path variables, gateway port, Control UI URL, and WebChat URL are verified from an installed payload.
 
 Adapter status: `blocked`
 

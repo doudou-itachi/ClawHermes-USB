@@ -604,6 +604,8 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertTrue(artifact["archivePath"].replace("\\", "/").endswith("runtimes/wsl/ubuntu-rootfs.tar"))
         self.assertIn("wsl-rootfs-guide --distro Ubuntu --json", artifact["guideCommand"])
         self.assertIn("wsl-import-plan --distro Ubuntu --json", artifact["importPlanCommand"])
+        artifact_services = {item["serviceId"] for item in payload["wslArtifacts"]}
+        self.assertIn("openclaw", artifact_services)
 
     def test_setup_json_reports_recommended_actions(self):
         result = run_dispatcher("setup", "-Json")
@@ -623,6 +625,7 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertNotIn("adapter-integration:hermes-web-ui", action_ids)
         self.assertIn("env-file:hermes-agent", action_ids)
         self.assertIn("wsl-artifact:hermes-agent", action_ids)
+        self.assertIn("wsl-artifact:openclaw", action_ids)
 
         node_action = next(action for action in actions if action["id"] == "runtime:node")
         self.assertEqual(node_action["severity"], "warning")
@@ -1202,7 +1205,7 @@ class WindowsCoreTests(unittest.TestCase):
         finally:
             temp_dir.cleanup()
 
-    def test_setup_json_reports_wsl2_action_when_hermes_agent_needs_wsl2(self):
+    def test_setup_json_reports_wsl2_actions_when_adapters_need_wsl2(self):
         missing_wsl = str(ROOT / "data" / "tmp" / "missing-wsl.exe")
 
         result = run_dispatcher("setup", "-Json", env={"CLAWHERMES_WSL_EXE": missing_wsl})
@@ -1213,6 +1216,7 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertFalse(payload["wsl"]["found"])
         action_ids = {action["id"] for action in payload["actions"]}
         self.assertIn("wsl2:hermes-agent", action_ids)
+        self.assertIn("wsl2:openclaw", action_ids)
         action = next(action for action in payload["actions"] if action["id"] == "wsl2:hermes-agent")
         self.assertEqual(action["category"], "wsl2")
         self.assertEqual(action["severity"], "warning")
@@ -1540,6 +1544,18 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertEqual(adapter["runtime"]["distro"], "Ubuntu")
         self.assertEqual(adapter["integration"]["platform"], "wsl2")
         self.assertEqual(adapter["integration"]["strategy"], "wsl2-adapter")
+
+    def test_adapters_json_reports_openclaw_wsl2_strategy(self):
+        result = run_dispatcher("adapters", "openclaw", "-Json")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        adapter = json.loads(result.stdout)["adapters"][0]
+        self.assertEqual(adapter["runtime"]["kind"], "wsl2")
+        self.assertEqual(adapter["runtime"]["requiredExecutable"], "wsl.exe")
+        self.assertEqual(adapter["runtime"]["distro"], "Ubuntu")
+        self.assertEqual(adapter["integration"]["platform"], "wsl2")
+        self.assertEqual(adapter["integration"]["strategy"], "wsl2-adapter")
+        self.assertFalse(adapter["integration"]["productionReady"])
 
     def test_adapters_unknown_service_fails_with_actionable_message(self):
         result = run_dispatcher("adapters", "missing-service", "-Json")

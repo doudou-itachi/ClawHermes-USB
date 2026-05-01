@@ -2609,3 +2609,44 @@ Validation performed:
 Next steps:
 
 - Continue toward real upstream integration for Hermes Agent and OpenClaw where external prerequisites allow it.
+
+### OpenClaw WSL2 Strategy Alignment
+
+Status: `Done`
+
+Summary:
+
+- Refreshed OpenClaw Windows integration notes against current official documentation.
+- Updated the OpenClaw adapter runtime strategy from native Node to WSL2 because official Windows docs recommend WSL2 for the full experience.
+- Kept OpenClaw blocked and not production-ready until an installed payload proves portable data paths, gateway port, and UI behavior.
+- Setup diagnostics now naturally surface WSL2 and WSL rootfs artifact actions for OpenClaw as well as Hermes Agent.
+
+Changed areas:
+
+- `core/node/src/core.ts`
+- `core/node/dist/core.js`
+- `adapters/openclaw/adapter.json`
+- `adapters/openclaw/README.md`
+- `docs/upstream-integration.md`
+- `docs/PROGRESS.md`
+- `tests/test_windows_core.py`
+
+Sources checked:
+
+- `https://docs.openclaw.ai/platforms/windows`
+- `https://docs.openclaw.kr/cli/gateway`
+
+Validation performed:
+
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_adapters_json_reports_openclaw_wsl2_strategy tests.test_windows_core.WindowsCoreTests.test_setup_json_reports_wsl2_actions_when_adapters_need_wsl2 tests.test_windows_core.WindowsCoreTests.test_setup_json_reports_runtime_diagnostics_and_valid_adapters tests.test_windows_core.WindowsCoreTests.test_setup_json_reports_recommended_actions -v`
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_start_status_stop_manage_placeholder_pid_metadata tests.test_windows_core.WindowsCoreTests.test_start_generates_portal_from_adapter_metadata tests.test_windows_core.WindowsCoreTests.test_start_uses_placeholder_when_production_ready_app_dir_has_no_real_content tests.test_windows_core.WindowsCoreTests.test_start_uses_wsl2_plan_for_production_ready_wsl_adapter -v`
+- `npm test`
+- `git diff --check`
+- UTF-8 smoke check
+- C temp cleanup check
+
+Next steps:
+
+- Verify OpenClaw from a real WSL2 payload before setting any setup/start command or portal URLs.
+- Continue Hermes Agent WSL2 payload verification when WSL2 is available.

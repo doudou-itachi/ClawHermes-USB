@@ -18,8 +18,8 @@ This adapter will integrate the official OpenClaw runtime.
 
 Until those are confirmed, `adapter.json` intentionally leaves `commands.start` and portal URL as `null`.
 
-## 2026-04-30 Upstream Check
+## 2026-05-01 Upstream Check
 
-OpenClaw's current Windows documentation recommends WSL2 for the full experience. Native Windows CLI and gateway flows exist, but the documented service install path can use Scheduled Tasks or Startup-folder fallback behavior.
+OpenClaw's current Windows documentation says WSL2 is the more stable and recommended path for the full experience. Native Windows CLI and gateway flows exist, but the documented service install path can use Scheduled Tasks or Startup-folder fallback behavior.
 
-For ClawHermes-USB, production startup remains blocked until a portable foreground gateway mode, data directory behavior, and UI ports are verified locally.
+For ClawHermes-USB, this adapter is modeled as a WSL2 adapter. Production startup remains blocked until a portable foreground gateway mode, data directory behavior, gateway port, and UI ports are verified locally from an installed payload.

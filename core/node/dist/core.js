@@ -79,7 +79,8 @@ async function startSkeleton(usbRoot) {
     (0, diagnostics_1.writeSetupSnapshot)(root, setup);
     const started = [];
     for (const adapter of (0, adapters_1.serviceOrder)(root, "start").filter((item) => item.enabled)) {
-        const wslPlan = adapter.runtime?.kind === "wsl2" ? (0, wsl_adapter_1.wslAdapterCommandPlan)(root, adapter, (0, environment_1.resolveServiceEnvironment)(root, adapter.id), "start") : null;
+        const shouldPrepareWslPlan = adapter.runtime?.kind === "wsl2" && adapter.integration?.productionReady === true && Boolean(adapter.commands.start);
+        const wslPlan = shouldPrepareWslPlan ? (0, wsl_adapter_1.wslAdapterCommandPlan)(root, adapter, (0, environment_1.resolveServiceEnvironment)(root, adapter.id), "start") : null;
         if (wslPlan && adapter.integration?.productionReady === true) {
             (0, wsl_adapter_1.assertWslReadyForAdapterDistro)(root, adapter.id, adapter.runtime?.distro);
         }

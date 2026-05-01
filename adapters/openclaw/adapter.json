@@ -6,17 +6,18 @@
   "enabled": true,
   "appDir": "apps/openclaw",
   "runtime": {
-    "kind": "node",
+    "kind": "wsl2",
     "platform": "windows",
-    "requiredExecutable": "node.exe"
+    "requiredExecutable": "wsl.exe",
+    "distro": "Ubuntu"
   },
   "upstream": {
     "name": "openclaw/openclaw",
     "repositoryUrl": "https://github.com/openclaw/openclaw",
-    "installDocs": "https://github.com/openclaw/openclaw/blob/main/docs/platforms/windows.md",
+    "installDocs": "https://docs.openclaw.ai/platforms/windows",
     "checkoutRef": "main",
     "installMode": "source-checkout",
-    "notes": "Native portable Windows startup remains blocked pending upstream Windows data path verification."
+    "notes": "Official Windows docs recommend WSL2 for the full experience; native Windows remains a caveated path."
   },
   "commands": {
     "setup": null,
@@ -49,10 +50,13 @@
   "integration": {
     "status": "blocked",
     "productionReady": false,
-    "verifiedAt": "2026-04-30",
-    "summary": "Official Windows guidance recommends WSL2 for the full experience. Native Windows gateway use exists but has service-install caveats, so the portable native adapter is blocked until data path and port behavior are verified.",
+    "verifiedAt": "2026-05-01",
+    "summary": "Official Windows guidance says WSL2 is the more stable and recommended path for the full experience. Native Windows gateway use exists but has service-install caveats, so OpenClaw remains blocked until WSL2 data path, gateway port, and UI behavior are verified from an installed payload.",
+    "platform": "wsl2",
+    "strategy": "wsl2-adapter",
     "sources": [
-      "https://github.com/openclaw/openclaw/blob/main/docs/platforms/windows.md"
+      "https://docs.openclaw.ai/platforms/windows",
+      "https://docs.openclaw.kr/cli/gateway"
     ]
   },
   "dependsOn": []
