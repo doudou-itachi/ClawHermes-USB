@@ -5,6 +5,7 @@ const node_fs_1 = require("node:fs");
 const node_path_1 = require("node:path");
 const adapters_1 = require("./adapters");
 const adapter_verification_1 = require("./adapter-verification");
+const diagnostics_1 = require("./diagnostics");
 function parseArgs(argv) {
     let usbRoot = process.cwd();
     let port = 17000;
@@ -75,6 +76,14 @@ const server = (0, node_http_1.createServer)((request, response) => {
             response.end(JSON.stringify(adapterVerificationSnapshot(), null, 2));
             return;
         }
+        if (request.url === "/logs.json") {
+            response.writeHead(200, {
+                "content-type": "application/json; charset=utf-8",
+                "cache-control": "no-store",
+            });
+            response.end(JSON.stringify(logsSnapshot(), null, 2));
+            return;
+        }
         if (request.url !== "/" && request.url !== "/index.html") {
             response.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
             response.end("Not found");
@@ -139,6 +148,20 @@ function adapterVerificationSnapshot() {
                 health: verification.health,
             };
         }),
+    };
+}
+function logsSnapshot() {
+    const adapters = (0, adapters_1.loadAdapters)(usbRoot);
+    const targets = [
+        "launcher",
+        "portal",
+        ...adapters.map((adapter) => adapter.id),
+        ...adapters.map((adapter) => `setup-${adapter.id}`),
+    ];
+    return {
+        root: usbRoot,
+        generatedAt: new Date().toISOString(),
+        logs: targets.map((target) => (0, diagnostics_1.readLogTail)(usbRoot, target, 80)),
     };
 }
 server.listen(port, "127.0.0.1", () => {

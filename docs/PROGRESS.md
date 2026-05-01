@@ -2750,3 +2750,37 @@ Next steps:
 
 - Move from readiness surfaces to real WSL2 payload validation for Hermes Agent and OpenClaw when a prepared distro is available.
 - Add portal log viewing so operators can inspect setup/start failures from the local UI.
+
+### Portal Log Viewer
+
+Status: `Done`
+
+Summary:
+
+- Added `portal` and `setup-<service-id>` targets to the existing `logs` command.
+- Added a read-only `/logs.json` portal endpoint that returns launcher, portal, service, and setup log tails.
+- Added a Logs section to the generated portal so operators can inspect recent failures from the local UI.
+- Kept log viewing bounded to known project log targets under `data/logs/`.
+
+Changed areas:
+
+- `core/node/src/diagnostics.ts`
+- `core/node/src/portal-server.ts`
+- `core/node/src/portal.ts`
+- `core/node/dist/`
+- `docs/PROGRESS.md`
+- `tests/test_windows_core.py`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_logs_json_tails_known_service_log tests.test_windows_core.WindowsCoreTests.test_start_generates_portal_from_adapter_metadata tests.test_windows_core.WindowsCoreTests.test_portal_serves_log_snapshot -v`
+- `npm test`
+- `git diff --check`
+- UTF-8 smoke check
+- C temp cleanup check
+
+Next steps:
+
+- Add explicit portal stop/backup action surfaces while keeping execution guarded through the existing Batch/CLI commands.
+- Continue real Hermes Agent and OpenClaw WSL2 payload validation when a prepared distro is available.

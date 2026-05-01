@@ -223,6 +223,13 @@ export function readLogTail(usbRoot: string, target: string, requestedLines: num
 function resolveLogTarget(usbRoot: string, target: string): string {
   const root = getRoot(usbRoot);
   if (target === "launcher") return join(root, "data", "logs", "launcher.log");
+  if (target === "portal") return join(root, "data", "logs", "portal.log");
+  if (target.startsWith("setup-")) {
+    const serviceId = target.slice("setup-".length);
+    const adapter = loadAdapters(root).find((item) => item.id === serviceId);
+    if (!adapter) throw new Error(`Unknown log target: ${target}`);
+    return join(root, "data", "logs", `setup-${serviceId}.log`);
+  }
   const adapter = loadAdapters(root).find((item) => item.id === target);
   if (!adapter) throw new Error(`Unknown log target: ${target}`);
   return resolveRelative(root, adapter.logFile);

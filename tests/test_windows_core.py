@@ -86,6 +86,11 @@ def fetch_portal_adapter_verification(timeout=0.5):
         return json.loads(response.read().decode("utf-8"))
 
 
+def fetch_portal_logs(timeout=0.5):
+    with urllib.request.urlopen(f"{PORTAL_URL}logs.json", timeout=timeout) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
 def wait_for_portal():
     deadline = time.time() + 5
     last_error = None
@@ -2461,6 +2466,12 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertTrue(payload["path"].endswith(str(Path("data") / "logs" / "openclaw.log")))
             self.assertEqual(len(payload["lines"]), 1)
             self.assertIn("Placeholder service started", payload["lines"][0])
+
+            portal = run_dispatcher("logs", "portal", "--lines", "5", "-Json")
+            self.assertEqual(portal.returncode, 0, portal.stderr)
+            portal_payload = json.loads(portal.stdout)
+            self.assertEqual(portal_payload["target"], "portal")
+            self.assertTrue(portal_payload["exists"])
         finally:
             run_dispatcher("stop", "-Json")
 
@@ -2596,6 +2607,9 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertIn("Adapter verification", html)
             self.assertIn("data-adapter-verification", html)
             self.assertIn("fetch('/adapter-verification.json'", html)
+            self.assertIn("Logs", html)
+            self.assertIn("data-log-viewer", html)
+            self.assertIn("fetch('/logs.json'", html)
         finally:
             run_dispatcher("stop", "-Json")
 
@@ -2666,6 +2680,26 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertIn("wsl-executable", openclaw_checks)
             self.assertIn("wsl-target-distro", openclaw_checks)
             self.assertGreaterEqual(len(adapters["openclaw"]["nextSteps"]), 1)
+        finally:
+            run_dispatcher("stop", "-Json")
+
+    def test_portal_serves_log_snapshot(self):
+        try:
+            start = run_dispatcher("start", "-Json")
+            self.assertEqual(start.returncode, 0, start.stderr)
+            wait_for_portal()
+
+            payload = fetch_portal_logs(timeout=5)
+            logs = {item["target"]: item for item in payload["logs"]}
+
+            self.assertEqual(Path(payload["root"]).resolve(), ROOT)
+            self.assertIn("generatedAt", payload)
+            self.assertIn("launcher", logs)
+            self.assertIn("portal", logs)
+            self.assertIn("openclaw", logs)
+            self.assertIn("setup-openclaw", logs)
+            self.assertTrue(logs["launcher"]["exists"])
+            self.assertLessEqual(len(logs["launcher"]["lines"]), logs["launcher"]["requestedLines"])
         finally:
             run_dispatcher("stop", "-Json")
 

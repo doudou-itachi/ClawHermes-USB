@@ -223,6 +223,15 @@ function resolveLogTarget(usbRoot, target) {
     const root = (0, portable_1.getRoot)(usbRoot);
     if (target === "launcher")
         return (0, node_path_1.join)(root, "data", "logs", "launcher.log");
+    if (target === "portal")
+        return (0, node_path_1.join)(root, "data", "logs", "portal.log");
+    if (target.startsWith("setup-")) {
+        const serviceId = target.slice("setup-".length);
+        const adapter = (0, adapters_1.loadAdapters)(root).find((item) => item.id === serviceId);
+        if (!adapter)
+            throw new Error(`Unknown log target: ${target}`);
+        return (0, node_path_1.join)(root, "data", "logs", `setup-${serviceId}.log`);
+    }
     const adapter = (0, adapters_1.loadAdapters)(root).find((item) => item.id === target);
     if (!adapter)
         throw new Error(`Unknown log target: ${target}`);

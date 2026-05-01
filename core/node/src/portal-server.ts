@@ -3,6 +3,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statS
 import { dirname, join, resolve } from "node:path";
 import { loadAdapters } from "./adapters";
 import { verifyAdapter } from "./adapter-verification";
+import { readLogTail } from "./diagnostics";
 import type { WslDiagnostic } from "./types";
 
 function parseArgs(argv: string[]): { usbRoot: string; port: number } {
@@ -77,6 +78,14 @@ const server = createServer((request, response) => {
       response.end(JSON.stringify(adapterVerificationSnapshot(), null, 2));
       return;
     }
+    if (request.url === "/logs.json") {
+      response.writeHead(200, {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+      });
+      response.end(JSON.stringify(logsSnapshot(), null, 2));
+      return;
+    }
     if (request.url !== "/" && request.url !== "/index.html") {
       response.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
       response.end("Not found");
@@ -142,6 +151,21 @@ function adapterVerificationSnapshot() {
         health: verification.health,
       };
     }),
+  };
+}
+
+function logsSnapshot() {
+  const adapters = loadAdapters(usbRoot);
+  const targets = [
+    "launcher",
+    "portal",
+    ...adapters.map((adapter) => adapter.id),
+    ...adapters.map((adapter) => `setup-${adapter.id}`),
+  ];
+  return {
+    root: usbRoot,
+    generatedAt: new Date().toISOString(),
+    logs: targets.map((target) => readLogTail(usbRoot, target, 80)),
   };
 }
 

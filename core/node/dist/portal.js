@@ -87,6 +87,12 @@ function generatePortal(usbRoot, services) {
         <li>Checking adapter verification gates...</li>
       </ul>
     </section>
+    <section>
+      <h2>Logs</h2>
+      <div data-log-viewer>
+        <p>Checking recent logs...</p>
+      </div>
+    </section>
   </main>
   <script>
     async function refreshStatus() {
@@ -212,14 +218,46 @@ function generatePortal(usbRoot, services) {
         // Adapter verification is an operator aid; keep the portal usable if it fails.
       }
     }
+    async function refreshLogs() {
+      try {
+        const response = await fetch('/logs.json', { cache: 'no-store' });
+        if (!response.ok) return;
+        const payload = await response.json();
+        const target = document.querySelector('[data-log-viewer]');
+        if (!target) return;
+        const logs = (payload.logs || []).filter((log) => log.exists).slice(0, 6);
+        if (logs.length === 0) {
+          target.innerHTML = '<p>No log files exist yet.</p>';
+          return;
+        }
+        target.innerHTML = '';
+        for (const log of logs) {
+          const block = document.createElement('section');
+          const title = document.createElement('h3');
+          title.textContent = log.target || 'log';
+          const path = document.createElement('code');
+          path.textContent = log.path || '';
+          const lines = document.createElement('pre');
+          lines.textContent = (log.lines || []).slice(-8).join('\\n') || '(empty)';
+          block.appendChild(title);
+          block.appendChild(path);
+          block.appendChild(lines);
+          target.appendChild(block);
+        }
+      } catch {
+        // Log viewing should never prevent the rest of the portal from rendering.
+      }
+    }
     refreshStatus();
     refreshSetupActions();
     refreshBackups();
     refreshAdapterVerification();
+    refreshLogs();
     window.setInterval(refreshStatus, 5000);
     window.setInterval(refreshSetupActions, 15000);
     window.setInterval(refreshBackups, 15000);
     window.setInterval(refreshAdapterVerification, 30000);
+    window.setInterval(refreshLogs, 15000);
   </script>
 </body>
 </html>
