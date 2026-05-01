@@ -562,6 +562,30 @@ def wait_for_process_exit(pid):
     raise AssertionError(f"Process {pid} was still running")
 
 
+def wait_for_no_process_command_line_fragment(fragment):
+    escaped = str(fragment).replace("'", "''")
+    command = (
+        "$fragment = '" + escaped + "'; "
+        "$matches = Get-CimInstance Win32_Process | "
+        "Where-Object { $_.ProcessId -ne $PID -and $_.CommandLine -like \"*$fragment*\" } | "
+        "Select-Object -First 1 -ExpandProperty ProcessId; "
+        "if ($matches) { $matches }"
+    )
+    deadline = time.time() + 5
+    while time.time() < deadline:
+        result = subprocess.run(
+            ["powershell", "-NoProfile", "-Command", command],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        if not result.stdout.strip():
+            return
+        time.sleep(0.1)
+    raise AssertionError(f"Process command line still referenced {fragment}")
+
+
 class WindowsCoreTests(unittest.TestCase):
     def setUp(self):
         pid_dir = ROOT / "data" / "tmp" / "pids"
@@ -695,9 +719,16 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertEqual(provider["apiKey"], secret)
             self.assertEqual(provider["models"], [{"id": "gpt-test", "name": "gpt-test", "input": ["text"]}])
             self.assertEqual(openclaw_config["models"]["providers"]["existing"]["api"], "other")
+            self.assertEqual(openclaw_config["agents"]["defaults"]["model"], {"primary": "clawhermes/gpt-test"})
             self.assertEqual(openclaw_config["agents"]["defaults"]["models"]["clawhermes/gpt-test"], {})
             self.assertEqual(openclaw_config["agents"]["defaults"]["models"]["existing/model"]["temperature"], 0)
             self.assertTrue(openclaw_config["unrelated"])
+
+            main_auth_store = json.loads((temp_root / "data" / "openclaw" / "agents" / "main" / "agent" / "auth-profiles.json").read_text(encoding="utf-8"))
+            self.assertEqual(main_auth_store["version"], 1)
+            self.assertEqual(main_auth_store["profiles"]["clawhermes:default"]["type"], "api_key")
+            self.assertEqual(main_auth_store["profiles"]["clawhermes:default"]["provider"], "clawhermes")
+            self.assertEqual(main_auth_store["profiles"]["clawhermes:default"]["key"], secret)
 
             hermes_config = (temp_root / "data" / "hermes" / "config.yaml").read_text(encoding="utf-8")
             self.assertIn("# ClawHermes-managed model configuration", hermes_config)
@@ -767,9 +798,26 @@ class WindowsCoreTests(unittest.TestCase):
     def test_gui_control_launcher_calls_powershell_gui(self):
         text = (ROOT / "launcher" / "windows" / "ClawHermes-Control.bat").read_text(encoding="utf-8")
 
-        self.assertIn('ClawHermes-Control.ps1" -UsbRoot "%USB_ROOT%"', text)
-        self.assertIn("set CLAWHERMES_EXIT=%ERRORLEVEL%", text)
-        self.assertIn("endlocal & exit /b %CLAWHERMES_EXIT%", text)
+        self.assertIn("ClawHermes-Control.vbs", text)
+        self.assertIn("wscript.exe", text.lower())
+        self.assertIn("endlocal & exit /b 0", text)
+
+    def test_gui_control_has_no_console_vbs_entry(self):
+        text = (ROOT / "launcher" / "windows" / "ClawHermes-Control.vbs").read_text(encoding="utf-8")
+
+        self.assertIn("WScript.Shell", text)
+        self.assertIn("ClawHermes-Control-Launch.ps1", text)
+        self.assertIn("-WindowStyle Hidden", text)
+        self.assertIn("shell.Run command, 0, False", text)
+
+    def test_gui_control_bootstrap_hides_console_without_hiding_gui(self):
+        text = (ROOT / "launcher" / "windows" / "ClawHermes-Control-Launch.ps1").read_text(encoding="utf-8")
+
+        self.assertIn("ClawHermes-Control.ps1", text)
+        self.assertIn("CreateNoWindow = $true", text)
+        self.assertIn("UseShellExecute = $false", text)
+        self.assertIn("-Sta", text)
+        self.assertNotIn("-WindowStyle Hidden", text)
 
     def test_gui_control_script_exposes_left_nav_theme_and_hidden_runner(self):
         text = (ROOT / "launcher" / "windows" / "ClawHermes-Control.ps1").read_text(encoding="utf-8")
@@ -780,6 +828,13 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertIn(theme, text)
         self.assertIn("CreateNoWindow = $true", text)
         self.assertIn("UseShellExecute = $false", text)
+        self.assertIn("System.Windows.Forms.Timer", text)
+        self.assertIn("HasExited", text)
+        self.assertIn("StandardOutput.ReadToEnd", text)
+        self.assertIn("正在后台执行", text)
+        self.assertIn("New-NavButton", text)
+        self.assertIn("New-SectionPanel", text)
+        self.assertIn("FlatAppearance.BorderSize = 0", text)
         self.assertIn("小白模式", text)
         self.assertNotIn("setx ", text.lower())
 
@@ -811,7 +866,10 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertIn("--model", text)
         self.assertIn("--api-key", text)
         self.assertIn("--apply", text)
+        self.assertIn('-Action "logs" -Arguments @("openclaw") -Json', text)
+        self.assertIn('-Action "logs" -Arguments @("hermes-agent") -Json', text)
         self.assertIn("Start-GuiDetachedAction -Action \"start\" -Json", text)
+        self.assertIn('Start-GuiAsyncAction -Action "status" -Json', text)
 
     def test_gui_control_theme_preference_and_docs_are_user_facing(self):
         text = (ROOT / "launcher" / "windows" / "ClawHermes-Control.ps1").read_text(encoding="utf-8")
@@ -823,9 +881,11 @@ class WindowsCoreTests(unittest.TestCase):
         for theme in ["跟随系统", "浅色", "深色"]:
             self.assertIn(theme, text)
         self.assertIn("ClawHermes-Control.bat", readme_text)
+        self.assertIn("ClawHermes-Control.vbs", readme_text)
         self.assertIn("GUI control center", readme_text)
         self.assertIn("图形控制中心", readme_zh_text)
         self.assertIn("ClawHermes-Control.bat", readme_zh_text)
+        self.assertIn("ClawHermes-Control.vbs", readme_zh_text)
 
     def test_gui_control_click_handlers_change_pages(self):
         with tempfile.TemporaryDirectory(prefix="ClawHermes-USB-gui-click-") as temp_root:
@@ -856,6 +916,34 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertTrue(payload["modelStatusClickShowsFeedback"])
         self.assertEqual(payload["afterThemeClick"], "dark")
         self.assertGreaterEqual(payload["contentLeft"], payload["navWidth"])
+
+    def test_gui_control_async_status_button_does_not_close_window(self):
+        result = subprocess.run(
+            [
+                "powershell",
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                str(ROOT / "launcher" / "windows" / "ClawHermes-Control.ps1"),
+                "-UsbRoot",
+                str(ROOT),
+                "-AsyncButtonSelfTest",
+            ],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=30,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["header"], "总览")
+        self.assertTrue(payload["formVisible"])
+        self.assertFalse(payload["formDisposed"])
+        self.assertIn('"services"', payload["output"])
 
     def test_gui_control_hidden_runner_works_on_windows_powershell(self):
         result = subprocess.run(
@@ -3091,10 +3179,12 @@ class WindowsCoreTests(unittest.TestCase):
             metadata = payload["metadata"]
             self.assertEqual(metadata["status"], "running")
             self.assertFalse(metadata["placeholder"])
-            self.assertEqual(metadata["runner"], "wsl2-background")
+            self.assertEqual(metadata["runner"], "wsl2")
+            self.assertIn("node", metadata["command"].lower())
+            self.assertIn("wsl", metadata["command"].lower())
             expected_wsl_root = f"/mnt/{temp_root.drive[0].lower()}/{str(temp_root)[3:].replace(chr(92), '/')}"
             self.assertEqual(metadata["wsl"]["workingDirectory"].replace("\\", "/"), expected_wsl_root + "/apps/hermes-agent")
-            self.assertTrue(metadata["wsl"]["background"])
+            self.assertNotIn("nohup", metadata["wsl"]["args"])
             self.assertIsInstance(metadata["processId"], int)
             self.assertTrue(process_exists(metadata["processId"]))
             wait_for_file(marker)
@@ -3106,14 +3196,14 @@ class WindowsCoreTests(unittest.TestCase):
             pid_file = temp_root / "data" / "tmp" / "pids" / "hermes-agent.pid"
             self.assertTrue(pid_file.exists())
             pid_metadata = json.loads(pid_file.read_text(encoding="utf-8"))
-            self.assertEqual(pid_metadata["runner"], "wsl2-background")
+            self.assertEqual(pid_metadata["runner"], "wsl2")
             self.assertEqual(pid_metadata["processId"], metadata["processId"])
 
             status = run_dispatcher_for_root(temp_root, "status", "-Json", env=env)
             self.assertEqual(status.returncode, 0, status.stderr)
             services = {service["id"]: service for service in json.loads(status.stdout)["services"]}
             self.assertEqual(services["hermes-agent"]["status"], "running")
-            self.assertIsNone(services["hermes-agent"]["processId"])
+            self.assertEqual(services["hermes-agent"]["processId"], metadata["processId"])
 
             stop = run_dispatcher_for_root(temp_root, "stop", "-Json", env=env)
             self.assertEqual(stop.returncode, 0, stop.stderr)
@@ -3122,7 +3212,7 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertFalse(process_exists(metadata["processId"]))
         finally:
             run_dispatcher_for_root(temp_root, "stop", "-Json", env={"CLAWHERMES_WSL_EXE": str(temp_root / "fake-wsl.cmd")})
-            time.sleep(0.5)
+            wait_for_no_process_command_line_fragment(temp_root)
             temp_dir.cleanup()
 
     def test_stop_runs_wsl2_adapter_stop_hook_before_killing_managed_process(self):
@@ -3155,7 +3245,7 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertIn("WSL2 stop hook", log_text)
         finally:
             run_dispatcher_for_root(temp_root, "stop", "-Json", env={"CLAWHERMES_WSL_EXE": str(temp_root / "fake-wsl.cmd")})
-            time.sleep(0.5)
+            wait_for_no_process_command_line_fragment(temp_root)
             temp_dir.cleanup()
 
     def test_stop_runs_wsl2_adapter_stop_hook_when_pid_file_is_missing(self):
@@ -3216,15 +3306,18 @@ class WindowsCoreTests(unittest.TestCase):
             wait_for_file(marker)
             metadata = json.loads((temp_root / "data" / "tmp" / "pids" / "hermes-agent.pid").read_text(encoding="utf-8"))
             process_id = metadata["processId"]
-            self.assertEqual(metadata["runner"], "wsl2-background")
+            self.assertEqual(metadata["runner"], "wsl2")
             self.assertFalse(metadata["placeholder"])
+            self.assertIn("node", metadata["command"].lower())
+            self.assertIn("wsl", metadata["command"].lower())
             self.assertIn("--distribution", metadata["wsl"]["args"])
-            self.assertTrue(metadata["wsl"]["background"])
+            self.assertNotIn("nohup", metadata["wsl"]["args"])
             self.assertTrue(process_exists(process_id))
         finally:
             run_dispatcher_for_root(temp_root, "stop", "-Json", env={"CLAWHERMES_WSL_EXE": str(temp_root / "fake-wsl.cmd")})
             if process_id:
                 wait_for_process_exit(process_id)
+            wait_for_no_process_command_line_fragment(temp_root)
             temp_dir.cleanup()
 
     def test_start_openclaw_refreshes_gateway_token_in_runtime_config(self):

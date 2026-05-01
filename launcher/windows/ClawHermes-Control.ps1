@@ -2,6 +2,7 @@
     [string]$UsbRoot,
     [switch]$SelfTest,
     [switch]$ClickSelfTest,
+    [switch]$AsyncButtonSelfTest,
     [switch]$HiddenSelfTest
 )
 
@@ -73,21 +74,31 @@ function Get-ThemePalette {
         return @{
             Window = [System.Drawing.Color]::FromArgb(15, 23, 42)
             Surface = [System.Drawing.Color]::FromArgb(30, 41, 59)
+            Panel = [System.Drawing.Color]::FromArgb(17, 24, 39)
+            Border = [System.Drawing.Color]::FromArgb(51, 65, 85)
+            Output = [System.Drawing.Color]::FromArgb(2, 6, 23)
             Text = [System.Drawing.Color]::FromArgb(241, 245, 249)
             Muted = [System.Drawing.Color]::FromArgb(148, 163, 184)
-            Accent = [System.Drawing.Color]::FromArgb(14, 165, 233)
+            Accent = [System.Drawing.Color]::FromArgb(59, 130, 246)
+            AccentHover = [System.Drawing.Color]::FromArgb(37, 99, 235)
             Nav = [System.Drawing.Color]::FromArgb(2, 6, 23)
-            NavButton = [System.Drawing.Color]::FromArgb(30, 41, 59)
+            NavButton = [System.Drawing.Color]::FromArgb(15, 23, 42)
+            NavButtonActive = [System.Drawing.Color]::FromArgb(30, 64, 175)
         }
     }
     return @{
-        Window = [System.Drawing.Color]::FromArgb(248, 250, 252)
+        Window = [System.Drawing.Color]::FromArgb(246, 248, 251)
         Surface = [System.Drawing.Color]::White
+        Panel = [System.Drawing.Color]::White
+        Border = [System.Drawing.Color]::FromArgb(226, 232, 240)
+        Output = [System.Drawing.Color]::FromArgb(255, 255, 255)
         Text = [System.Drawing.Color]::FromArgb(15, 23, 42)
-        Muted = [System.Drawing.Color]::FromArgb(71, 85, 105)
-        Accent = [System.Drawing.Color]::FromArgb(2, 132, 199)
-        Nav = [System.Drawing.Color]::FromArgb(17, 24, 39)
-        NavButton = [System.Drawing.Color]::FromArgb(31, 41, 55)
+        Muted = [System.Drawing.Color]::FromArgb(79, 90, 108)
+        Accent = [System.Drawing.Color]::FromArgb(37, 99, 235)
+        AccentHover = [System.Drawing.Color]::FromArgb(29, 78, 216)
+        Nav = [System.Drawing.Color]::FromArgb(15, 23, 42)
+        NavButton = [System.Drawing.Color]::FromArgb(15, 23, 42)
+        NavButtonActive = [System.Drawing.Color]::FromArgb(37, 99, 235)
     }
 }
 
@@ -177,6 +188,41 @@ function Invoke-ClawHermesHidden {
     return $stdout
 }
 
+function New-ClawHermesProcessStartInfo {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Root,
+        [Parameter(Mandatory = $true)]
+        [string]$Action,
+        [string[]]$Arguments = @(),
+        [switch]$Json,
+        [switch]$RedirectOutput
+    )
+
+    $dispatcher = Join-Path -Path $Root -ChildPath "core\windows\clawhermes.ps1"
+    if (-not (Test-Path -LiteralPath $dispatcher -PathType Leaf)) {
+        throw "Cannot find core dispatcher: $dispatcher"
+    }
+
+    $argumentList = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $dispatcher, $Action, "-UsbRoot", $Root)
+    if ($Json) {
+        $argumentList += "-Json"
+    }
+    if ($Arguments) {
+        $argumentList += $Arguments
+    }
+
+    $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+    $startInfo.FileName = "powershell.exe"
+    $startInfo.Arguments = (($argumentList | ForEach-Object { ConvertTo-ProcessArgument -Argument $_ }) -join " ")
+    $startInfo.CreateNoWindow = $true
+    $startInfo.UseShellExecute = $false
+    $startInfo.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden
+    $startInfo.RedirectStandardOutput = [bool]$RedirectOutput
+    $startInfo.RedirectStandardError = [bool]$RedirectOutput
+    return $startInfo
+}
+
 function New-Label {
     param(
         [string]$Text,
@@ -206,11 +252,50 @@ function New-ActionButton {
     $button = New-Object System.Windows.Forms.Button
     $button.Text = $Text
     $button.Location = New-Object System.Drawing.Point($X, $Y)
-    $button.Size = New-Object System.Drawing.Size($Width, 34)
+    $button.Size = New-Object System.Drawing.Size($Width, 36)
     $button.FlatStyle = "Flat"
+    $button.FlatAppearance.BorderSize = 0
+    $button.Font = New-Object System.Drawing.Font("Microsoft YaHei UI", 9, [System.Drawing.FontStyle]::Bold)
+    $button.Cursor = [System.Windows.Forms.Cursors]::Hand
     $button.UseVisualStyleBackColor = $false
     $button.Add_Click($OnClick)
     return $button
+}
+
+function New-NavButton {
+    param(
+        [hashtable]$Item,
+        [int]$Y,
+        [scriptblock]$OnClick
+    )
+    $button = New-Object System.Windows.Forms.Button
+    $button.Text = "$($Item["Icon"])  $($Item["Label"])"
+    $button.Tag = $Item["Id"]
+    $button.Location = New-Object System.Drawing.Point(18, $Y)
+    $button.Size = New-Object System.Drawing.Size(204, 38)
+    $button.FlatStyle = "Flat"
+    $button.FlatAppearance.BorderSize = 0
+    $button.TextAlign = [System.Drawing.ContentAlignment]::MiddleLeft
+    $button.Padding = New-Object System.Windows.Forms.Padding(14, 0, 0, 0)
+    $button.Font = New-Object System.Drawing.Font("Microsoft YaHei UI", 9, [System.Drawing.FontStyle]::Bold)
+    $button.Cursor = [System.Windows.Forms.Cursors]::Hand
+    $button.UseVisualStyleBackColor = $false
+    $button.Add_Click($OnClick)
+    return $button
+}
+
+function New-SectionPanel {
+    param(
+        [int]$X,
+        [int]$Y,
+        [int]$Width,
+        [int]$Height
+    )
+    $panel = New-Object System.Windows.Forms.Panel
+    $panel.Location = New-Object System.Drawing.Point($X, $Y)
+    $panel.Size = New-Object System.Drawing.Size($Width, $Height)
+    $panel.Anchor = "Top,Bottom,Left,Right"
+    return $panel
 }
 
 function Format-Output {
@@ -236,19 +321,66 @@ function Set-GuiOutput {
     }
 }
 
-function Invoke-GuiRunAction {
+function Start-GuiAsyncAction {
     param(
         [string]$Action,
         [string[]]$Arguments = @(),
         [switch]$Json
     )
     try {
-        Set-GuiOutput -Text "正在执行：$Action`r`n请稍等，窗口不会弹出额外的命令行。"
-        $result = Invoke-ClawHermesHidden -Root $script:GuiRoot -Action $Action -Arguments $Arguments -Json:$Json
-        Set-GuiOutput -Text (Format-Output -Value $result)
+        Set-GuiOutput -Text "正在后台执行：$Action`r`n`r`n窗口可以继续点击和移动，执行完成后这里会自动刷新结果。"
+        $startInfo = New-ClawHermesProcessStartInfo -Root $script:GuiRoot -Action $Action -Arguments $Arguments -Json:$Json -RedirectOutput
+        $process = New-Object System.Diagnostics.Process
+        $process.StartInfo = $startInfo
+        [void]$process.Start()
+        $timer = New-Object System.Windows.Forms.Timer
+        $timer.Interval = 250
+        $timer.Add_Tick({
+            if (-not $process.HasExited) {
+                return
+            }
+
+            $timer.Stop()
+            try {
+                $outText = $process.StandardOutput.ReadToEnd()
+                $errText = $process.StandardError.ReadToEnd()
+                $process.WaitForExit()
+                if ($process.ExitCode -ne 0) {
+                    $finalText = "执行失败：$Action`r`n$errText"
+                } elseif ($Json -and -not [string]::IsNullOrWhiteSpace($outText)) {
+                    try {
+                        $finalText = Format-Output -Value ($outText | ConvertFrom-Json)
+                    } catch {
+                        $finalText = $outText
+                    }
+                } else {
+                    $finalText = $outText
+                }
+
+                if ([string]::IsNullOrWhiteSpace($finalText)) {
+                    $finalText = "执行完成：$Action"
+                }
+                Set-GuiOutput -Text $finalText
+            } catch {
+                Set-GuiOutput -Text ("执行失败：`r`n" + $_.Exception.Message)
+            } finally {
+                $process.Dispose()
+                $timer.Dispose()
+            }
+        }.GetNewClosure())
+        $timer.Start()
     } catch {
         Set-GuiOutput -Text ("执行失败：`r`n" + $_.Exception.Message)
     }
+}
+
+function Invoke-GuiRunAction {
+    param(
+        [string]$Action,
+        [string[]]$Arguments = @(),
+        [switch]$Json
+    )
+    Start-GuiAsyncAction -Action $Action -Arguments $Arguments -Json:$Json
 }
 
 function Start-GuiDetachedAction {
@@ -309,7 +441,8 @@ function Update-GuiThemeFromBox {
 function Show-ClawHermesControl {
     param(
         [string]$Root,
-        [switch]$ClickSelfTest
+        [switch]$ClickSelfTest,
+        [switch]$AsyncButtonSelfTest
     )
 
     [System.Windows.Forms.Application]::EnableVisualStyles()
@@ -326,6 +459,7 @@ function Show-ClawHermesControl {
     $form.Size = New-Object System.Drawing.Size(1100, 720)
     $form.MinimumSize = New-Object System.Drawing.Size(960, 640)
     $form.Font = New-Object System.Drawing.Font("Microsoft YaHei UI", 9)
+    $script:GuiForm = $form
 
     $nav = New-Object System.Windows.Forms.Panel
     $nav.Dock = "Left"
@@ -351,10 +485,7 @@ function Show-ClawHermesControl {
     $description = New-Label -Text "启动、停止、打开界面、安装向导、模型配置、日志、备份和修复都集中在这里。" -X 28 -Y 62 -Width 800 -Height 24 -Size 9
     [void]$content.Controls.Add($description)
 
-    $page = New-Object System.Windows.Forms.Panel
-    $page.Location = New-Object System.Drawing.Point(28, 96)
-    $page.Size = New-Object System.Drawing.Size(790, 540)
-    $page.Anchor = "Top,Bottom,Left,Right"
+    $page = New-SectionPanel -X 28 -Y 96 -Width 790 -Height 540
     [void]$content.Controls.Add($page)
 
     $output = New-Object System.Windows.Forms.TextBox
@@ -364,6 +495,8 @@ function Show-ClawHermesControl {
     $output.Location = New-Object System.Drawing.Point(0, 190)
     $output.Size = New-Object System.Drawing.Size(760, 320)
     $output.Anchor = "Top,Bottom,Left,Right"
+    $output.BorderStyle = "FixedSingle"
+    $output.Font = New-Object System.Drawing.Font("Consolas", 9)
     $script:GuiRoot = $Root
     $script:GuiOutput = $output
 
@@ -388,6 +521,7 @@ function Show-ClawHermesControl {
 
     $showPage = {
         param([string]$Id)
+        $script:CurrentPageId = $Id
         & $clearPage
         $header.Text = switch ($Id) {
             "overview" { "总览" }
@@ -406,7 +540,7 @@ function Show-ClawHermesControl {
             "overview" {
                 $description.Text = "查看服务状态、端口和常用入口。遇到问题时先看这里。"
                 $null = & $addInfoText -Text "建议流程：第一次使用先进入“安装向导”，安装完成后点“启动服务”，再到“打开界面”。"
-                $statusButton = New-ActionButton -Text "刷新状态" -X 0 -Y 118 -OnClick ({ Invoke-GuiRunAction -Action "status" -Json }).GetNewClosure()
+                $statusButton = New-ActionButton -Text "刷新状态" -X 0 -Y 118 -OnClick ({ Start-GuiAsyncAction -Action "status" -Json }).GetNewClosure()
                 $openButton = New-ActionButton -Text "打开门户" -X 210 -Y 118 -OnClick ({ Open-Url -Url "http://127.0.0.1:17000/" }).GetNewClosure()
                 [void]$page.Controls.Add($statusButton)
                 [void]$page.Controls.Add($openButton)
@@ -424,13 +558,13 @@ function Show-ClawHermesControl {
                 $description.Text = "启动 OpenClaw、Hermes Agent、Hermes Web UI 和本地门户。"
                 $null = & $addInfoText -Text "点击后会在后台启动服务，不再弹出多个黑色命令行窗口。"
                 [void]$page.Controls.Add((New-ActionButton -Text "启动服务" -X 0 -Y 118 -OnClick ({ Start-GuiDetachedAction -Action "start" -Json }).GetNewClosure()))
-                [void]$page.Controls.Add((New-ActionButton -Text "启动后刷新状态" -X 205 -Y 118 -OnClick ({ Invoke-GuiRunAction -Action "status" -Json }).GetNewClosure()))
+                [void]$page.Controls.Add((New-ActionButton -Text "启动后刷新状态" -X 205 -Y 118 -OnClick ({ Start-GuiAsyncAction -Action "status" -Json }).GetNewClosure()))
             }
             "stop" {
                 $description.Text = "停止当前由 ClawHermes 管理的服务。"
                 $null = & $addInfoText -Text "停止只影响本项目启动的服务，不会删除 USB 数据。"
                 [void]$page.Controls.Add((New-ActionButton -Text "停止服务" -X 0 -Y 118 -OnClick ({ Invoke-GuiRunAction -Action "stop" }).GetNewClosure()))
-                [void]$page.Controls.Add((New-ActionButton -Text "查看状态" -X 205 -Y 118 -OnClick ({ Invoke-GuiRunAction -Action "status" -Json }).GetNewClosure()))
+                [void]$page.Controls.Add((New-ActionButton -Text "查看状态" -X 205 -Y 118 -OnClick ({ Start-GuiAsyncAction -Action "status" -Json }).GetNewClosure()))
             }
             "open" {
                 $description.Text = "打开各个本地 Web 界面。"
@@ -486,9 +620,12 @@ function Show-ClawHermesControl {
                 }
             }
             "logs" {
-                $description.Text = "查看日志目录和核心日志列表。"
-                $null = & $addInfoText -Text "日志统一写在 data\logs，方便拷贝给技术支持排查。"
-                [void]$page.Controls.Add((New-ActionButton -Text "列出日志" -X 0 -Y 118 -OnClick ({ Invoke-GuiRunAction -Action "logs" }).GetNewClosure()))
+                $description.Text = "查看各个服务的最近日志。"
+                $null = & $addInfoText -Text "日志统一写在 data\logs。点击对应服务即可查看最近日志，方便拷贝给技术支持排查。"
+                [void]$page.Controls.Add((New-ActionButton -Text "OpenClaw 日志" -X 0 -Y 118 -OnClick ({ Invoke-GuiRunAction -Action "logs" -Arguments @("openclaw") -Json }).GetNewClosure()))
+                [void]$page.Controls.Add((New-ActionButton -Text "Hermes Agent 日志" -X 205 -Y 118 -OnClick ({ Invoke-GuiRunAction -Action "logs" -Arguments @("hermes-agent") -Json }).GetNewClosure()))
+                [void]$page.Controls.Add((New-ActionButton -Text "Hermes Web UI 日志" -X 410 -Y 118 -Width 220 -OnClick ({ Invoke-GuiRunAction -Action "logs" -Arguments @("hermes-web-ui") -Json }).GetNewClosure()))
+                [void]$page.Controls.Add((New-ActionButton -Text "Portal 日志" -X 0 -Y 156 -OnClick ({ Invoke-GuiRunAction -Action "logs" -Arguments @("portal") -Json }).GetNewClosure()))
             }
             "backup" {
                 $description.Text = "备份本项目的数据目录。"
@@ -524,7 +661,11 @@ function Show-ClawHermesControl {
         $output.ForeColor = $palette.Text
         foreach ($control in $nav.Controls) {
             if ($control -is [System.Windows.Forms.Button]) {
-                $control.BackColor = $palette.NavButton
+                if ([string]$control.Tag -eq $script:CurrentPageId) {
+                    $control.BackColor = $palette.NavButtonActive
+                } else {
+                    $control.BackColor = $palette.NavButton
+                }
                 $control.ForeColor = [System.Drawing.Color]::White
             }
         }
@@ -536,23 +677,20 @@ function Show-ClawHermesControl {
                 $control.BackColor = $palette.Accent
                 $control.ForeColor = [System.Drawing.Color]::White
             }
+            if ($control -is [System.Windows.Forms.TextBox]) {
+                $control.BackColor = $palette.Output
+                $control.ForeColor = $palette.Text
+            }
         }
     }.GetNewClosure()
     $script:GuiApplyTheme = $applyTheme
 
     $buttonTop = 86
     foreach ($item in $script:NavItems) {
-        $button = New-Object System.Windows.Forms.Button
-        $button.Text = "$($item["Icon"])  $($item["Label"])"
-        $button.Tag = $item["Id"]
-        $button.Location = New-Object System.Drawing.Point(14, $buttonTop)
-        $button.Size = New-Object System.Drawing.Size(200, 38)
-        $button.FlatStyle = "Flat"
-        $button.UseVisualStyleBackColor = $false
-        $button.Add_Click(({
+        $button = New-NavButton -Item $item -Y $buttonTop -OnClick ({
             & $showPage -Id ([string]$this.Tag)
             & $applyTheme -Theme $script:CurrentTheme
-        }).GetNewClosure())
+        }).GetNewClosure()
         [void]$nav.Controls.Add($button)
         $buttonTop += 44
     }
@@ -591,6 +729,26 @@ function Show-ClawHermesControl {
 
     & $showPage -Id "overview"
     & $applyTheme -Theme $script:CurrentTheme
+    if ($AsyncButtonSelfTest) {
+        $form.Show()
+        [System.Windows.Forms.Application]::DoEvents()
+        $statusButton = $page.Controls | Where-Object { $_ -is [System.Windows.Forms.Button] -and $_.Text -eq "刷新状态" } | Select-Object -First 1
+        $statusButton.PerformClick()
+        $deadline = [DateTime]::UtcNow.AddSeconds(12)
+        while ([DateTime]::UtcNow -lt $deadline -and $output.Text -notmatch '"services"') {
+            [System.Windows.Forms.Application]::DoEvents()
+            Start-Sleep -Milliseconds 100
+        }
+        [System.Windows.Forms.Application]::DoEvents()
+        $payload = [pscustomobject]@{
+            header = $header.Text
+            formVisible = $form.Visible
+            formDisposed = $form.IsDisposed
+            output = $output.Text
+        }
+        $form.Close()
+        return $payload
+    }
     if ($ClickSelfTest) {
         $form.Show()
         [System.Windows.Forms.Application]::DoEvents()
@@ -636,6 +794,11 @@ if ($SelfTest) {
 
 if ($ClickSelfTest) {
     Show-ClawHermesControl -Root $root -ClickSelfTest | ConvertTo-Json -Compress
+    exit 0
+}
+
+if ($AsyncButtonSelfTest) {
+    Show-ClawHermesControl -Root $root -AsyncButtonSelfTest | ConvertTo-Json -Compress
     exit 0
 }
 

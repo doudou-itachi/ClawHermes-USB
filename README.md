@@ -45,6 +45,7 @@ Run the Windows launchers:
 
 ```text
 launcher/windows/ClawHermes-Control.bat
+launcher/windows/ClawHermes-Control.vbs
 launcher/windows/Setup.bat
 launcher/windows/Start.bat
 launcher/windows/Status.bat
@@ -52,7 +53,7 @@ launcher/windows/Stop.bat
 launcher/windows/Backup.bat
 ```
 
-For non-technical USB users, the recommended entry is `launcher/windows/ClawHermes-Control.bat`. It opens a single Windows GUI control center with left-side navigation for installation, service start/stop, OpenClaw Chat, Hermes Web UI, model configuration, logs, backup, repair/update, and light/dark/system theme switching. The GUI stores its preference in `data\settings\gui.json` and runs background commands without opening extra command windows.
+For non-technical USB users, the recommended entry is `launcher/windows/ClawHermes-Control.vbs` because it opens the GUI without a console window. `launcher/windows/ClawHermes-Control.bat` remains as a compatibility launcher and delegates to the same VBS entry. The GUI control center opens as a single Windows window with left-side navigation for installation, service start/stop, OpenClaw Chat, Hermes Web UI, model configuration, logs, backup, repair/update, and light/dark/system theme switching. The GUI stores its preference in `data\settings\gui.json` and runs status/log/config commands asynchronously so the window remains responsive.
 
 Model configuration in the GUI asks for API URL / Base URL, model name, API key, and whether to apply the settings to OpenClaw, Hermes, or both. The shared core command stores the redacted user-facing status under `data/settings/model-config.json`, writes OpenClaw settings under `data/openclaw/openclaw.json`, and writes Hermes settings under `data/hermes/`.
 

@@ -38,6 +38,7 @@ npm run build
 
 ```text
 launcher/windows/ClawHermes-Control.bat
+launcher/windows/ClawHermes-Control.vbs
 launcher/windows/Setup.bat
 launcher/windows/Start.bat
 launcher/windows/Status.bat
@@ -45,7 +46,7 @@ launcher/windows/Stop.bat
 launcher/windows/Backup.bat
 ```
 
-面向普通 U 盘用户时，推荐先双击 `launcher/windows/ClawHermes-Control.bat`。它会打开一个“图形控制中心”，所有功能都在左侧竖排：安装向导、启动服务、停止服务、打开 OpenClaw Chat、打开 Hermes Web UI、模型配置、日志、备份、修复 / 更新，以及跟随系统 / 浅色 / 深色主题切换。主题偏好只保存在本项目的 `data\settings\gui.json`，后台命令不会再弹出多个命令行窗口。
+面向普通 U 盘用户时，推荐先双击 `launcher/windows/ClawHermes-Control.vbs`，它会打开图形界面并且不显示黑色命令窗口。`launcher/windows/ClawHermes-Control.bat` 仍然保留为兼容入口，会转到同一个 VBS 启动器。图形控制中心的所有功能都在左侧竖排：安装向导、启动服务、停止服务、打开 OpenClaw Chat、打开 Hermes Web UI、模型配置、日志、备份、修复 / 更新，以及跟随系统 / 浅色 / 深色主题切换。主题偏好只保存在本项目的 `data\settings\gui.json`，查看状态、日志和配置会在后台异步执行，窗口不会因为等待检查结果而卡住。
 
 模型配置页面会让用户填写 API URL / Base URL、模型名称、API Key，并选择应用到 OpenClaw、Hermes 或两者。共享核心命令会把配置保存在 `data/settings/model-config.json`，把 OpenClaw 配置写入 `data/openclaw/openclaw.json`，把 Hermes 配置写入 `data/hermes/`；界面和状态输出会隐藏 API Key。
 

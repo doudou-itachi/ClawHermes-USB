@@ -104,7 +104,7 @@ async function startSkeleton(usbRoot) {
         if (wslPlan && adapter.integration?.productionReady === true) {
             (0, wsl_adapter_1.assertWslReadyForAdapterDistro)(root, adapter.id, adapter.runtime?.distro);
         }
-        (0, lifecycle_1.startAdapter)(root, adapter, wslPlan ? { processPlan: wslManagedProcessPlan(root, adapter, wslPlan), serviceEnv } : { serviceEnv });
+        (0, lifecycle_1.startAdapter)(root, adapter, wslPlan ? { processPlan: wslManagedProcessPlan(root, wslPlan), serviceEnv } : { serviceEnv });
         started.push(adapter.id);
     }
     (0, portal_1.generatePortal)(root, getStatus(root).services);
@@ -156,7 +156,7 @@ function startSingleAdapter(usbRoot, serviceId, options) {
         (0, wsl_adapter_1.assertWslReadyForAdapterDistro)(root, serviceId, runtimeAdapter.runtime?.distro);
         const metadata = (0, lifecycle_1.startAdapter)(root, runtimeAdapter, {
             forceManaged: true,
-            processPlan: wslManagedProcessPlan(root, runtimeAdapter, wslPlan),
+            processPlan: wslManagedProcessPlan(root, wslPlan),
             serviceEnv,
         });
         return { ...result, started: true, metadata };
@@ -164,25 +164,33 @@ function startSingleAdapter(usbRoot, serviceId, options) {
     const metadata = (0, lifecycle_1.startAdapter)(root, runtimeAdapter, { forceManaged: true, serviceEnv });
     return { ...result, started: true, metadata };
 }
-function wslManagedProcessPlan(root, adapter, wslPlan) {
-    const logPath = (0, portable_1.resolveRelative)(root, adapter.logFile);
-    const wslLogPath = logPath.match(/^[A-Za-z]:[\\/]/) ? logPath.replace(/^([A-Za-z]):[\\/]*(.*)$/, (_, drive, rest) => `/mnt/${drive.toLowerCase()}/${String(rest).replaceAll("\\", "/")}`) : logPath;
-    const backgroundScript = `mkdir -p "$(dirname '${wslLogPath.replaceAll("'", "'\"'\"'")}')" && nohup bash -lc '${wslPlan.script.replaceAll("'", "'\"'\"'")}' >> '${wslLogPath.replaceAll("'", "'\"'\"'")}' 2>&1 < /dev/null & echo $!`;
-    const backgroundArgs = [...wslPlan.args.slice(0, -1), backgroundScript];
-    const invocation = (0, wsl_1.wslExecutableInvocation)(wslPlan.executablePath, backgroundArgs);
+function wslManagedProcessPlan(root, wslPlan) {
+    const invocation = (0, wsl_1.wslExecutableInvocation)(wslPlan.executablePath, wslPlan.args);
+    const hostScript = [
+        "const { spawn } = require('node:child_process');",
+        "const executablePath = process.env.CLAWHERMES_WSL_HOST_EXE;",
+        "const args = JSON.parse(process.env.CLAWHERMES_WSL_HOST_ARGS || '[]');",
+        "if (!executablePath) { process.stderr.write('CLAWHERMES_WSL_HOST_EXE is not set.\\n'); process.exit(1); }",
+        "const child = spawn(executablePath, args, { stdio: 'inherit', windowsHide: true, shell: false });",
+        "child.on('error', (error) => { process.stderr.write(`${error.message}\\n`); process.exit(1); });",
+        "child.on('exit', (code, signal) => { process.exit(code ?? (signal ? 1 : 0)); });",
+    ].join("");
     return {
-        runner: "wsl2-background",
-        executablePath: invocation.executablePath,
-        args: invocation.args,
-        command: [wslPlan.executablePath, ...backgroundArgs].join(" "),
+        runner: "wsl2",
+        executablePath: process.execPath,
+        args: ["-e", hostScript],
+        env: {
+            CLAWHERMES_WSL_HOST_EXE: invocation.executablePath,
+            CLAWHERMES_WSL_HOST_ARGS: JSON.stringify(invocation.args),
+        },
+        command: `${process.execPath} -e <wsl-host> # launches ${wslPlan.executablePath} ${wslPlan.args.join(" ")}`,
         workingDirectory: root,
         metadata: {
             wsl: {
                 executablePath: wslPlan.executablePath,
-                args: backgroundArgs,
+                args: wslPlan.args,
                 workingDirectory: wslPlan.workingDirectory,
                 script: wslPlan.script,
-                background: true,
             },
         },
     };
@@ -200,9 +208,20 @@ function getStatus(usbRoot) {
         if ((0, node_fs_1.existsSync)(pidFile)) {
             const metadata = JSON.parse((0, node_fs_1.readFileSync)(pidFile, "utf8"));
             if (metadata.placeholder === false && metadata.runner === "wsl2-background") {
-                status = metadata.status ?? "running";
-                processId = null;
-                placeholder = false;
+                const candidateStatus = metadata.status ?? "running";
+                const candidateHealth = adapter.runtime?.kind === "wsl2" && adapter.health?.type === "http"
+                    ? (0, status_1.adapterHealth)(adapter, candidateStatus, false)
+                    : null;
+                if (candidateHealth?.ready) {
+                    status = candidateStatus;
+                    processId = null;
+                    placeholder = false;
+                    healthOverride = candidateHealth;
+                }
+                else {
+                    (0, node_fs_1.rmSync)(pidFile, { force: true });
+                    status = "stopped";
+                }
             }
             else if (metadata.placeholder === false && metadata.processId && !(0, status_1.processExists)(metadata.processId)) {
                 const candidateStatus = metadata.status ?? "running";

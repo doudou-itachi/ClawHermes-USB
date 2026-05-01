@@ -422,7 +422,31 @@ function runWslStopHook(root: string, adapter: AdapterDescriptor): void {
 export function killProcessTree(pid: number): void {
   if (process.platform === "win32") {
     execFileSync("taskkill", ["/PID", String(pid), "/T", "/F"], { stdio: "ignore" });
+    waitForProcessExit(pid);
   } else {
     process.kill(pid, "SIGTERM");
   }
+}
+
+function waitForProcessExit(pid: number, timeoutMs = 5000): void {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (!processExists(pid)) {
+      return;
+    }
+    sleep(100);
+  }
+}
+
+function processExists(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function sleep(ms: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }

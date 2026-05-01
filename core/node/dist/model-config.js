@@ -98,6 +98,7 @@ function redactModelConfig(config) {
 function applyOpenClawModelConfig(root, config) {
     const configPath = (0, portable_1.resolveRelative)(root, "data/openclaw/openclaw.json");
     const openclaw = objectValue(readJsonFile(configPath));
+    const modelRef = `clawhermes/${config.model}`;
     const models = ensureObjectProperty(openclaw, "models");
     const providers = ensureObjectProperty(models, "providers");
     providers.clawhermes = {
@@ -114,10 +115,12 @@ function applyOpenClawModelConfig(root, config) {
     };
     const agents = ensureObjectProperty(openclaw, "agents");
     const defaults = ensureObjectProperty(agents, "defaults");
+    defaults.model = { primary: modelRef };
     const defaultModels = ensureObjectProperty(defaults, "models");
-    defaultModels[`clawhermes/${config.model}`] = {};
+    defaultModels[modelRef] = {};
     (0, node_fs_1.mkdirSync)((0, node_path_1.dirname)(configPath), { recursive: true });
     (0, node_fs_1.writeFileSync)(configPath, `${JSON.stringify(openclaw, null, 2)}\n`, "utf8");
+    writeOpenClawAuthProfile(root, config);
 }
 function applyHermesModelConfig(root, config) {
     const hermesDir = (0, portable_1.resolveRelative)(root, "data/hermes");
@@ -136,6 +139,19 @@ function readJsonFile(path) {
     if (!text)
         return {};
     return JSON.parse(text);
+}
+function writeOpenClawAuthProfile(root, config) {
+    const authPath = (0, portable_1.resolveRelative)(root, "data/openclaw/agents/main/agent/auth-profiles.json");
+    const store = objectValue(readJsonFile(authPath));
+    store.version = 1;
+    const profiles = ensureObjectProperty(store, "profiles");
+    profiles["clawhermes:default"] = {
+        type: "api_key",
+        provider: "clawhermes",
+        key: config.apiKey,
+    };
+    (0, node_fs_1.mkdirSync)((0, node_path_1.dirname)(authPath), { recursive: true });
+    (0, node_fs_1.writeFileSync)(authPath, `${JSON.stringify(store, null, 2)}\n`, "utf8");
 }
 function objectValue(value) {
     return value && typeof value === "object" && !Array.isArray(value) ? value : {};

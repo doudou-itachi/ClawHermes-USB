@@ -11,7 +11,115 @@ Update it whenever a milestone is completed, changed, blocked, or deferred.
 - `Blocked`: Waiting on external information or action.
 - `Deferred`: Intentionally postponed.
 
+## 2026-05-02
+
+### GUI Responsiveness And No-Console Entry
+
+Status: `Done`
+
+Summary:
+
+- Changed GUI read actions such as status refresh to run in a hidden background process and update the WinForms output area through `BeginInvoke` when complete.
+- Added `ClawHermes-Control.vbs` as the recommended no-console GUI entry; the existing Batch launcher now delegates to it for compatibility.
+- Added a PowerShell bootstrapper so the VBS entry hides only the launcher console, not the actual WinForms GUI window.
+- Reworked GUI background command handling to use a WinForms timer on the UI thread instead of PowerShell/.NET process event callbacks, preventing button clicks from closing the GUI process.
+- Refined the GUI shell with cleaner navigation buttons, active page highlighting, a calmer light/dark palette, and a monospace output panel.
+- Updated English and Chinese README guidance to recommend the VBS entry for non-technical users.
+
+Changed areas:
+
+- `launcher/windows/ClawHermes-Control.ps1`
+- `launcher/windows/ClawHermes-Control.bat`
+- `launcher/windows/ClawHermes-Control-Launch.ps1`
+- `launcher/windows/ClawHermes-Control.vbs`
+- `README.md`
+- `README.zh-CN.md`
+- `tests/test_windows_core.py`
+- `docs/PROGRESS.md`
+
+Validation performed:
+
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_gui_control_launcher_calls_powershell_gui tests.test_windows_core.WindowsCoreTests.test_gui_control_has_no_console_vbs_entry tests.test_windows_core.WindowsCoreTests.test_gui_control_script_exposes_left_nav_theme_and_hidden_runner tests.test_windows_core.WindowsCoreTests.test_gui_control_script_wires_pages_to_dispatcher_actions tests.test_windows_core.WindowsCoreTests.test_gui_control_theme_preference_and_docs_are_user_facing tests.test_windows_core.WindowsCoreTests.test_gui_control_click_handlers_change_pages tests.test_windows_core.WindowsCoreTests.test_gui_control_hidden_runner_works_on_windows_powershell -v`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_gui_control_launcher_calls_powershell_gui tests.test_windows_core.WindowsCoreTests.test_gui_control_has_no_console_vbs_entry tests.test_windows_core.WindowsCoreTests.test_gui_control_bootstrap_hides_console_without_hiding_gui -v`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_gui_control_async_status_button_does_not_close_window -v`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_gui_control_launcher_calls_powershell_gui tests.test_windows_core.WindowsCoreTests.test_gui_control_has_no_console_vbs_entry tests.test_windows_core.WindowsCoreTests.test_gui_control_bootstrap_hides_console_without_hiding_gui tests.test_windows_core.WindowsCoreTests.test_gui_control_script_exposes_left_nav_theme_and_hidden_runner tests.test_windows_core.WindowsCoreTests.test_gui_control_script_wires_pages_to_dispatcher_actions tests.test_windows_core.WindowsCoreTests.test_gui_control_theme_preference_and_docs_are_user_facing tests.test_windows_core.WindowsCoreTests.test_gui_control_click_handlers_change_pages tests.test_windows_core.WindowsCoreTests.test_gui_control_async_status_button_does_not_close_window tests.test_windows_core.WindowsCoreTests.test_gui_control_hidden_runner_works_on_windows_powershell -v`
+- Manual VBS launch smoke test detected the visible `ClawHermes-USB 图形控制中心` window title and then closed the test window.
+- `git diff --check`
+- UTF-8 smoke check for edited Chinese files.
+- `node core\node\dist\clawhermes.js status --json`
+
+Next steps:
+
+- Reopen the GUI through `launcher/windows/ClawHermes-Control.vbs` to avoid the Batch console window entirely.
+- Use the async status output to confirm service health after manual start/stop checks.
+
 ## 2026-05-01
+
+### OpenClaw Model Config And GUI Log Fix
+
+Status: `Done`
+
+Summary:
+
+- Fixed GUI model configuration for OpenClaw so saved OpenAI-compatible settings become the actual default agent model instead of only adding an unused provider entry.
+- The OpenClaw model configuration now writes the current agent auth profile store under `data/openclaw/agents/main/agent/auth-profiles.json`, which prevents the runtime from falling back to provider `openai` without an API key.
+- Fixed the GUI logs page so each button calls `logs` with an explicit service target.
+- Changed the GUI Batch entry to launch PowerShell hidden and exit immediately, reducing the lingering black command window when users double-click the GUI entry.
+
+Changed areas:
+
+- `core/node/src/model-config.ts`
+- `core/node/dist/model-config.js`
+- `launcher/windows/ClawHermes-Control.bat`
+- `launcher/windows/ClawHermes-Control.ps1`
+- `tests/test_windows_core.py`
+- `docs/PROGRESS.md`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_model_config_applies_openclaw_and_hermes_without_printing_api_key tests.test_windows_core.WindowsCoreTests.test_gui_control_launcher_calls_powershell_gui tests.test_windows_core.WindowsCoreTests.test_gui_control_script_wires_pages_to_dispatcher_actions tests.test_windows_core.WindowsCoreTests.test_gui_control_click_handlers_change_pages tests.test_windows_core.WindowsCoreTests.test_gui_control_hidden_runner_works_on_windows_powershell -v`
+- Re-applied the saved local OpenClaw model configuration and confirmed the default model points to the ClawHermes provider while API key output stays redacted.
+- Cleaned stale local OpenClaw/Hermes Web UI orphan processes, restarted services, and confirmed healthy default URLs: OpenClaw `18789`, Hermes Agent `8642`, Hermes Web UI `8648`, Portal `17000`.
+- `logs openclaw --json` returned recent log lines and showed `agent model: clawhermes/Pro/zai-org/GLM-4.7`.
+
+Next steps:
+
+- Reopen the GUI so the updated Batch launcher and Logs page are loaded.
+- Restart OpenClaw after changing model settings so the running gateway picks up the updated config.
+
+### WSL Service Launch Recovery
+
+Status: `Done`
+
+Summary:
+
+- Fixed a regression where the GUI and legacy Batch launchers could mark OpenClaw and Hermes Agent as running even when the WSL services were not actually listening.
+- Replaced the WSL-internal `nohup` background wrapper with a hidden Node host process that keeps the `wsl.exe` session alive after the launcher exits.
+- Kept GUI startup asynchronous so the control center does not freeze while services boot.
+- Added stale `wsl2-background` metadata cleanup so old pid files do not keep reporting false running state.
+
+Changed areas:
+
+- `core/node/src/core.ts`
+- `core/node/src/lifecycle.ts`
+- `core/node/dist/core.js`
+- `core/node/dist/lifecycle.js`
+- `tests/test_windows_core.py`
+- `docs/PROGRESS.md`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_start_adapter_wsl2_confirm_launches_managed_wsl_process_and_stop_kills_it tests.test_windows_core.WindowsCoreTests.test_stop_runs_wsl2_adapter_stop_hook_before_killing_managed_process tests.test_windows_core.WindowsCoreTests.test_start_uses_wsl2_plan_for_production_ready_wsl_adapter -v`
+- `npm test`
+- Real local startup stayed healthy after a 75-second stability wait: OpenClaw `http://127.0.0.1:18789/healthz`, Hermes Agent `http://127.0.0.1:8642/health`, Hermes Web UI, and Portal all reported healthy.
+- Direct HTTP probes returned `200` for OpenClaw health, Hermes Agent health, Hermes Web UI, and Portal.
+- Cleaned up stale local orphan service processes from earlier manual starts and confirmed a clean restart uses the default local URLs again: OpenClaw `18789`, Hermes Agent `8642`, Hermes Web UI `8648`, Portal `17000`.
+
+Next steps:
+
+- Keep the GUI start page messaging clear that OpenClaw can take roughly 45-60 seconds to become ready after clicking start.
 
 ### Windows User Launchers
 

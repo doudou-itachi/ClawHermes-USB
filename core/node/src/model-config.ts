@@ -128,6 +128,7 @@ function redactModelConfig(config: SavedModelConfig): RedactedModelConfig {
 function applyOpenClawModelConfig(root: string, config: SavedModelConfig): void {
   const configPath = resolveRelative(root, "data/openclaw/openclaw.json");
   const openclaw = objectValue(readJsonFile(configPath));
+  const modelRef = `clawhermes/${config.model}`;
   const models = ensureObjectProperty(openclaw, "models");
   const providers = ensureObjectProperty(models, "providers");
   providers.clawhermes = {
@@ -145,11 +146,13 @@ function applyOpenClawModelConfig(root: string, config: SavedModelConfig): void 
 
   const agents = ensureObjectProperty(openclaw, "agents");
   const defaults = ensureObjectProperty(agents, "defaults");
+  defaults.model = { primary: modelRef };
   const defaultModels = ensureObjectProperty(defaults, "models");
-  defaultModels[`clawhermes/${config.model}`] = {};
+  defaultModels[modelRef] = {};
 
   mkdirSync(dirname(configPath), { recursive: true });
   writeFileSync(configPath, `${JSON.stringify(openclaw, null, 2)}\n`, "utf8");
+  writeOpenClawAuthProfile(root, config);
 }
 
 function applyHermesModelConfig(root: string, config: SavedModelConfig): void {
@@ -170,6 +173,21 @@ function readJsonFile(path: string): unknown {
   const text = readFileSync(path, "utf8").trim();
   if (!text) return {};
   return JSON.parse(text);
+}
+
+function writeOpenClawAuthProfile(root: string, config: SavedModelConfig): void {
+  const authPath = resolveRelative(root, "data/openclaw/agents/main/agent/auth-profiles.json");
+  const store = objectValue(readJsonFile(authPath));
+  store.version = 1;
+  const profiles = ensureObjectProperty(store, "profiles");
+  profiles["clawhermes:default"] = {
+    type: "api_key",
+    provider: "clawhermes",
+    key: config.apiKey,
+  };
+
+  mkdirSync(dirname(authPath), { recursive: true });
+  writeFileSync(authPath, `${JSON.stringify(store, null, 2)}\n`, "utf8");
 }
 
 function objectValue(value: unknown): Record<string, unknown> {
