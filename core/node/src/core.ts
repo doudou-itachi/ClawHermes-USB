@@ -25,6 +25,7 @@ export { installRuntimeFromArchive, loadRuntimeManifest, runtimeDiagnostics, run
 export { payloadExport } from "./payload-export";
 export { payloadInventory } from "./payloads";
 export { assignRuntimePorts, readRuntimePortState } from "./ports-runtime";
+export { setupWizard } from "./setup-wizard";
 export { writeStatusSnapshot } from "./status";
 export { prepareWsl, wslDiagnostics } from "./wsl";
 export { wslExport, wslImport, wslImportPlan, wslRootfsGuide, wslUnregister, wslUnregisterPlan } from "./wsl-import";

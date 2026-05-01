@@ -13,6 +13,7 @@ Implemented:
 - USB root detection from launcher location.
 - Process-local portable environment variables.
 - Runtime, path, port, adapter, env-file, and readiness diagnostics.
+- Read-only setup wizard that orders diagnostics, runtime preparation, WSL2, env files, payload packaging, adapter setup, verification, backup, and release steps.
 - Adapter descriptor loading and dependency ordering.
 - Placeholder service start/status/stop with logs and PID metadata.
 - Managed process launch for production-ready adapters.
@@ -55,6 +56,7 @@ Run the Node CLI directly:
 
 ```powershell
 node core/node/dist/clawhermes.js setup --json
+node core/node/dist/clawhermes.js setup-wizard --json
 node core/node/dist/clawhermes.js payloads --json
 node core/node/dist/clawhermes.js payload-export --dry-run --json
 node core/node/dist/clawhermes.js payload-export --confirm-export --json

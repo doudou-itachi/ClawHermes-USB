@@ -76,10 +76,10 @@
 - Test: `tests/test_windows_core.py`
 - Docs: `README.md`, `docs/PROGRESS.md`
 
-- [ ] Add a failing test for `setup-wizard --json` returning ordered phases with commands, confirmation requirements, and no host mutation.
-- [ ] Implement a read-only setup wizard that combines setup diagnostics, payload inventory, WSL workflow, env init, setup-adapter, start, verify, backup, and release checklist pointers.
-- [ ] Add PowerShell wrapper support and docs.
-- [ ] Build, run focused tests, then commit.
+- [x] Add a failing test for `setup-wizard --json` returning ordered phases with commands, confirmation requirements, and no host mutation.
+- [x] Implement a read-only setup wizard that combines setup diagnostics, payload inventory, WSL workflow, env init, setup-adapter, start, verify, backup, and release checklist pointers.
+- [x] Add PowerShell wrapper support and docs.
+- [x] Build, run focused tests, then commit.
 
 ### Task 6: Release Checklist
 

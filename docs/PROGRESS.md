@@ -3045,6 +3045,39 @@ Next steps:
 - Keep remapping limited to localhost ports for MVP.
 - Use `status --json` or `data/tmp/ports.json` as the source of truth for actual runtime URLs.
 
+### Setup Wizard
+
+Status: `Done`
+
+Summary:
+
+- Added read-only `setup-wizard --json`.
+- The wizard returns ordered phases for diagnostics, runtime preparation, WSL2 preparation, env initialization, payload review/export, adapter setup, start/verify, backup, and release readiness.
+- Each phase reports commands, whether the command mutates state, and whether explicit confirmation is required.
+- The wizard combines setup diagnostics and payload inventory without writing `data/tmp/ports.json`, starting services, exporting payloads, initializing env files, or modifying WSL.
+- Added PowerShell wrapper support.
+
+Changed areas:
+
+- `core/node/src/setup-wizard.ts`
+- `core/node/src/core.ts`
+- `core/node/src/clawhermes.ts`
+- `core/node/dist/`
+- `core/windows/clawhermes.ps1`
+- `README.md`
+- `docs/PROGRESS.md`
+- `tests/test_windows_core.py`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_setup_wizard_json_reports_ordered_read_only_phases -v`
+
+Next steps:
+
+- Keep setup wizard commands read-only unless the operator copies and runs a guarded command explicitly.
+- Link the release checklist once the checklist document is added.
+
 ### Real WSL2 Payload Host Preparation
 
 Status: `Done`

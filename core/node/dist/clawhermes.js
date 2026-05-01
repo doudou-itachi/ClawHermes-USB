@@ -136,6 +136,21 @@ async function main() {
             }
             return;
         }
+        case "setup-wizard": {
+            const result = (0, core_1.setupWizard)(root);
+            if (json) {
+                printJson(result);
+            }
+            else {
+                console.log("ClawHermes-USB setup wizard");
+                for (const phase of result.phases) {
+                    console.log(`- [${phase.status}] ${phase.title}`);
+                    for (const item of phase.commands)
+                        console.log(`  ${item.command}`);
+                }
+            }
+            return;
+        }
         case "runtimes": {
             const result = (0, core_1.runtimePreparationPlan)(root);
             if (json) {

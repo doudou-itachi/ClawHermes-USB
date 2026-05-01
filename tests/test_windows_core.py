@@ -683,6 +683,43 @@ class WindowsCoreTests(unittest.TestCase):
         finally:
             temp_dir.cleanup()
 
+    def test_setup_wizard_json_reports_ordered_read_only_phases(self):
+        temp_dir, temp_root = make_temp_skeleton_usb_root()
+        try:
+            result = run_dispatcher_for_root(temp_root, "setup-wizard", "-Json")
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            phase_ids = [phase["id"] for phase in payload["phases"]]
+
+            self.assertFalse(payload["wouldModify"])
+            self.assertEqual(
+                phase_ids,
+                [
+                    "diagnose",
+                    "prepare-runtimes",
+                    "prepare-wsl2",
+                    "initialize-env",
+                    "payloads",
+                    "setup-adapters",
+                    "start-and-verify",
+                    "backup-and-release",
+                ],
+            )
+            commands = "\n".join(command["command"] for phase in payload["phases"] for command in phase["commands"])
+            self.assertIn("setup --json", commands)
+            self.assertIn("init-env --dry-run --json", commands)
+            self.assertIn("payloads --json", commands)
+            self.assertIn("payload-export --dry-run --json", commands)
+            self.assertIn("setup-adapter hermes-agent --dry-run --json", commands)
+            self.assertIn("setup-adapter hermes-agent --confirm-setup --json", commands)
+            self.assertIn("start --json", commands)
+            self.assertIn("verify-adapter hermes-agent --json", commands)
+            self.assertIn("docs/release-checklist.md", payload["releaseChecklist"])
+            self.assertFalse((temp_root / "data" / "tmp" / "ports.json").exists())
+        finally:
+            temp_dir.cleanup()
+
     def test_wsl_json_reports_missing_host_wsl_without_throwing(self):
         missing_wsl = str(ROOT / "data" / "tmp" / "missing-wsl.exe")
 
@@ -858,6 +895,10 @@ class WindowsCoreTests(unittest.TestCase):
         payloads = run_powershell_dispatcher("payloads", "-Json")
         self.assertEqual(payloads.returncode, 0, payloads.stderr)
         self.assertFalse(json.loads(payloads.stdout)["wouldModify"])
+
+        wizard = run_powershell_dispatcher("setup-wizard", "-Json")
+        self.assertEqual(wizard.returncode, 0, wizard.stderr)
+        self.assertFalse(json.loads(wizard.stdout)["wouldModify"])
 
         guide = run_powershell_dispatcher("wsl-rootfs-guide", "-Json", "--distro", "Ubuntu")
         self.assertEqual(guide.returncode, 0, guide.stderr)
