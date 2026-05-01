@@ -617,11 +617,15 @@ class WindowsCoreTests(unittest.TestCase):
 
         for file_name, mode in launchers.items():
             text = (ROOT / "launcher" / "windows" / file_name).read_text(encoding="utf-8")
+            self.assertIn("@echo off", text)
+            self.assertIn("setlocal", text)
             self.assertIn("set SCRIPT_DIR=%~dp0", text)
-            self.assertIn("set USB_ROOT=%%~fI", text)
+            self.assertIn('for %%I in ("%SCRIPT_DIR%..\\..") do set USB_ROOT=%%~fI', text)
             self.assertIn("UserGuide.ps1", text)
-            self.assertIn(f"-Mode {mode}", text)
-            self.assertIn("-UsbRoot \"%USB_ROOT%\"", text)
+            self.assertIn(
+                f'powershell -NoProfile -ExecutionPolicy Bypass -File "%USB_ROOT%\\launcher\\windows\\UserGuide.ps1" -Mode {mode} -UsbRoot "%USB_ROOT%"',
+                text,
+            )
             self.assertIn("set CLAWHERMES_EXIT=%ERRORLEVEL%", text)
             self.assertIn("endlocal & exit /b %CLAWHERMES_EXIT%", text)
 
