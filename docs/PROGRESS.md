@@ -19,12 +19,12 @@ Status: `Done`
 
 Summary:
 
-- Added numbered double-click Windows launchers for install, start, stop, status, backup, host WSL uninstall, and advanced repair/update.
-- Added a shared PowerShell user guide that keeps Batch files thin and forwards real operations to the existing core dispatcher.
-- Kept the normal user flow offline-first while labeling repair/update as advanced maintenance.
-- Preserved explicit guardrails for WSL import and WSL unregister operations.
+- Recorded the completed Windows User Launchers feature across the implementation and documentation work.
+- The feature added numbered double-click Windows launchers for install, start, stop, status, backup, host WSL uninstall, and advanced repair/update.
+- The feature added a shared PowerShell user guide that keeps Batch files thin and forwards real operations to the existing core dispatcher.
+- The completed feature kept the normal user flow offline-first while preserving explicit guardrails for WSL import and WSL unregister operations.
 
-Changed areas:
+Changed areas for the completed feature:
 
 - `launcher/windows/`
 - `tests/test_windows_core.py`
