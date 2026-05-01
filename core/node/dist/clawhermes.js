@@ -23,6 +23,11 @@ function parseArgs(argv) {
     let confirmRestore = false;
     let distro;
     let summary;
+    let providerType;
+    let apiUrl;
+    let model;
+    let apiKey;
+    let apply;
     let lines = 50;
     for (let index = 0; index < args.length; index += 1) {
         const arg = args[index];
@@ -86,6 +91,26 @@ function parseArgs(argv) {
             summary = args[index + 1];
             index += 1;
         }
+        else if (arg === "--provider-type" && optionValue(args[index + 1])) {
+            providerType = args[index + 1];
+            index += 1;
+        }
+        else if (arg === "--api-url" && optionValue(args[index + 1])) {
+            apiUrl = args[index + 1];
+            index += 1;
+        }
+        else if (arg === "--model" && optionValue(args[index + 1])) {
+            model = args[index + 1];
+            index += 1;
+        }
+        else if (arg === "--api-key" && optionValue(args[index + 1])) {
+            apiKey = args[index + 1];
+            index += 1;
+        }
+        else if (arg === "--apply" && optionValue(args[index + 1])) {
+            apply = args[index + 1];
+            index += 1;
+        }
         else if (arg === "--lines" && args[index + 1]) {
             lines = Number(args[index + 1]);
             index += 1;
@@ -94,7 +119,10 @@ function parseArgs(argv) {
             positional.push(arg);
         }
     }
-    return { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, confirmCheckout, confirmSetup, confirmInstall, confirmReady, confirmStart, confirmImport, confirmExport, confirmUnregister, confirmRestore, distro, summary, lines };
+    return { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, confirmCheckout, confirmSetup, confirmInstall, confirmReady, confirmStart, confirmImport, confirmExport, confirmUnregister, confirmRestore, distro, summary, providerType, apiUrl, model, apiKey, apply, lines };
+}
+function optionValue(value) {
+    return Boolean(value) && !value.startsWith("-");
 }
 function parseBackupProfile(value) {
     if (value === "data-only" || value === "full")
@@ -105,7 +133,7 @@ function printJson(value) {
     process.stdout.write(`${JSON.stringify(value, null, 2)}\n`);
 }
 async function main() {
-    const { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, confirmCheckout, confirmSetup, confirmInstall, confirmReady, confirmStart, confirmImport, confirmExport, confirmUnregister, confirmRestore, distro, summary, lines } = parseArgs(process.argv.slice(2));
+    const { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, confirmCheckout, confirmSetup, confirmInstall, confirmReady, confirmStart, confirmImport, confirmExport, confirmUnregister, confirmRestore, distro, summary, providerType, apiUrl, model, apiKey, apply, lines } = parseArgs(process.argv.slice(2));
     const root = (0, core_1.getRoot)(usbRoot);
     switch (action) {
         case "env-json":
@@ -349,6 +377,36 @@ async function main() {
                     console.log(`- ${file.path}: ${file.loaded ? "loaded" : file.exists ? "parse issues" : "missing"}`);
                 }
                 console.log(`Variables: ${result.variables.join(", ")}`);
+            }
+            return;
+        }
+        case "model-config": {
+            const result = (0, core_1.configureSharedModel)(root, { providerType, apiUrl, model, apiKey, apply });
+            if (json) {
+                printJson(result);
+            }
+            else {
+                console.log("ClawHermes-USB model configuration");
+                for (const message of result.messages)
+                    console.log(`- ${message}`);
+            }
+            return;
+        }
+        case "model-config-status": {
+            const result = (0, core_1.sharedModelConfigStatus)(root);
+            if (json) {
+                printJson(result);
+            }
+            else if (result.exists && result.config) {
+                console.log("ClawHermes-USB model configuration");
+                console.log(`Provider: ${result.config.providerType}`);
+                console.log(`API URL: ${result.config.apiUrl}`);
+                console.log(`Model: ${result.config.model}`);
+                console.log("API key: [redacted]");
+                console.log(`Apply: ${result.config.apply}`);
+            }
+            else {
+                console.log("ClawHermes-USB model configuration is not saved.");
             }
             return;
         }

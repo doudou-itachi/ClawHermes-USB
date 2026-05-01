@@ -22,6 +22,7 @@ export { envFileDiagnostics, initializeEnvFiles, resolveServiceEnvironment, serv
 export { pathDiagnostics, portDiagnostics, readLogTail, setupDiagnostics, writeSetupSnapshot } from "./diagnostics";
 export { PORTAL_URL, generatePortal, getPortalStatus, startPortalServer, stopPortalServer } from "./portal";
 export { installRuntimeFromArchive, loadRuntimeManifest, runtimeDiagnostics, runtimePreparationPlan } from "./runtimes";
+export { configureSharedModel, sharedModelConfigStatus } from "./model-config";
 export { payloadExport } from "./payload-export";
 export { payloadInventory } from "./payloads";
 export { assignRuntimePorts, readRuntimePortState } from "./ports-runtime";

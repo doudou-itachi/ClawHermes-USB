@@ -609,6 +609,116 @@ class WindowsCoreTests(unittest.TestCase):
             ROOT / "data" / "cache" / "uv",
         )
 
+    def test_model_config_rejects_missing_model_name(self):
+        temp_dir, temp_root = make_temp_usb_root()
+        secret = "sk-test-missing-model"
+        try:
+            result = run_dispatcher_for_root(
+                temp_root,
+                "model-config",
+                "--provider-type",
+                "openai-compatible",
+                "--api-url",
+                "https://api.example.test/v1",
+                "--api-key",
+                secret,
+                "-Json",
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("model name is required", result.stderr.lower())
+            self.assertNotIn(secret, result.stdout)
+            self.assertNotIn(secret, result.stderr)
+        finally:
+            temp_dir.cleanup()
+
+    def test_model_config_applies_openclaw_and_hermes_without_printing_api_key(self):
+        temp_dir, temp_root = make_temp_usb_root()
+        secret = "sk-test-shared-model-config"
+        try:
+            openclaw_config_path = temp_root / "data" / "openclaw" / "openclaw.json"
+            openclaw_config_path.parent.mkdir(parents=True, exist_ok=True)
+            openclaw_config_path.write_text(
+                json.dumps(
+                    {
+                        "models": {
+                            "providers": {
+                                "existing": {
+                                    "api": "other",
+                                }
+                            }
+                        },
+                        "agents": {
+                            "defaults": {
+                                "models": {
+                                    "existing/model": {
+                                        "temperature": 0,
+                                    }
+                                }
+                            }
+                        },
+                        "unrelated": True,
+                    },
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
+
+            result = run_dispatcher_for_root(
+                temp_root,
+                "model-config",
+                "--provider-type",
+                "openai-compatible",
+                "--api-url",
+                "https://api.example.test/v1",
+                "--model",
+                "gpt-test",
+                "--api-key",
+                secret,
+                "-Json",
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertNotIn(secret, result.stdout)
+            self.assertNotIn(secret, result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["config"]["apiKey"], "[redacted]")
+            self.assertEqual(payload["apply"], "both")
+
+            saved = json.loads((temp_root / "data" / "settings" / "model-config.json").read_text(encoding="utf-8"))
+            self.assertEqual(saved["apiKey"], secret)
+
+            openclaw_config = json.loads(openclaw_config_path.read_text(encoding="utf-8"))
+            provider = openclaw_config["models"]["providers"]["clawhermes"]
+            self.assertEqual(provider["api"], "openai-completions")
+            self.assertEqual(provider["baseUrl"], "https://api.example.test/v1")
+            self.assertEqual(provider["apiKey"], secret)
+            self.assertEqual(provider["models"], [{"id": "gpt-test", "name": "gpt-test", "input": ["text"]}])
+            self.assertEqual(openclaw_config["models"]["providers"]["existing"]["api"], "other")
+            self.assertEqual(openclaw_config["agents"]["defaults"]["models"]["clawhermes/gpt-test"], {})
+            self.assertEqual(openclaw_config["agents"]["defaults"]["models"]["existing/model"]["temperature"], 0)
+            self.assertTrue(openclaw_config["unrelated"])
+
+            hermes_config = (temp_root / "data" / "hermes" / "config.yaml").read_text(encoding="utf-8")
+            self.assertIn("# ClawHermes-managed model configuration", hermes_config)
+            self.assertIn("model:", hermes_config)
+            self.assertIn("  provider: openai", hermes_config)
+            self.assertIn("  model: gpt-test", hermes_config)
+            self.assertIn("  base_url: https://api.example.test/v1", hermes_config)
+
+            hermes_env = (temp_root / "data" / "hermes" / ".env").read_text(encoding="utf-8")
+            self.assertEqual(hermes_env.count("OPENAI_API_KEY="), 1)
+            self.assertIn(f"OPENAI_API_KEY={secret}", hermes_env)
+
+            status = run_dispatcher_for_root(temp_root, "model-config-status", "-Json")
+            self.assertEqual(status.returncode, 0, status.stderr)
+            self.assertNotIn(secret, status.stdout)
+            status_payload = json.loads(status.stdout)
+            self.assertTrue(status_payload["exists"])
+            self.assertEqual(status_payload["config"]["apiKey"], "[redacted]")
+        finally:
+            temp_dir.cleanup()
+
     def test_windows_batch_launchers_forward_exit_codes_and_start_opens_portal(self):
         launchers = {
             "Setup.bat": "setup",

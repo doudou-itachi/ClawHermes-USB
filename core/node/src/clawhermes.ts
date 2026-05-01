@@ -1,4 +1,4 @@
-import { adapterSetupPlan, appSourcePlan, checkoutAppSource, createBackup, getRoot, getStatus, initializeEnvFiles, installRuntimeFromArchive, markAdapterReady, payloadExport, payloadInventory, portableEnv, prepareWsl, probeAppSources, readLogTail, restoreBackup, restorePlan, runAdapterSetup, runtimePreparationPlan, serviceEnvironmentDiagnostic, setupDiagnostics, setupWizard, startSingleAdapter, startSkeleton, stopSkeleton, verifyAdapter, writeStatusSnapshot, wslDiagnostics, wslExport, wslImport, wslImportPlan, wslRootfsGuide, wslUnregister, wslUnregisterPlan, wslWorkflowPlan } from "./core";
+import { adapterSetupPlan, appSourcePlan, checkoutAppSource, configureSharedModel, createBackup, getRoot, getStatus, initializeEnvFiles, installRuntimeFromArchive, markAdapterReady, payloadExport, payloadInventory, portableEnv, prepareWsl, probeAppSources, readLogTail, restoreBackup, restorePlan, runAdapterSetup, runtimePreparationPlan, serviceEnvironmentDiagnostic, setupDiagnostics, setupWizard, sharedModelConfigStatus, startSingleAdapter, startSkeleton, stopSkeleton, verifyAdapter, writeStatusSnapshot, wslDiagnostics, wslExport, wslImport, wslImportPlan, wslRootfsGuide, wslUnregister, wslUnregisterPlan, wslWorkflowPlan } from "./core";
 import type { BackupProfile } from "./backup";
 
 type ParsedArgs = {
@@ -22,6 +22,11 @@ type ParsedArgs = {
   confirmRestore: boolean;
   distro?: string;
   summary?: string;
+  providerType?: string;
+  apiUrl?: string;
+  model?: string;
+  apiKey?: string;
+  apply?: string;
   lines: number;
 };
 
@@ -47,6 +52,11 @@ function parseArgs(argv: string[]): ParsedArgs {
   let confirmRestore = false;
   let distro: string | undefined;
   let summary: string | undefined;
+  let providerType: string | undefined;
+  let apiUrl: string | undefined;
+  let model: string | undefined;
+  let apiKey: string | undefined;
+  let apply: string | undefined;
   let lines = 50;
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
@@ -92,6 +102,21 @@ function parseArgs(argv: string[]): ParsedArgs {
     } else if (arg === "--summary" && args[index + 1]) {
       summary = args[index + 1];
       index += 1;
+    } else if (arg === "--provider-type" && optionValue(args[index + 1])) {
+      providerType = args[index + 1];
+      index += 1;
+    } else if (arg === "--api-url" && optionValue(args[index + 1])) {
+      apiUrl = args[index + 1];
+      index += 1;
+    } else if (arg === "--model" && optionValue(args[index + 1])) {
+      model = args[index + 1];
+      index += 1;
+    } else if (arg === "--api-key" && optionValue(args[index + 1])) {
+      apiKey = args[index + 1];
+      index += 1;
+    } else if (arg === "--apply" && optionValue(args[index + 1])) {
+      apply = args[index + 1];
+      index += 1;
     } else if (arg === "--lines" && args[index + 1]) {
       lines = Number(args[index + 1]);
       index += 1;
@@ -99,7 +124,11 @@ function parseArgs(argv: string[]): ParsedArgs {
       positional.push(arg);
     }
   }
-  return { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, confirmCheckout, confirmSetup, confirmInstall, confirmReady, confirmStart, confirmImport, confirmExport, confirmUnregister, confirmRestore, distro, summary, lines };
+  return { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, confirmCheckout, confirmSetup, confirmInstall, confirmReady, confirmStart, confirmImport, confirmExport, confirmUnregister, confirmRestore, distro, summary, providerType, apiUrl, model, apiKey, apply, lines };
+}
+
+function optionValue(value: string | undefined): value is string {
+  return Boolean(value) && !value!.startsWith("-");
 }
 
 function parseBackupProfile(value: string): BackupProfile {
@@ -112,7 +141,7 @@ function printJson(value: unknown): void {
 }
 
 async function main(): Promise<void> {
-  const { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, confirmCheckout, confirmSetup, confirmInstall, confirmReady, confirmStart, confirmImport, confirmExport, confirmUnregister, confirmRestore, distro, summary, lines } = parseArgs(process.argv.slice(2));
+  const { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, confirmCheckout, confirmSetup, confirmInstall, confirmReady, confirmStart, confirmImport, confirmExport, confirmUnregister, confirmRestore, distro, summary, providerType, apiUrl, model, apiKey, apply, lines } = parseArgs(process.argv.slice(2));
   const root = getRoot(usbRoot);
 
   switch (action) {
@@ -316,6 +345,32 @@ async function main(): Promise<void> {
           console.log(`- ${file.path}: ${file.loaded ? "loaded" : file.exists ? "parse issues" : "missing"}`);
         }
         console.log(`Variables: ${result.variables.join(", ")}`);
+      }
+      return;
+    }
+    case "model-config": {
+      const result = configureSharedModel(root, { providerType, apiUrl, model, apiKey, apply });
+      if (json) {
+        printJson(result);
+      } else {
+        console.log("ClawHermes-USB model configuration");
+        for (const message of result.messages) console.log(`- ${message}`);
+      }
+      return;
+    }
+    case "model-config-status": {
+      const result = sharedModelConfigStatus(root);
+      if (json) {
+        printJson(result);
+      } else if (result.exists && result.config) {
+        console.log("ClawHermes-USB model configuration");
+        console.log(`Provider: ${result.config.providerType}`);
+        console.log(`API URL: ${result.config.apiUrl}`);
+        console.log(`Model: ${result.config.model}`);
+        console.log("API key: [redacted]");
+        console.log(`Apply: ${result.config.apply}`);
+      } else {
+        console.log("ClawHermes-USB model configuration is not saved.");
       }
       return;
     }
