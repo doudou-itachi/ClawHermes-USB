@@ -165,12 +165,12 @@ try {
             Write-Section "Uninstall host WSL environment"
             Write-Host "This only targets the managed ClawHermes-Ubuntu WSL distribution on this Windows host."
             Write-Host "It does not delete the USB project directory."
-            Invoke-ClawHermes -Root $root -Action "stop" -Arguments @()
             Invoke-ClawHermes -Root $root -Action "wsl-unregister-plan" -Arguments @("--distro", "Ubuntu")
             if ($PlanOnly) {
                 Write-Host "Plan-only mode finished. The WSL distribution was not unregistered."
                 break
             }
+            Invoke-ClawHermes -Root $root -Action "stop" -Arguments @()
             if (Confirm-GuideAction -Prompt "Unregister ClawHermes-Ubuntu from this Windows host?" -RequiredText "UNREGISTER") {
                 Invoke-ClawHermes -Root $root -Action "wsl-unregister" -Arguments @("--distro", "Ubuntu", "--confirm-unregister")
             } else {

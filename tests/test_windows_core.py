@@ -61,6 +61,30 @@ def run_powershell_dispatcher(*args, env=None):
     )
 
 
+def run_user_guide(mode, *args, root=ROOT, env=None):
+    command = [
+        "powershell",
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        str(root / "launcher" / "windows" / "UserGuide.ps1"),
+        "-Mode",
+        mode,
+        "-UsbRoot",
+        str(root),
+        "-NoPause",
+        *args,
+    ]
+    return subprocess.run(
+        command,
+        cwd=root,
+        text=True,
+        capture_output=True,
+        env={**os.environ, **(env or {})},
+    )
+
+
 def fetch_portal(timeout=0.5):
     with urllib.request.urlopen(PORTAL_URL, timeout=timeout) as response:
         return response.read().decode("utf-8")
@@ -640,6 +664,46 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertIn("core\\windows\\clawhermes.ps1", text)
         self.assertIn("data\\logs", text)
         self.assertNotIn("setx ", text.lower())
+
+    def test_user_guide_status_runs_without_pausing_and_prints_services(self):
+        result = run_user_guide("Status")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("ClawHermes-USB", result.stdout)
+        self.assertIn("USB root:", result.stdout)
+        self.assertIn("openclaw:", result.stdout)
+        self.assertIn("Portal:", result.stdout)
+
+    def test_user_guide_install_plan_only_does_not_import_wsl_or_start_services(self):
+        result = run_user_guide("Install", "-PlanOnly")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Offline-first install", result.stdout)
+        self.assertIn("Plan-only mode finished", result.stdout)
+        self.assertNotIn("Portal:", result.stdout)
+
+    def test_user_guide_uninstall_plan_only_shows_guard_without_unregistering(self):
+        result = run_user_guide("Uninstall", "-PlanOnly")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Uninstall host WSL environment", result.stdout)
+        self.assertIn("ClawHermes-Ubuntu", result.stdout)
+        self.assertIn("was not unregistered", result.stdout)
+
+    def test_user_guide_uninstall_plan_only_does_not_stop_running_services(self):
+        start = run_dispatcher("start", "-Json")
+        self.assertEqual(start.returncode, 0, start.stderr)
+        wait_for_portal()
+
+        try:
+            result = run_user_guide("Uninstall", "-PlanOnly")
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("Plan-only mode finished", result.stdout)
+            html = fetch_portal()
+            self.assertIn("ClawHermes-USB Portal", html)
+        finally:
+            run_dispatcher("stop", "-Json")
 
     def test_setup_json_reports_runtime_diagnostics_and_valid_adapters(self):
         result = run_dispatcher("setup", "-Json")
