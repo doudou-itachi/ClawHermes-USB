@@ -654,6 +654,25 @@ class WindowsCoreTests(unittest.TestCase):
                 ],
             )
 
+    def test_gui_control_launcher_calls_powershell_gui(self):
+        text = (ROOT / "launcher" / "windows" / "ClawHermes-Control.bat").read_text(encoding="utf-8")
+
+        self.assertIn('ClawHermes-Control.ps1" -UsbRoot "%USB_ROOT%"', text)
+        self.assertIn("set CLAWHERMES_EXIT=%ERRORLEVEL%", text)
+        self.assertIn("endlocal & exit /b %CLAWHERMES_EXIT%", text)
+
+    def test_gui_control_script_exposes_left_nav_theme_and_hidden_runner(self):
+        text = (ROOT / "launcher" / "windows" / "ClawHermes-Control.ps1").read_text(encoding="utf-8")
+
+        for label in ["总览", "安装向导", "启动服务", "停止服务", "打开界面", "模型配置", "日志", "备份", "修复 / 更新"]:
+            self.assertIn(label, text)
+        for theme in ["跟随系统", "浅色", "深色"]:
+            self.assertIn(theme, text)
+        self.assertIn("CreateNoWindow = $true", text)
+        self.assertIn("UseShellExecute = $false", text)
+        self.assertIn("小白模式", text)
+        self.assertNotIn("setx ", text.lower())
+
     def test_user_guide_script_exposes_safe_modes_and_noninteractive_switches(self):
         text = (ROOT / "launcher" / "windows" / "UserGuide.ps1").read_text(encoding="utf-8")
 
