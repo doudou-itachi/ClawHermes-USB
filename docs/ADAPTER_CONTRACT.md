@@ -594,3 +594,4 @@ Rules:
 - Confirmed WSL2 adapter startup launches a Windows-side managed `wsl.exe` process and writes normal PID metadata.
 - If a WSL2 adapter declares `commands.stop`, `stop` runs that command inside the target distro before terminating the managed Windows-side process tree.
 - WSL2 stop hooks are best-effort. Hook failure is logged to the service log, and PID cleanup still proceeds so stale managed processes do not block shutdown.
+- `verify-adapter <service-id> --json` must include WSL2 gate checks for WSL2 adapters. The gate should fail when `wsl.exe` is missing, when the target distribution is not registered, or when the target distribution is not WSL2, and `mark-adapter-ready` must inherit those failures through `productionReadyCandidate`.

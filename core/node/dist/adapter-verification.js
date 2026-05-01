@@ -6,6 +6,7 @@ const adapters_1 = require("./adapters");
 const environment_1 = require("./environment");
 const portable_1 = require("./portable");
 const status_1 = require("./status");
+const wsl_1 = require("./wsl");
 function verifyAdapter(usbRoot, serviceId) {
     const root = (0, portable_1.getRoot)(usbRoot);
     if (!serviceId)
@@ -29,6 +30,16 @@ function verifyAdapter(usbRoot, serviceId) {
     checks.push(check("env-files", "Env files", envReady, envReady ? "All declared env files exist." : "One or more declared env files are missing."));
     const healthDeclared = Boolean(adapter.health?.type);
     checks.push(check("health-declared", "Health declaration", healthDeclared, healthDeclared ? `Health check type is ${adapter.health?.type}.` : "Health check is missing."));
+    const wsl = adapter.runtime?.kind === "wsl2" ? (0, wsl_1.wslDiagnostics)(root, adapter.runtime.distro) : null;
+    if (wsl) {
+        checks.push(check("wsl-executable", "WSL executable", wsl.found, wsl.found ? `WSL executable is available: ${wsl.executablePath}` : wsl.messages.join(" ")));
+        const targetReady = adapter.runtime?.distro
+            ? wsl.hasDesiredDistro && wsl.desiredDistroVersion === 2
+            : wsl.hasWsl2Distro;
+        checks.push(check("wsl-target-distro", "WSL2 target distribution", targetReady, targetReady
+            ? `WSL2 target distribution is ready: ${adapter.runtime?.distro ?? wsl.defaultDistro}.`
+            : wsl.messages.join(" ")));
+    }
     const health = healthBehavior(adapter);
     checks.push({
         id: "health-behavior",
@@ -50,6 +61,7 @@ function verifyAdapter(usbRoot, serviceId) {
             examplePath: file.examplePath,
             exampleExists: file.exampleExists,
         })),
+        wsl,
         health,
         nextSteps: checks.filter((item) => item.status !== "pass").map((item) => item.message),
     };

@@ -2650,3 +2650,37 @@ Next steps:
 
 - Verify OpenClaw from a real WSL2 payload before setting any setup/start command or portal URLs.
 - Continue Hermes Agent WSL2 payload verification when WSL2 is available.
+
+### WSL2 Adapter Verification Gate
+
+Status: `Done`
+
+Summary:
+
+- Added WSL2-specific verification checks to `verify-adapter <service-id> --json`.
+- WSL2 adapters now report `wsl-executable` and `wsl-target-distro` checks before they can become production-ready candidates.
+- Missing `wsl.exe`, missing target distributions, or non-WSL2 target distributions block `productionReadyCandidate`, so `mark-adapter-ready` inherits the gate.
+- The verification payload now includes WSL diagnostics for WSL2 adapters, giving operators the exact host/distro reason before real payload validation.
+- Documented the gate in the adapter contract.
+
+Changed areas:
+
+- `core/node/src/adapter-verification.ts`
+- `core/node/dist/adapter-verification.js`
+- `docs/ADAPTER_CONTRACT.md`
+- `docs/PROGRESS.md`
+- `tests/test_windows_core.py`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_verify_adapter_reports_wsl2_gate_when_host_is_missing tests.test_windows_core.WindowsCoreTests.test_verify_adapter_passes_wsl2_gate_when_target_distro_is_ready -v`
+- `npm test`
+- `git diff --check`
+- UTF-8 smoke check
+- C temp cleanup check
+
+Next steps:
+
+- Add a portal surface for WSL2 workflow/verification readiness so operators do not need to memorize CLI commands.
+- Continue real OpenClaw/Hermes Agent WSL2 payload verification when a prepared WSL2 distro is available.

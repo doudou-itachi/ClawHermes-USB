@@ -1855,6 +1855,61 @@ class WindowsCoreTests(unittest.TestCase):
         finally:
             temp_dir.cleanup()
 
+    def test_verify_adapter_reports_wsl2_gate_when_host_is_missing(self):
+        temp_dir, temp_root = make_temp_usb_root()
+        try:
+            make_hermes_agent_app_ready(temp_root)
+            adapter_path = temp_root / "adapters" / "hermes-agent" / "adapter.json"
+            adapter = json.loads(adapter_path.read_text(encoding="utf-8"))
+            adapter["health"]["timeoutSeconds"] = 1
+            adapter_path.write_text(json.dumps(adapter, indent=2), encoding="utf-8")
+            (temp_root / "config" / "env" / "hermes.env").write_text("HERMES_HOME=data/hermes\n", encoding="utf-8")
+            setup_log = temp_root / "data" / "logs" / "setup-hermes-agent.log"
+            setup_log.parent.mkdir(parents=True, exist_ok=True)
+            setup_log.write_text("exitCode: 0\n", encoding="utf-8")
+
+            missing_wsl = str(temp_root / "missing-wsl.exe")
+            result = run_dispatcher_for_root(temp_root, "verify-adapter", "hermes-agent", "-Json", env={"CLAWHERMES_WSL_EXE": missing_wsl})
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            checks = {check["id"]: check for check in payload["checks"]}
+            self.assertFalse(payload["productionReadyCandidate"])
+            self.assertEqual(checks["wsl-executable"]["status"], "fail")
+            self.assertEqual(checks["wsl-target-distro"]["status"], "fail")
+            self.assertIn("wsl.exe not found", checks["wsl-executable"]["message"])
+            self.assertFalse(payload["wsl"]["found"])
+        finally:
+            temp_dir.cleanup()
+
+    def test_verify_adapter_passes_wsl2_gate_when_target_distro_is_ready(self):
+        temp_dir, temp_root = make_temp_usb_root()
+        try:
+            make_hermes_agent_app_ready(temp_root)
+            adapter_path = temp_root / "adapters" / "hermes-agent" / "adapter.json"
+            adapter = json.loads(adapter_path.read_text(encoding="utf-8"))
+            adapter["health"]["timeoutSeconds"] = 1
+            adapter_path.write_text(json.dumps(adapter, indent=2), encoding="utf-8")
+            (temp_root / "config" / "env" / "hermes.env").write_text("HERMES_HOME=data/hermes\n", encoding="utf-8")
+            setup_log = temp_root / "data" / "logs" / "setup-hermes-agent.log"
+            setup_log.parent.mkdir(parents=True, exist_ok=True)
+            setup_log.write_text("exitCode: 0\n", encoding="utf-8")
+            fake_wsl = make_fake_wsl_cmd(temp_root, stay_running=False, list_distribution="Ubuntu")
+
+            result = run_dispatcher_for_root(temp_root, "verify-adapter", "hermes-agent", "-Json", env={"CLAWHERMES_WSL_EXE": str(fake_wsl)})
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            checks = {check["id"]: check for check in payload["checks"]}
+            self.assertEqual(checks["wsl-executable"]["status"], "pass")
+            self.assertEqual(checks["wsl-target-distro"]["status"], "pass")
+            self.assertEqual(payload["wsl"]["desiredDistro"], "Ubuntu")
+            self.assertEqual(payload["wsl"]["desiredDistroVersion"], 2)
+            self.assertFalse(payload["productionReadyCandidate"])
+            self.assertEqual(checks["health-behavior"]["status"], "fail")
+        finally:
+            temp_dir.cleanup()
+
     def test_verify_adapter_unknown_service_fails_with_actionable_message(self):
         result = run_dispatcher("verify-adapter", "missing-service", "-Json")
 

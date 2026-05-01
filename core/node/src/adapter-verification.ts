@@ -4,6 +4,7 @@ import { loadAdapters } from "./adapters";
 import { envFileDiagnostics } from "./environment";
 import { getRoot, resolveRelative } from "./portable";
 import { adapterHealth } from "./status";
+import { wslDiagnostics } from "./wsl";
 
 type VerificationStatus = "pass" | "fail" | "warn";
 
@@ -42,6 +43,27 @@ export function verifyAdapter(usbRoot: string, serviceId: string | undefined) {
   const healthDeclared = Boolean(adapter.health?.type);
   checks.push(check("health-declared", "Health declaration", healthDeclared, healthDeclared ? `Health check type is ${adapter.health?.type}.` : "Health check is missing."));
 
+  const wsl = adapter.runtime?.kind === "wsl2" ? wslDiagnostics(root, adapter.runtime.distro) : null;
+  if (wsl) {
+    checks.push(check(
+      "wsl-executable",
+      "WSL executable",
+      wsl.found,
+      wsl.found ? `WSL executable is available: ${wsl.executablePath}` : wsl.messages.join(" "),
+    ));
+    const targetReady = adapter.runtime?.distro
+      ? wsl.hasDesiredDistro && wsl.desiredDistroVersion === 2
+      : wsl.hasWsl2Distro;
+    checks.push(check(
+      "wsl-target-distro",
+      "WSL2 target distribution",
+      targetReady,
+      targetReady
+        ? `WSL2 target distribution is ready: ${adapter.runtime?.distro ?? wsl.defaultDistro}.`
+        : wsl.messages.join(" "),
+    ));
+  }
+
   const health = healthBehavior(adapter);
   checks.push({
     id: "health-behavior",
@@ -64,6 +86,7 @@ export function verifyAdapter(usbRoot: string, serviceId: string | undefined) {
       examplePath: file.examplePath,
       exampleExists: file.exampleExists,
     })),
+    wsl,
     health,
     nextSteps: checks.filter((item) => item.status !== "pass").map((item) => item.message),
   };
