@@ -69,6 +69,32 @@ Next steps:
 
 - Refresh or restart the Portal after updating so the regenerated status snapshot is shown in the browser.
 
+### Windows GUI Control Center Design
+
+Status: `Done`
+
+Summary:
+
+- Designed a beginner-friendly Windows GUI control center as the primary user entry point.
+- The design replaces normal end-user reliance on multiple Batch windows with one left-navigation GUI.
+- The design includes first-run install guidance for WSL/environment setup, daily service controls, web UI shortcuts, logs, backup, repair/update, and model configuration for OpenClaw and Hermes.
+- The design includes light/dark theme support with a system-following default and project-local preference storage.
+- Model configuration requires API URL/Base URL, model name, API key, provider type, and apply targets.
+
+Changed areas:
+
+- `docs/superpowers/specs/2026-05-01-windows-gui-control-center-design.md`
+- `docs/PROGRESS.md`
+- `.gitignore`
+
+Validation performed:
+
+- Spec self-review for scope, ambiguity, and safety guardrails.
+
+Next steps:
+
+- Write an implementation plan for the Windows GUI control center.
+
 ## 2026-04-30
 
 ### Initial Project Foundation

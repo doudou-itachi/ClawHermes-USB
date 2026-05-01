@@ -45,6 +45,7 @@ Thumbs.db
 node_modules/
 __pycache__/
 *.pyc
+.superpowers/
 
 # Generated portal output
 portal/index.html
