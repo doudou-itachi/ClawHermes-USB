@@ -2093,6 +2093,65 @@ class WindowsCoreTests(unittest.TestCase):
         finally:
             temp_dir.cleanup()
 
+    def test_payload_export_dry_run_reports_manifest_entries_without_archive(self):
+        temp_dir, temp_root = make_temp_skeleton_usb_root()
+        try:
+            app_file = temp_root / "apps" / "openclaw" / "README.md"
+            app_file.write_text("# tiny openclaw\n", encoding="utf-8")
+            rootfs = temp_root / "runtimes" / "wsl" / "ubuntu-rootfs.tar"
+            rootfs.parent.mkdir(parents=True, exist_ok=True)
+            rootfs.write_bytes(b"tiny-rootfs")
+            backup = temp_root / "data" / "backups" / "wsl" / "ClawHermes-Ubuntu-2026-05-01T00-00-00-000Z.tar"
+            backup.parent.mkdir(parents=True, exist_ok=True)
+            backup.write_bytes(b"tiny-backup")
+
+            result = run_dispatcher_for_root(temp_root, "payload-export", "--dry-run", "-Json")
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            entry_paths = {entry["path"] for entry in payload["entries"]}
+            self.assertTrue(payload["dryRun"])
+            self.assertFalse(payload["created"])
+            self.assertFalse(Path(payload["archivePath"]).exists())
+            self.assertIn("apps/openclaw", entry_paths)
+            self.assertIn("runtimes/wsl/ubuntu-rootfs.tar", entry_paths)
+            self.assertIn("data/backups/wsl/ClawHermes-Ubuntu-2026-05-01T00-00-00-000Z.tar", entry_paths)
+            self.assertFalse(any(path.startswith("data/tmp") for path in entry_paths))
+        finally:
+            temp_dir.cleanup()
+
+    def test_payload_export_confirm_creates_manifest_archive(self):
+        temp_dir, temp_root = make_temp_skeleton_usb_root()
+        try:
+            app_file = temp_root / "apps" / "openclaw" / "README.md"
+            app_file.write_text("# tiny openclaw\n", encoding="utf-8")
+            rootfs = temp_root / "runtimes" / "wsl" / "ubuntu-rootfs.tar"
+            rootfs.parent.mkdir(parents=True, exist_ok=True)
+            rootfs.write_bytes(b"tiny-rootfs")
+            backup = temp_root / "data" / "backups" / "wsl" / "ClawHermes-Ubuntu-2026-05-01T00-00-00-000Z.tar"
+            backup.parent.mkdir(parents=True, exist_ok=True)
+            backup.write_bytes(b"tiny-backup")
+
+            result = run_dispatcher_for_root(temp_root, "payload-export", "--confirm-export", "-Json")
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            archive_path = Path(payload["archivePath"])
+            self.assertTrue(payload["created"])
+            self.assertTrue(archive_path.exists())
+            self.assertTrue(archive_path.parent.samefile(temp_root / "data" / "backups" / "payloads"))
+            with zipfile.ZipFile(archive_path) as archive:
+                names = set(archive.namelist())
+                manifest = json.loads(archive.read("payload-manifest.json").decode("utf-8"))
+            self.assertIn("payload-manifest.json", names)
+            self.assertIn("apps/openclaw/README.md", names)
+            self.assertIn("runtimes/wsl/ubuntu-rootfs.tar", names)
+            self.assertIn("data/backups/wsl/ClawHermes-Ubuntu-2026-05-01T00-00-00-000Z.tar", names)
+            self.assertFalse(any(name.startswith("data/tmp/") for name in names))
+            self.assertEqual({entry["path"] for entry in manifest["entries"]}, {entry["path"] for entry in payload["entries"]})
+        finally:
+            temp_dir.cleanup()
+
     def test_install_runtime_dry_run_reports_archive_plan(self):
         temp_dir = tempfile.TemporaryDirectory()
         temp_root = Path(temp_dir.name)

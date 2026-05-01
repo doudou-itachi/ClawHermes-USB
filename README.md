@@ -55,6 +55,8 @@ Run the Node CLI directly:
 ```powershell
 node core/node/dist/clawhermes.js setup --json
 node core/node/dist/clawhermes.js payloads --json
+node core/node/dist/clawhermes.js payload-export --dry-run --json
+node core/node/dist/clawhermes.js payload-export --confirm-export --json
 node core/node/dist/clawhermes.js wsl --distro Ubuntu --json
 node core/node/dist/clawhermes.js prepare-wsl --distro Ubuntu --dry-run --json
 node core/node/dist/clawhermes.js wsl-rootfs-guide --distro Ubuntu --json

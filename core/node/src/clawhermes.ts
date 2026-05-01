@@ -1,4 +1,4 @@
-import { adapterSetupPlan, appSourcePlan, checkoutAppSource, createBackup, getRoot, getStatus, initializeEnvFiles, installRuntimeFromArchive, markAdapterReady, payloadInventory, portableEnv, prepareWsl, probeAppSources, readLogTail, restoreBackup, restorePlan, runAdapterSetup, runtimePreparationPlan, serviceEnvironmentDiagnostic, setupDiagnostics, startSingleAdapter, startSkeleton, stopSkeleton, verifyAdapter, writeStatusSnapshot, wslDiagnostics, wslExport, wslImport, wslImportPlan, wslRootfsGuide, wslUnregister, wslUnregisterPlan, wslWorkflowPlan } from "./core";
+import { adapterSetupPlan, appSourcePlan, checkoutAppSource, createBackup, getRoot, getStatus, initializeEnvFiles, installRuntimeFromArchive, markAdapterReady, payloadExport, payloadInventory, portableEnv, prepareWsl, probeAppSources, readLogTail, restoreBackup, restorePlan, runAdapterSetup, runtimePreparationPlan, serviceEnvironmentDiagnostic, setupDiagnostics, startSingleAdapter, startSkeleton, stopSkeleton, verifyAdapter, writeStatusSnapshot, wslDiagnostics, wslExport, wslImport, wslImportPlan, wslRootfsGuide, wslUnregister, wslUnregisterPlan, wslWorkflowPlan } from "./core";
 import type { BackupProfile } from "./backup";
 
 type ParsedArgs = {
@@ -160,6 +160,18 @@ async function main(): Promise<void> {
         for (const app of result.apps) console.log(`- app ${app.serviceId}: ${app.ready ? "ready" : "missing/placeholder"} at ${app.path}`);
         for (const rootfs of result.wslRootfs) console.log(`- rootfs ${rootfs.distro}: ${rootfs.archive.exists ? "present" : "missing"} at ${rootfs.archive.path}`);
         for (const backup of result.wslBackups) console.log(`- backup ${backup.distributionName}: ${backup.latest ? "present" : "missing"}`);
+      }
+      return;
+    }
+    case "payload-export": {
+      const result = payloadExport(root, { archive, dryRun, confirmExport });
+      if (json) {
+        printJson(result);
+      } else {
+        console.log(dryRun ? "ClawHermes-USB payload export plan" : "ClawHermes-USB payload export");
+        for (const message of result.messages) console.log(`- ${message}`);
+        console.log(`Archive: ${result.archivePath}`);
+        for (const entry of result.entries) console.log(`- ${entry.path}`);
       }
       return;
     }

@@ -2904,6 +2904,38 @@ Validation performed:
 Next steps:
 
 - Decide whether the next packaging step should remain an operator guide or become a guarded `payload-export` command that writes a manifest plus archive into `data/backups/`.
+
+### Payload Export Command
+
+Status: `Done`
+
+Summary:
+
+- Added guarded `payload-export --confirm-export --json`.
+- Added `payload-export --dry-run --json` so operators can inspect included payload paths before writing an archive.
+- The command creates a zip archive under `data/backups/payloads/` by default with `payload-manifest.json`.
+- Payload export includes ready app payload directories, WSL rootfs archives and sidecars, and latest WSL backup exports and sidecars.
+- The command excludes `data/tmp`, refuses unconfirmed writes, and rejects archive overrides under system temp outside the project root.
+
+Changed areas:
+
+- `core/node/src/payload-export.ts`
+- `core/node/src/core.ts`
+- `core/node/src/clawhermes.ts`
+- `core/node/dist/`
+- `core/windows/clawhermes.ps1`
+- `README.md`
+- `docs/PROGRESS.md`
+- `tests/test_windows_core.py`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_payload_export_dry_run_reports_manifest_entries_without_archive tests.test_windows_core.WindowsCoreTests.test_payload_export_confirm_creates_manifest_archive -v`
+
+Next steps:
+
+- Use `payload-export --dry-run --json` before creating a real full-size package because the current verified WSL backup/rootfs artifacts are multi-GB files.
 - Review whether portal action execution should remain command-only for MVP or move behind a separate confirmation flow later.
 
 ### Real WSL2 Payload Host Preparation

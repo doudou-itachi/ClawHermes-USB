@@ -166,6 +166,21 @@ async function main() {
             }
             return;
         }
+        case "payload-export": {
+            const result = (0, core_1.payloadExport)(root, { archive, dryRun, confirmExport });
+            if (json) {
+                printJson(result);
+            }
+            else {
+                console.log(dryRun ? "ClawHermes-USB payload export plan" : "ClawHermes-USB payload export");
+                for (const message of result.messages)
+                    console.log(`- ${message}`);
+                console.log(`Archive: ${result.archivePath}`);
+                for (const entry of result.entries)
+                    console.log(`- ${entry.path}`);
+            }
+            return;
+        }
         case "wsl": {
             const result = (0, core_1.wslDiagnostics)(root, distro);
             if (json) {
