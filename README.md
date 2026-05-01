@@ -19,11 +19,14 @@ Implemented:
 - Local portal at `http://127.0.0.1:17000/` with live status, setup actions, adapter verification, logs, backup status, and guarded operation commands.
 - Portable backup command that writes timestamped zip archives under `data/backups/`.
 - Read-only restore planning and guarded no-overwrite restore execution for backup archives.
+- Verified WSL2 adapter path for Hermes Agent using the project-managed `ClawHermes-Ubuntu` distro and `http://127.0.0.1:8642/health`.
+- Verified WSL2 adapter path for OpenClaw using Node.js 24, pnpm 10.33.2, project-local state/log paths, and `http://127.0.0.1:18789/healthz`.
+- Project-local WSL export backups under `data/backups/wsl/`.
 
 Not implemented yet:
 
 - Automatic download, vendoring, or installation of OpenClaw, Hermes Agent, or Hermes Web UI.
-- Verified real upstream service integration for OpenClaw and Hermes Agent.
+- One-click packaging of the ignored upstream app payloads and WSL rootfs artifacts.
 
 ## Quick Start
 
@@ -83,7 +86,7 @@ Run verification:
 npm test
 ```
 
-WSL2 note: `prepare-wsl` is guarded because enabling WSL2 and registering a Linux distribution modify the current Windows host. The command only prints a plan by default; real host preparation requires `--confirm-install`. Rootfs archives for `wsl-import-plan` are operator-managed payloads under `runtimes/wsl/`; see [WSL2 Rootfs Artifact Policy](docs/wsl-rootfs-artifacts.md).
+WSL2 note: `prepare-wsl` is guarded because enabling WSL2 and registering a Linux distribution modify the current Windows host. The command only prints a plan by default; real host preparation requires `--confirm-install`. WSL2 adapters run in `ClawHermes-Ubuntu`; rootfs/import/export planning uses `Ubuntu` as the source distro. Rootfs archives for `wsl-import-plan` are operator-managed payloads under `runtimes/wsl/`; see [WSL2 Rootfs Artifact Policy](docs/wsl-rootfs-artifacts.md).
 
 ## Core Documents
 
@@ -123,4 +126,4 @@ ClawHermes-USB/
   docs/       Product and architecture documentation.
 ```
 
-Real OpenClaw and Hermes integration will follow after the portable launcher skeleton is verified against the upstream projects.
+Real OpenClaw, Hermes Agent, and Hermes Web UI integration paths are now verified. Large upstream checkouts, dependency folders, WSL rootfs archives, and WSL backups remain local ignored payloads rather than source files.

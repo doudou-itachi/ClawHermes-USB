@@ -2873,18 +2873,19 @@ Next steps:
 
 ### Real WSL2 Payload Host Preparation
 
-Status: `Blocked`
+Status: `Done`
 
 Summary:
 
 - Enabled the Windows host features required by WSL2: `Microsoft-Windows-Subsystem-Linux` and `VirtualMachinePlatform`.
-- Confirmed the host now has a pending Windows reboot (`RebootPending` and `PendingFileRenameOperations` are present), so distro registration cannot complete in this session.
+- Confirmed the host initially had a pending Windows reboot (`RebootPending` and `PendingFileRenameOperations` were present), so distro registration could not complete before restart.
+- After restart, WSL was updated to `2.6.3.0`, Ubuntu registration completed, and the managed `ClawHermes-Ubuntu` import path was verified.
 - Checked out real upstream payloads locally under ignored runtime app directories:
   - Hermes Agent: `apps/hermes-agent`, upstream commit `ec1443b`
   - OpenClaw: `apps/openclaw`, upstream commit `e8f9c3e6`
 - Created local env files from committed examples with `init-env`; existing secrets would be skipped by that command.
 - Preserved parent-repo `.gitkeep` placeholders so the source repository stays clean while local ignored payloads remain available for runtime validation.
-- Verified that both WSL2 adapters now pass the real app-directory and env-file checks, but remain blocked by missing registered Ubuntu WSL2 distribution, missing setup logs, and unstarted health checks.
+- This host-preparation checkpoint is superseded by the later `Real WSL2 Payload Verification` milestone, where both WSL2 adapters passed setup, startup, health checks, and production-readiness verification.
 
 Changed areas:
 
@@ -2906,15 +2907,13 @@ Validation performed:
 - `node core\node\dist\clawhermes.js verify-adapter openclaw --json`
 - `node core\node\dist\clawhermes.js setup --json`
 
-Current blocker:
+Resolution:
 
-- Windows must be rebooted before `wsl.exe --install -d Ubuntu` or managed `ClawHermes-Ubuntu` import/registration can proceed.
+- The reboot was completed, WSL2 became usable, and both real WSL2 payloads were verified from the managed distro.
 
-Next steps after reboot:
+Follow-up:
 
-- Re-run `node core\node\dist\clawhermes.js wsl --distro Ubuntu --json`.
-- Complete Ubuntu WSL2 registration or import the managed `ClawHermes-Ubuntu` rootfs.
-- Run real WSL2 setup for Hermes Agent and OpenClaw, capture `data/logs/setup-*.log`, verify ports/health/data paths, then update adapter commands only with evidence.
+- Keep packaging and regeneration guidance for ignored WSL/app payload artifacts current.
 
 ### Backup Restore Planning
 
