@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { getRoot } from "./portable";
-import { resolveWslExecutable, wslExecutableInvocation } from "./wsl";
+import { resolveWslExecutable, wslDiagnostics, wslExecutableInvocation } from "./wsl";
 
 const WSL_COMMAND_DOCS = "https://learn.microsoft.com/en-us/windows/wsl/basic-commands";
 
@@ -108,6 +108,11 @@ export function wslImport(usbRoot: string, options: { distro?: string; confirmIm
   const executablePath = resolveWslExecutable();
   if (!executablePath) {
     throw new Error("wsl.exe not found. Install or enable WSL2 before importing a distribution.");
+  }
+  const diagnostics = wslDiagnostics(plan.root);
+  const registered = diagnostics.distros.find((item) => item.name.toLowerCase() === plan.distributionName.toLowerCase());
+  if (diagnostics.listSucceeded && registered) {
+    throw new Error(`WSL distribution is already registered: ${plan.distributionName}`);
   }
   const invocation = wslExecutableInvocation(executablePath, plan.args);
   const stdout = execFileSync(invocation.executablePath, invocation.args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], windowsHide: true });

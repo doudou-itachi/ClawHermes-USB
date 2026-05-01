@@ -129,7 +129,7 @@ def make_hermes_agent_app_ready(temp_root):
     (app_dir / "pyproject.toml").write_text("[project]\nname = \"hermes-agent-test\"\n", encoding="utf-8")
 
 
-def make_fake_wsl_cmd(temp_root, stay_running=True, marker_path=None, args_path=None, stop_marker_path=None):
+def make_fake_wsl_cmd(temp_root, stay_running=True, marker_path=None, args_path=None, stop_marker_path=None, list_distribution="Ubuntu"):
     fake_wsl = temp_root / "fake-wsl.cmd"
     marker = marker_path or (temp_root / "data" / "tmp" / "fake-wsl-started.txt")
     args = args_path or (temp_root / "data" / "tmp" / "fake-wsl-args.txt")
@@ -145,7 +145,7 @@ def make_fake_wsl_cmd(temp_root, stay_running=True, marker_path=None, args_path=
         ")",
         "if \"%~1\"==\"--list\" (",
         "  echo   NAME      STATE           VERSION",
-            "  echo * Ubuntu    Running         2",
+        f"  echo * {list_distribution}    Running         2",
             "  exit /b 0",
         ")",
         f"echo started > \"{marker}\"",
@@ -901,6 +901,36 @@ class WindowsCoreTests(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("install location already exists", result.stderr)
+            self.assertFalse(marker.exists())
+        finally:
+            temp_dir.cleanup()
+
+    def test_wsl_import_rejects_existing_registered_distribution_before_running_wsl(self):
+        temp_dir, temp_root = make_temp_usb_root()
+        try:
+            archive = temp_root / "runtimes" / "wsl" / "ubuntu-rootfs.tar"
+            archive.parent.mkdir(parents=True, exist_ok=True)
+            archive.write_text("tiny rootfs placeholder for registered distro test\n", encoding="utf-8")
+            marker = temp_root / "data" / "tmp" / "fake-wsl-import.txt"
+            fake_wsl = make_fake_wsl_cmd(
+                temp_root,
+                stay_running=False,
+                marker_path=marker,
+                list_distribution="ClawHermes-Ubuntu",
+            )
+
+            result = run_dispatcher_for_root(
+                temp_root,
+                "wsl-import",
+                "--distro",
+                "Ubuntu",
+                "--confirm-import",
+                "-Json",
+                env={"CLAWHERMES_WSL_EXE": str(fake_wsl)},
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("already registered", result.stderr)
             self.assertFalse(marker.exists())
         finally:
             temp_dir.cleanup()

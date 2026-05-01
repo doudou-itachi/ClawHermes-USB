@@ -61,4 +61,4 @@ After placing the rootfs archive under `runtimes/wsl/`, explicitly confirm impor
 node core/node/dist/clawhermes.js wsl-import --distro Ubuntu --confirm-import --json
 ```
 
-This command fails before running WSL if `--confirm-import` is missing, if the rootfs archive is absent, if the planned `data/wsl/<distribution-name>/` install location already exists, or if an available `.sha256` sidecar does not match the archive.
+This command fails before running WSL if `--confirm-import` is missing, if the rootfs archive is absent, if the planned `data/wsl/<distribution-name>/` install location already exists, if the planned distribution name is already registered on the host, or if an available `.sha256` sidecar does not match the archive.

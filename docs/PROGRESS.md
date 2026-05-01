@@ -2367,3 +2367,35 @@ Next steps:
 
 - Consider requiring checksum sidecars once a trusted artifact source is chosen.
 - Add WSL import conflict guidance for already-registered distro names once unregister/export safeguards are defined.
+
+### WSL2 Import Registered Distro Guard
+
+Status: `Done`
+
+Summary:
+
+- `wsl-import --confirm-import` now checks registered WSL distributions before import.
+- If the planned distribution name, such as `ClawHermes-Ubuntu`, is already registered on the current Windows host, import fails before running WSL.
+- The guard uses existing WSL diagnostics and is covered by the fake WSL shim, so tests do not require real WSL2.
+- Documented the registered-distribution guard in the adapter contract and rootfs artifact policy.
+
+Changed areas:
+
+- `core/node/src/wsl-import.ts`
+- `core/node/dist/wsl-import.js`
+- `docs/ADAPTER_CONTRACT.md`
+- `docs/wsl-rootfs-artifacts.md`
+- `docs/PROGRESS.md`
+- `tests/test_windows_core.py`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_wsl_import_rejects_existing_registered_distribution_before_running_wsl -v`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_wsl_import_rejects_existing_registered_distribution_before_running_wsl tests.test_windows_core.WindowsCoreTests.test_wsl_import_confirm_runs_fake_wsl_import_with_project_local_archive -v`
+- `npm test`
+
+Next steps:
+
+- Consider requiring checksum sidecars once a trusted artifact source is chosen.
+- Add explicit unregister/export safety guidance before supporting any cleanup command.

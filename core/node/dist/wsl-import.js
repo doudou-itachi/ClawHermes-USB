@@ -110,6 +110,11 @@ function wslImport(usbRoot, options) {
     if (!executablePath) {
         throw new Error("wsl.exe not found. Install or enable WSL2 before importing a distribution.");
     }
+    const diagnostics = (0, wsl_1.wslDiagnostics)(plan.root);
+    const registered = diagnostics.distros.find((item) => item.name.toLowerCase() === plan.distributionName.toLowerCase());
+    if (diagnostics.listSucceeded && registered) {
+        throw new Error(`WSL distribution is already registered: ${plan.distributionName}`);
+    }
     const invocation = (0, wsl_1.wslExecutableInvocation)(executablePath, plan.args);
     const stdout = (0, node_child_process_1.execFileSync)(invocation.executablePath, invocation.args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
     return {
