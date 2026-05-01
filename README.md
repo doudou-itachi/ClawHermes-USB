@@ -2,6 +2,8 @@
 
 ClawHermes-USB is a Windows-first portable runtime suite for running [OpenClaw](https://github.com/openclaw/openclaw), [Hermes Agent](https://github.com/NousResearch/hermes-agent), and [EKKOLearnAI/hermes-web-ui](https://github.com/EKKOLearnAI/hermes-web-ui) from a USB drive.
 
+![ClawHermes-USB portable runtime overview](docs/assets/hero.svg)
+
 The project goal is not to fork these upstream tools. It provides a portable launcher, consistent directory layout, data isolation rules, service adapters, backup workflow, and a local portal so users can carry their agent environment between Windows machines with minimal host pollution.
 
 Development note: this project was developed with assistance from [Superpowers](https://github.com/obra/superpowers), the OpenAI ChatGPT 5.5 model, and OpenAI Codex.
@@ -149,6 +151,8 @@ Chinese versions:
 - [ADAPTER_CONTRACT.zh-CN.md](docs/ADAPTER_CONTRACT.zh-CN.md)
 
 ## Design Goals
+
+![ClawHermes-USB runtime architecture](docs/assets/runtime-architecture.svg)
 
 - Windows-first portable operation.
 - Keep OpenClaw, Hermes Agent, Hermes Web UI, runtime dependencies, sessions, memory, skills, logs, and workspace data on the USB drive.

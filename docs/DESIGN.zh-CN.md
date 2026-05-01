@@ -15,6 +15,8 @@ ClawHermes-USB 是围绕上游 agent 工具构建的一层便携编排外壳。
 
 ## 2. 架构分层
 
+![ClawHermes-USB 运行架构](assets/runtime-architecture.svg)
+
 ```text
 User
   |

@@ -15,6 +15,8 @@ This keeps the system understandable and makes future integrations possible.
 
 ## 2. Architectural Layers
 
+![ClawHermes-USB runtime architecture](assets/runtime-architecture.svg)
+
 ```text
 User
   |

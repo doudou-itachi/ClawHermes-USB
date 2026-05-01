@@ -2,6 +2,8 @@
 
 本文面向 clone 仓库后的开发者，目标是快速理解如何在本机运行 ClawHermes-USB 便携套件，并知道图形入口 `.vbs`、PowerShell 脚本、Node 核心和服务适配器之间的关系。
 
+![ClawHermes-USB 运行架构](assets/runtime-architecture.svg)
+
 ## 适用场景
 
 - 你要在 Windows 开发机上调试 ClawHermes 自己的启动器、GUI、适配器和编排逻辑。
@@ -40,6 +42,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File launcher/windows/ClawHermes-
 ```
 
 ## GUI 入口做了什么
+
+![小白用户操作路径](assets/user-journey.svg)
 
 启动链路如下：
 

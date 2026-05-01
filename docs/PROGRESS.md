@@ -13,6 +13,40 @@ Update it whenever a milestone is completed, changed, blocked, or deferred.
 
 ## 2026-05-02
 
+### Documentation Visual Assets
+
+Status: `Done`
+
+Summary:
+
+- Added colorful SVG documentation visuals for the project overview, runtime architecture, USB deployment flow, and beginner user journey.
+- Embedded the visuals in English and Chinese README files plus the architecture, developer runbook, and USB deployment documents.
+- Kept the assets local under `docs/assets/` so GitHub, local clones, and USB copies can render them without external image hosting.
+
+Changed areas:
+
+- `docs/assets/hero.svg`
+- `docs/assets/runtime-architecture.svg`
+- `docs/assets/usb-flow.svg`
+- `docs/assets/user-journey.svg`
+- `README.md`
+- `README.zh-CN.md`
+- `docs/DESIGN.md`
+- `docs/DESIGN.zh-CN.md`
+- `docs/developer-local-runbook.zh-CN.md`
+- `docs/usb-deployment.zh-CN.md`
+- `docs/PROGRESS.md`
+
+Validation performed:
+
+- Markdown and SVG reference checks.
+- `git diff --check`
+- UTF-8 smoke check for edited Chinese documents.
+
+Next steps:
+
+- Add more screenshots or generated visuals later if the GUI appearance becomes part of the public user guide.
+
 ### Developer And USB Deployment Documentation
 
 Status: `Done`

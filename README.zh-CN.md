@@ -2,6 +2,8 @@
 
 ClawHermes-USB 是一个 Windows 优先的便携运行套件，用来从同一个项目目录运行 [OpenClaw](https://github.com/openclaw/openclaw)、[Hermes Agent](https://github.com/NousResearch/hermes-agent) 和 [EKKOLearnAI/hermes-web-ui](https://github.com/EKKOLearnAI/hermes-web-ui)。项目目标不是 fork 上游应用，而是在它们外面提供一层可交付、可启动、可备份、可诊断的便携编排层。
 
+![ClawHermes-USB 便携运行总览](docs/assets/hero.svg)
+
 开发标注：本项目开发过程中使用了 [Superpowers](https://github.com/obra/superpowers)、OpenAI ChatGPT 5.5 模型和 OpenAI Codex 辅助完成。
 
 ## 推荐入口
@@ -13,6 +15,8 @@ launcher/windows/ClawHermes-Control.vbs
 ```
 
 这个入口会打开图形控制中心，不显示黑色命令窗口。图形界面左侧包含安装向导、启动服务、停止服务、打开界面、模型配置、日志、备份、修复 / 更新和主题切换。
+
+![小白用户操作路径](docs/assets/user-journey.svg)
 
 如果 VBS 被安全软件拦截，可以改用兼容入口：
 

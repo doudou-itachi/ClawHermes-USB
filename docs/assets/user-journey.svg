@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="460" viewBox="0 0 1100 460" role="img" aria-labelledby="title desc">
+  <title id="title">New user journey for ClawHermes-USB</title>
+  <desc id="desc">A Chinese user journey diagram showing the beginner flow from opening the GUI to installing, configuring, starting, using, and backing up.</desc>
+  <defs>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#102033" flood-opacity=".12"/>
+    </filter>
+  </defs>
+  <rect width="1100" height="460" rx="26" fill="#f8fafc"/>
+  <text x="54" y="58" font-family="Segoe UI, Microsoft YaHei, Arial, sans-serif" font-size="30" font-weight="800" fill="#102033">小白用户操作路径</text>
+  <text x="54" y="88" font-family="Segoe UI, Microsoft YaHei, Arial, sans-serif" font-size="16" fill="#617086">把复杂命令藏在图形入口后面，只保留用户能理解的步骤。</text>
+  <g filter="url(#shadow)">
+    <rect x="70" y="136" width="170" height="210" rx="22" fill="#ffffff"/>
+    <circle cx="155" cy="188" r="30" fill="#dbeafe"/>
+    <path d="M140 188 h30 M155 173 v30" stroke="#2563eb" stroke-width="5" stroke-linecap="round"/>
+    <text x="105" y="250" font-family="Segoe UI, Microsoft YaHei, Arial, sans-serif" font-size="18" font-weight="700" fill="#182434">打开入口</text>
+    <text x="101" y="282" font-family="Segoe UI, Microsoft YaHei, Arial, sans-serif" font-size="13" fill="#6b7b8e">双击 VBS</text>
+    <text x="98" y="306" font-family="Segoe UI, Microsoft YaHei, Arial, sans-serif" font-size="13" fill="#6b7b8e">不显示黑窗口</text>
+  </g>
+  <g filter="url(#shadow)">
+    <rect x="272" y="136" width="170" height="210" rx="22" fill="#ffffff"/>
+    <circle cx="357" cy="188" r="30" fill="#dcfce7"/>
+    <path d="M342 190 l10 10 l22 -26" fill="none" stroke="#16a34a" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="306" y="250" font-family="Segoe UI, Microsoft YaHei, Arial, sans-serif" font-size="18" font-weight="700" fill="#182434">安装向导</text>
+    <text x="302" y="282" font-family="Segoe UI, Microsoft YaHei, Arial, sans-serif" font-size="13" fill="#6b7b8e">检查 WSL</text>
+    <text x="290" y="306" font-family="Segoe UI, Microsoft YaHei, Arial, sans-serif" font-size="13" fill="#6b7b8e">检查 payload</text>
+  </g>
+  <g filter="url(#shadow)">
+    <rect x="474" y="136" width="170" height="210" rx="22" fill="#ffffff"/>
+    <circle cx="559" cy="188" r="30" fill="#ffedd5"/>
+    <path d="M544 182 h30 M544 195 h20 M578 195 h4" stroke="#f97316" stroke-width="5" stroke-linecap="round"/>
+    <text x="509" y="250" font-family="Segoe UI, Microsoft YaHei, Arial, sans-serif" font-size="18" font-weight="700" fill="#182434">模型配置</text>
+    <text x="502" y="282" font-family="Segoe UI, Microsoft YaHei, Arial, sans-serif" font-size="13" fill="#6b7b8e">URL, 模型名</text>
+    <text x="513" y="306" font-family="Segoe UI, Microsoft YaHei, Arial, sans-serif" font-size="13" fill="#6b7b8e">API Key</text>
+  </g>
+  <g filter="url(#shadow)">
+    <rect x="676" y="136" width="170" height="210" rx="22" fill="#ffffff"/>
+    <circle cx="761" cy="188" r="30" fill="#ede9fe"/>
+    <path d="M753 174 l22 14 l-22 14 z" fill="#7c3aed"/>
+    <text x="710" y="250" font-family="Segoe UI, Microsoft YaHei, Arial, sans-serif" font-size="18" font-weight="700" fill="#182434">启动服务</text>
+    <text x="704" y="282" font-family="Segoe UI, Microsoft YaHei, Arial, sans-serif" font-size="13" fill="#6b7b8e">后台运行</text>
+    <text x="692" y="306" font-family="Segoe UI, Microsoft YaHei, Arial, sans-serif" font-size="13" fill="#6b7b8e">自动刷新状态</text>
+  </g>
+  <g filter="url(#shadow)">
+    <rect x="878" y="136" width="170" height="210" rx="22" fill="#ffffff"/>
+    <circle cx="963" cy="188" r="30" fill="#fce7f3"/>
+    <path d="M950 178 h26 v20 h-26 z M950 186 h26" fill="none" stroke="#db2777" stroke-width="4" stroke-linejoin="round"/>
+    <text x="912" y="250" font-family="Segoe UI, Microsoft YaHei, Arial, sans-serif" font-size="18" font-weight="700" fill="#182434">打开界面</text>
+    <text x="909" y="282" font-family="Segoe UI, Microsoft YaHei, Arial, sans-serif" font-size="13" fill="#6b7b8e">OpenClaw</text>
+    <text x="907" y="306" font-family="Segoe UI, Microsoft YaHei, Arial, sans-serif" font-size="13" fill="#6b7b8e">Hermes Web UI</text>
+  </g>
+  <path d="M240 240 H272" stroke="#a8b5c7" stroke-width="4" stroke-linecap="round"/>
+  <path d="M442 240 H474" stroke="#a8b5c7" stroke-width="4" stroke-linecap="round"/>
+  <path d="M644 240 H676" stroke="#a8b5c7" stroke-width="4" stroke-linecap="round"/>
+  <path d="M846 240 H878" stroke="#a8b5c7" stroke-width="4" stroke-linecap="round"/>
+  <rect x="190" y="382" width="720" height="38" rx="19" fill="#eaf7f1"/>
+  <text x="244" y="407" font-family="Segoe UI, Microsoft YaHei, Arial, sans-serif" font-size="15" fill="#2d5c4b">结束使用前点“停止服务”，重要数据定期点“备份”。</text>
+</svg>
