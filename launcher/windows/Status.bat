@@ -3,4 +3,5 @@ setlocal
 set SCRIPT_DIR=%~dp0
 for %%I in ("%SCRIPT_DIR%..\..") do set USB_ROOT=%%~fI
 powershell -NoProfile -ExecutionPolicy Bypass -File "%USB_ROOT%\core\windows\clawhermes.ps1" status -UsbRoot "%USB_ROOT%"
-endlocal
+set CLAWHERMES_EXIT=%ERRORLEVEL%
+endlocal & exit /b %CLAWHERMES_EXIT%

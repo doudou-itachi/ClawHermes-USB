@@ -43,6 +43,8 @@ launcher/windows/Stop.bat
 launcher/windows/Backup.bat
 ```
 
+`Start.bat` opens the local portal after a successful start. All Windows Batch launchers forward the core command exit code.
+
 Run the Node CLI directly:
 
 ```powershell

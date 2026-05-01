@@ -548,6 +548,24 @@ class WindowsCoreTests(unittest.TestCase):
             ROOT / "data" / "cache" / "uv",
         )
 
+    def test_windows_batch_launchers_forward_exit_codes_and_start_opens_portal(self):
+        launchers = {
+            "Setup.bat": "setup",
+            "Start.bat": "start",
+            "Stop.bat": "stop",
+            "Status.bat": "status",
+            "Backup.bat": "backup",
+        }
+
+        for file_name, action in launchers.items():
+            text = (ROOT / "launcher" / "windows" / file_name).read_text(encoding="utf-8")
+            self.assertIn(f"clawhermes.ps1\" {action} -UsbRoot", text)
+            self.assertIn("set CLAWHERMES_EXIT=%ERRORLEVEL%", text)
+            self.assertIn("endlocal & exit /b %CLAWHERMES_EXIT%", text)
+
+        start_text = (ROOT / "launcher" / "windows" / "Start.bat").read_text(encoding="utf-8")
+        self.assertIn('if "%CLAWHERMES_EXIT%"=="0" start "" "http://127.0.0.1:17000/"', start_text)
+
     def test_setup_json_reports_runtime_diagnostics_and_valid_adapters(self):
         result = run_dispatcher("setup", "-Json")
 

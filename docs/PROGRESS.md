@@ -2575,3 +2575,37 @@ Next steps:
 
 - Consider requiring checksum sidecars once a trusted artifact source is chosen.
 - Review PRD/progress for the next highest-value gap after the WSL2 operator workflow is complete.
+
+### Windows Batch Launcher Exit Handling
+
+Status: `Done`
+
+Summary:
+
+- Updated Windows Batch launchers to preserve and return the PowerShell/Node core exit code.
+- Updated `Start.bat` to open `http://127.0.0.1:17000/` only after the core start command succeeds.
+- Added regression coverage that keeps the outer launchers thin and prevents accidental loss of exit-code forwarding.
+- Documented the launcher behavior in the README.
+
+Changed areas:
+
+- `launcher/windows/Setup.bat`
+- `launcher/windows/Start.bat`
+- `launcher/windows/Stop.bat`
+- `launcher/windows/Status.bat`
+- `launcher/windows/Backup.bat`
+- `README.md`
+- `docs/PROGRESS.md`
+- `tests/test_windows_core.py`
+
+Validation performed:
+
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_windows_batch_launchers_forward_exit_codes_and_start_opens_portal -v`
+- `npm test`
+- `git diff --check`
+- UTF-8 smoke check
+- C temp cleanup check
+
+Next steps:
+
+- Continue toward real upstream integration for Hermes Agent and OpenClaw where external prerequisites allow it.
