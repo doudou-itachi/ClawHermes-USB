@@ -1,4 +1,4 @@
-import { adapterSetupPlan, appSourcePlan, checkoutAppSource, createBackup, getRoot, getStatus, initializeEnvFiles, installRuntimeFromArchive, markAdapterReady, portableEnv, prepareWsl, probeAppSources, readLogTail, restorePlan, runAdapterSetup, runtimePreparationPlan, serviceEnvironmentDiagnostic, setupDiagnostics, startSingleAdapter, startSkeleton, stopSkeleton, verifyAdapter, writeStatusSnapshot, wslDiagnostics, wslExport, wslImport, wslImportPlan, wslRootfsGuide, wslUnregister, wslUnregisterPlan, wslWorkflowPlan } from "./core";
+import { adapterSetupPlan, appSourcePlan, checkoutAppSource, createBackup, getRoot, getStatus, initializeEnvFiles, installRuntimeFromArchive, markAdapterReady, portableEnv, prepareWsl, probeAppSources, readLogTail, restoreBackup, restorePlan, runAdapterSetup, runtimePreparationPlan, serviceEnvironmentDiagnostic, setupDiagnostics, startSingleAdapter, startSkeleton, stopSkeleton, verifyAdapter, writeStatusSnapshot, wslDiagnostics, wslExport, wslImport, wslImportPlan, wslRootfsGuide, wslUnregister, wslUnregisterPlan, wslWorkflowPlan } from "./core";
 import type { BackupProfile } from "./backup";
 
 type ParsedArgs = {
@@ -19,6 +19,7 @@ type ParsedArgs = {
   confirmImport: boolean;
   confirmExport: boolean;
   confirmUnregister: boolean;
+  confirmRestore: boolean;
   distro?: string;
   summary?: string;
   lines: number;
@@ -43,6 +44,7 @@ function parseArgs(argv: string[]): ParsedArgs {
   let confirmImport = false;
   let confirmExport = false;
   let confirmUnregister = false;
+  let confirmRestore = false;
   let distro: string | undefined;
   let summary: string | undefined;
   let lines = 50;
@@ -82,6 +84,8 @@ function parseArgs(argv: string[]): ParsedArgs {
       confirmExport = true;
     } else if (arg === "--confirm-unregister") {
       confirmUnregister = true;
+    } else if (arg === "--confirm-restore") {
+      confirmRestore = true;
     } else if (arg === "--distro" && args[index + 1]) {
       distro = args[index + 1];
       index += 1;
@@ -95,7 +99,7 @@ function parseArgs(argv: string[]): ParsedArgs {
       positional.push(arg);
     }
   }
-  return { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, confirmCheckout, confirmSetup, confirmInstall, confirmReady, confirmStart, confirmImport, confirmExport, confirmUnregister, distro, summary, lines };
+  return { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, confirmCheckout, confirmSetup, confirmInstall, confirmReady, confirmStart, confirmImport, confirmExport, confirmUnregister, confirmRestore, distro, summary, lines };
 }
 
 function parseBackupProfile(value: string): BackupProfile {
@@ -108,7 +112,7 @@ function printJson(value: unknown): void {
 }
 
 async function main(): Promise<void> {
-  const { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, confirmCheckout, confirmSetup, confirmInstall, confirmReady, confirmStart, confirmImport, confirmExport, confirmUnregister, distro, summary, lines } = parseArgs(process.argv.slice(2));
+  const { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, confirmCheckout, confirmSetup, confirmInstall, confirmReady, confirmStart, confirmImport, confirmExport, confirmUnregister, confirmRestore, distro, summary, lines } = parseArgs(process.argv.slice(2));
   const root = getRoot(usbRoot);
 
   switch (action) {
@@ -414,6 +418,16 @@ async function main(): Promise<void> {
         console.log(`Archive: ${result.archivePath}`);
         for (const message of result.messages) console.log(`- ${message}`);
         console.log(`Confirm command: ${result.confirmCommand}`);
+      }
+      return;
+    }
+    case "restore": {
+      const result = restoreBackup(root, archive, { confirmRestore });
+      if (json) {
+        printJson(result);
+      } else {
+        console.log("ClawHermes-USB restore");
+        for (const message of result.messages) console.log(`- ${message}`);
       }
       return;
     }

@@ -2553,6 +2553,73 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("Backup archive not found", result.stderr)
 
+    def test_restore_requires_explicit_confirm_restore(self):
+        backup = run_dispatcher("backup", "-Json")
+        self.assertEqual(backup.returncode, 0, backup.stderr)
+        archive_path = Path(json.loads(backup.stdout)["archivePath"])
+        try:
+            temp_dir, temp_root = make_temp_usb_root()
+            try:
+                result = run_dispatcher_for_root(temp_root, "restore", "--archive", str(archive_path), "-Json")
+
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("--confirm-restore", result.stderr)
+            finally:
+                temp_dir.cleanup()
+        finally:
+            if archive_path.exists():
+                archive_path.unlink()
+
+    def test_restore_confirm_extracts_backup_without_existing_targets(self):
+        source_dir = tempfile.TemporaryDirectory()
+        restore_dir = tempfile.TemporaryDirectory()
+        try:
+            source_root = Path(source_dir.name)
+            restore_root = Path(restore_dir.name)
+            (source_root / "config" / "defaults").mkdir(parents=True)
+            (source_root / "adapters" / "demo").mkdir(parents=True)
+            (source_root / "data" / "openclaw").mkdir(parents=True)
+            (source_root / "config" / "defaults" / "ports.json").write_text('{"portal": 17000}\n', encoding="utf-8")
+            (source_root / "adapters" / "demo" / "adapter.json").write_text('{"id": "demo"}\n', encoding="utf-8")
+            (source_root / "data" / "openclaw" / "state.txt").write_text("portable state\n", encoding="utf-8")
+            backup = run_dispatcher_for_root(source_root, "backup", "-Json")
+            self.assertEqual(backup.returncode, 0, backup.stderr)
+            archive_path = Path(json.loads(backup.stdout)["archivePath"])
+
+            result = run_dispatcher_for_root(restore_root, "restore", "--archive", str(archive_path), "--confirm-restore", "-Json")
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertTrue(payload["executed"])
+            self.assertTrue(payload["confirmedRestore"])
+            self.assertEqual(Path(payload["root"]).resolve(), restore_root.resolve())
+            self.assertTrue((restore_root / "config" / "defaults" / "ports.json").exists())
+            self.assertTrue((restore_root / "adapters" / "demo" / "adapter.json").exists())
+            self.assertEqual((restore_root / "data" / "openclaw" / "state.txt").read_text(encoding="utf-8"), "portable state\n")
+            self.assertFalse((restore_root / "backup-manifest.json").exists())
+            self.assertFalse((restore_root / "data" / "tmp" / "restores").exists())
+        finally:
+            source_dir.cleanup()
+            restore_dir.cleanup()
+
+    def test_restore_rejects_existing_targets_before_extracting(self):
+        backup = run_dispatcher("backup", "-Json")
+        self.assertEqual(backup.returncode, 0, backup.stderr)
+        archive_path = Path(json.loads(backup.stdout)["archivePath"])
+        temp_dir, temp_root = make_temp_usb_root()
+        try:
+            (temp_root / "config").mkdir(parents=True, exist_ok=True)
+
+            result = run_dispatcher_for_root(temp_root, "restore", "--archive", str(archive_path), "--confirm-restore", "-Json")
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("restore target already exists", result.stderr)
+            self.assertFalse((temp_root / "data" / "tmp" / "restores").exists())
+        finally:
+            temp_dir.cleanup()
+            if archive_path.exists():
+                archive_path.unlink()
+
     def test_powershell_wrapper_allows_restore_plan(self):
         backup = run_dispatcher("backup", "-Json")
         self.assertEqual(backup.returncode, 0, backup.stderr)
@@ -2564,6 +2631,10 @@ class WindowsCoreTests(unittest.TestCase):
             payload = json.loads(result.stdout)
             self.assertEqual(Path(payload["archivePath"]).resolve(), archive_path.resolve())
             self.assertFalse(payload["wouldModify"])
+
+            restore = run_powershell_dispatcher("restore", "-Json", "--archive", str(archive_path))
+            self.assertNotEqual(restore.returncode, 0)
+            self.assertIn("--confirm-restore", restore.stderr)
         finally:
             if archive_path.exists():
                 archive_path.unlink()

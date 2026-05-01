@@ -2853,3 +2853,40 @@ Next steps:
 
 - Add guarded restore execution only after overwrite policy and recovery safety rules are defined.
 - Continue real Hermes Agent and OpenClaw WSL2 payload validation when a prepared distro is available.
+
+### Guarded Backup Restore Execution
+
+Status: `Done`
+
+Summary:
+
+- Added `restore --archive <zip> --confirm-restore --json`.
+- Restore execution requires explicit confirmation and refuses to overwrite existing restore targets.
+- The command validates backup manifest paths and zip entry paths before extraction.
+- Archives are extracted only into a project-local `data/tmp/restores/` staging directory, then declared manifest entries are copied into the project root and staging is removed.
+- Updated README examples and PowerShell wrapper support.
+
+Changed areas:
+
+- `core/node/src/backup.ts`
+- `core/node/src/clawhermes.ts`
+- `core/node/src/core.ts`
+- `core/node/dist/`
+- `core/windows/clawhermes.ps1`
+- `README.md`
+- `docs/PROGRESS.md`
+- `tests/test_windows_core.py`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_restore_requires_explicit_confirm_restore tests.test_windows_core.WindowsCoreTests.test_restore_confirm_extracts_backup_without_existing_targets tests.test_windows_core.WindowsCoreTests.test_restore_rejects_existing_targets_before_extracting tests.test_windows_core.WindowsCoreTests.test_powershell_wrapper_allows_restore_plan -v`
+- `npm test`
+- `git diff --check`
+- UTF-8 smoke check
+- C temp cleanup check
+
+Next steps:
+
+- Keep restore overwrite behavior out of MVP unless a separate conflict-resolution policy is designed.
+- Continue real Hermes Agent and OpenClaw WSL2 payload validation when a prepared distro is available.

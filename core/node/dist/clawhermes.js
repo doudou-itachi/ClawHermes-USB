@@ -20,6 +20,7 @@ function parseArgs(argv) {
     let confirmImport = false;
     let confirmExport = false;
     let confirmUnregister = false;
+    let confirmRestore = false;
     let distro;
     let summary;
     let lines = 50;
@@ -74,6 +75,9 @@ function parseArgs(argv) {
         else if (arg === "--confirm-unregister") {
             confirmUnregister = true;
         }
+        else if (arg === "--confirm-restore") {
+            confirmRestore = true;
+        }
         else if (arg === "--distro" && args[index + 1]) {
             distro = args[index + 1];
             index += 1;
@@ -90,7 +94,7 @@ function parseArgs(argv) {
             positional.push(arg);
         }
     }
-    return { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, confirmCheckout, confirmSetup, confirmInstall, confirmReady, confirmStart, confirmImport, confirmExport, confirmUnregister, distro, summary, lines };
+    return { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, confirmCheckout, confirmSetup, confirmInstall, confirmReady, confirmStart, confirmImport, confirmExport, confirmUnregister, confirmRestore, distro, summary, lines };
 }
 function parseBackupProfile(value) {
     if (value === "data-only" || value === "full")
@@ -101,7 +105,7 @@ function printJson(value) {
     process.stdout.write(`${JSON.stringify(value, null, 2)}\n`);
 }
 async function main() {
-    const { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, confirmCheckout, confirmSetup, confirmInstall, confirmReady, confirmStart, confirmImport, confirmExport, confirmUnregister, distro, summary, lines } = parseArgs(process.argv.slice(2));
+    const { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, confirmCheckout, confirmSetup, confirmInstall, confirmReady, confirmStart, confirmImport, confirmExport, confirmUnregister, confirmRestore, distro, summary, lines } = parseArgs(process.argv.slice(2));
     const root = (0, core_1.getRoot)(usbRoot);
     switch (action) {
         case "env-json":
@@ -461,6 +465,18 @@ async function main() {
                 for (const message of result.messages)
                     console.log(`- ${message}`);
                 console.log(`Confirm command: ${result.confirmCommand}`);
+            }
+            return;
+        }
+        case "restore": {
+            const result = (0, core_1.restoreBackup)(root, archive, { confirmRestore });
+            if (json) {
+                printJson(result);
+            }
+            else {
+                console.log("ClawHermes-USB restore");
+                for (const message of result.messages)
+                    console.log(`- ${message}`);
             }
             return;
         }

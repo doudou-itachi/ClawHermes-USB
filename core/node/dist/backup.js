@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createBackup = createBackup;
 exports.restorePlan = restorePlan;
+exports.restoreBackup = restoreBackup;
 const node_child_process_1 = require("node:child_process");
 const node_fs_1 = require("node:fs");
 const node_path_1 = require("node:path");
@@ -90,6 +91,45 @@ function restorePlan(usbRoot, archivePath) {
         ],
     };
 }
+function restoreBackup(usbRoot, archivePath, options = {}) {
+    const plan = restorePlan(usbRoot, archivePath);
+    if (!options.confirmRestore) {
+        throw new Error("restore writes files into the project root. Re-run with --confirm-restore to proceed.");
+    }
+    if (plan.conflicts.length > 0) {
+        throw new Error(`restore target already exists: ${plan.conflicts[0].path}`);
+    }
+    validateZipEntryNames(plan.archivePath);
+    const timestamp = new Date().toISOString().replaceAll(":", "-").replaceAll(".", "-");
+    const restoreRoot = (0, node_path_1.join)(plan.root, "data", "tmp", "restores");
+    const stagingRoot = (0, node_path_1.join)(restoreRoot, `stage-${timestamp}`);
+    (0, node_fs_1.rmSync)(restoreRoot, { recursive: true, force: true });
+    (0, node_fs_1.mkdirSync)(stagingRoot, { recursive: true });
+    try {
+        expandArchive(plan.archivePath, stagingRoot);
+        for (const entry of plan.entries) {
+            const source = (0, node_path_1.join)(stagingRoot, entry.path);
+            if (!(0, node_fs_1.existsSync)(source))
+                throw new Error(`Backup archive is missing expected restore entry: ${entry.path}`);
+            const destination = (0, node_path_1.join)(plan.root, entry.path);
+            (0, node_fs_1.mkdirSync)((0, node_path_1.dirname)(destination), { recursive: true });
+            (0, node_fs_1.cpSync)(source, destination, { recursive: entry.kind === "directory", force: false });
+        }
+    }
+    finally {
+        (0, node_fs_1.rmSync)(restoreRoot, { recursive: true, force: true });
+    }
+    return {
+        ...plan,
+        confirmedRestore: true,
+        executed: true,
+        restored: plan.entries,
+        messages: [
+            `Restored ${plan.entries.length} entries from ${plan.archivePath}.`,
+            "Existing targets are never overwritten by this restore command.",
+        ],
+    };
+}
 function backupEntries(root, profile, includeLogs) {
     return profile === "full" ? fullBackupEntries(root, includeLogs) : dataOnlyBackupEntries(root, includeLogs);
 }
@@ -168,6 +208,37 @@ function readBackupManifest(archivePath) {
     if (!Array.isArray(parsed.entries))
         throw new Error("Backup manifest entries are missing or invalid.");
     return parsed;
+}
+function validateZipEntryNames(archivePath) {
+    const names = zipEntryNames(archivePath);
+    for (const name of names) {
+        const normalized = (0, node_path_1.normalize)(name);
+        if ((0, node_path_1.isAbsolute)(name) || normalized === ".." || normalized.startsWith(`..\\`) || normalized.startsWith("../")) {
+            throw new Error(`Backup archive contains an unsafe zip entry: ${name}`);
+        }
+    }
+}
+function zipEntryNames(archivePath) {
+    const script = [
+        "Add-Type -AssemblyName System.IO.Compression.FileSystem",
+        `$zip = [System.IO.Compression.ZipFile]::OpenRead(${powershellString(archivePath)})`,
+        "try {",
+        "  @($zip.Entries | ForEach-Object { $_.FullName }) | ConvertTo-Json -Compress",
+        "} finally { $zip.Dispose() }",
+    ].join("; ");
+    const raw = (0, node_child_process_1.execFileSync)("powershell", ["-NoProfile", "-Command", script], { encoding: "utf8", timeout: 10000 }).trim();
+    if (!raw)
+        return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [parsed];
+}
+function expandArchive(archivePath, destinationPath) {
+    const script = [
+        `$archive = ${powershellString(archivePath)}`,
+        `$destination = ${powershellString(destinationPath)}`,
+        "Expand-Archive -LiteralPath $archive -DestinationPath $destination -Force",
+    ].join("; ");
+    (0, node_child_process_1.execFileSync)("powershell", ["-NoProfile", "-Command", script], { stdio: "pipe", timeout: 30000 });
 }
 function validateRestoreEntry(entry) {
     if (!entry || typeof entry.path !== "string")

@@ -11,6 +11,10 @@ export type BackupOptions = {
   dryRun?: boolean;
 };
 
+export type RestoreOptions = {
+  confirmRestore?: boolean;
+};
+
 type BackupEntry = {
   path: string;
   kind: "directory" | "file";
@@ -107,6 +111,44 @@ export function restorePlan(usbRoot: string, archivePath: string | undefined) {
   };
 }
 
+export function restoreBackup(usbRoot: string, archivePath: string | undefined, options: RestoreOptions = {}) {
+  const plan = restorePlan(usbRoot, archivePath);
+  if (!options.confirmRestore) {
+    throw new Error("restore writes files into the project root. Re-run with --confirm-restore to proceed.");
+  }
+  if (plan.conflicts.length > 0) {
+    throw new Error(`restore target already exists: ${plan.conflicts[0].path}`);
+  }
+  validateZipEntryNames(plan.archivePath);
+  const timestamp = new Date().toISOString().replaceAll(":", "-").replaceAll(".", "-");
+  const restoreRoot = join(plan.root, "data", "tmp", "restores");
+  const stagingRoot = join(restoreRoot, `stage-${timestamp}`);
+  rmSync(restoreRoot, { recursive: true, force: true });
+  mkdirSync(stagingRoot, { recursive: true });
+  try {
+    expandArchive(plan.archivePath, stagingRoot);
+    for (const entry of plan.entries) {
+      const source = join(stagingRoot, entry.path);
+      if (!existsSync(source)) throw new Error(`Backup archive is missing expected restore entry: ${entry.path}`);
+      const destination = join(plan.root, entry.path);
+      mkdirSync(dirname(destination), { recursive: true });
+      cpSync(source, destination, { recursive: entry.kind === "directory", force: false });
+    }
+  } finally {
+    rmSync(restoreRoot, { recursive: true, force: true });
+  }
+  return {
+    ...plan,
+    confirmedRestore: true,
+    executed: true,
+    restored: plan.entries,
+    messages: [
+      `Restored ${plan.entries.length} entries from ${plan.archivePath}.`,
+      "Existing targets are never overwritten by this restore command.",
+    ],
+  };
+}
+
 function backupEntries(root: string, profile: BackupProfile, includeLogs: boolean): BackupEntry[] {
   return profile === "full" ? fullBackupEntries(root, includeLogs) : dataOnlyBackupEntries(root, includeLogs);
 }
@@ -185,6 +227,39 @@ function readBackupManifest(archivePath: string): BackupManifest {
   const parsed = JSON.parse(raw) as BackupManifest;
   if (!Array.isArray(parsed.entries)) throw new Error("Backup manifest entries are missing or invalid.");
   return parsed;
+}
+
+function validateZipEntryNames(archivePath: string): void {
+  const names = zipEntryNames(archivePath);
+  for (const name of names) {
+    const normalized = normalize(name);
+    if (isAbsolute(name) || normalized === ".." || normalized.startsWith(`..\\`) || normalized.startsWith("../")) {
+      throw new Error(`Backup archive contains an unsafe zip entry: ${name}`);
+    }
+  }
+}
+
+function zipEntryNames(archivePath: string): string[] {
+  const script = [
+    "Add-Type -AssemblyName System.IO.Compression.FileSystem",
+    `$zip = [System.IO.Compression.ZipFile]::OpenRead(${powershellString(archivePath)})`,
+    "try {",
+    "  @($zip.Entries | ForEach-Object { $_.FullName }) | ConvertTo-Json -Compress",
+    "} finally { $zip.Dispose() }",
+  ].join("; ");
+  const raw = execFileSync("powershell", ["-NoProfile", "-Command", script], { encoding: "utf8", timeout: 10000 }).trim();
+  if (!raw) return [];
+  const parsed = JSON.parse(raw) as string[] | string;
+  return Array.isArray(parsed) ? parsed : [parsed];
+}
+
+function expandArchive(archivePath: string, destinationPath: string): void {
+  const script = [
+    `$archive = ${powershellString(archivePath)}`,
+    `$destination = ${powershellString(destinationPath)}`,
+    "Expand-Archive -LiteralPath $archive -DestinationPath $destination -Force",
+  ].join("; ");
+  execFileSync("powershell", ["-NoProfile", "-Command", script], { stdio: "pipe", timeout: 30000 });
 }
 
 function validateRestoreEntry(entry: BackupEntry): BackupEntry {

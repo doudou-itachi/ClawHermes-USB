@@ -16,7 +16,7 @@ export { adapterSetupPlan, appSourcePlan, checkoutAppSource, probeAppSources } f
 export { markAdapterReady } from "./adapter-metadata";
 export { runAdapterSetup } from "./adapter-setup";
 export { verifyAdapter } from "./adapter-verification";
-export { createBackup, restorePlan } from "./backup";
+export { createBackup, restoreBackup, restorePlan } from "./backup";
 export { envFileDiagnostics, initializeEnvFiles, resolveServiceEnvironment, serviceEnvironmentDiagnostic } from "./environment";
 export { pathDiagnostics, portDiagnostics, readLogTail, setupDiagnostics, writeSetupSnapshot } from "./diagnostics";
 export { PORTAL_URL, generatePortal, getPortalStatus, startPortalServer, stopPortalServer } from "./portal";
