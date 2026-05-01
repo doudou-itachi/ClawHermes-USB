@@ -450,6 +450,20 @@ async function main() {
             }
             return;
         }
+        case "restore-plan": {
+            const result = (0, core_1.restorePlan)(root, archive);
+            if (json) {
+                printJson(result);
+            }
+            else {
+                console.log("ClawHermes-USB restore plan");
+                console.log(`Archive: ${result.archivePath}`);
+                for (const message of result.messages)
+                    console.log(`- ${message}`);
+                console.log(`Confirm command: ${result.confirmCommand}`);
+            }
+            return;
+        }
         case "start": {
             const result = await (0, core_1.startSkeleton)(root);
             if (json) {

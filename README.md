@@ -16,8 +16,9 @@ Implemented:
 - Adapter descriptor loading and dependency ordering.
 - Placeholder service start/status/stop with logs and PID metadata.
 - Managed process launch for production-ready adapters.
-- Local portal at `http://127.0.0.1:17000/` with live status and backup visibility.
+- Local portal at `http://127.0.0.1:17000/` with live status, setup actions, adapter verification, logs, backup status, and guarded operation commands.
 - Portable backup command that writes timestamped zip archives under `data/backups/`.
+- Read-only restore planning for backup archives.
 
 Not implemented yet:
 
@@ -72,6 +73,7 @@ node core/node/dist/clawhermes.js start --json
 node core/node/dist/clawhermes.js status --json
 node core/node/dist/clawhermes.js logs openclaw --lines 50 --json
 node core/node/dist/clawhermes.js backup --dry-run --json
+node core/node/dist/clawhermes.js restore-plan --archive data/backups/example.zip --json
 ```
 
 Run verification:

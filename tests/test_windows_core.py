@@ -2523,6 +2523,51 @@ class WindowsCoreTests(unittest.TestCase):
             if archive_path.exists():
                 archive_path.unlink()
 
+    def test_restore_plan_reports_backup_manifest_without_extracting(self):
+        backup = run_dispatcher("backup", "-Json")
+        self.assertEqual(backup.returncode, 0, backup.stderr)
+        archive_path = Path(json.loads(backup.stdout)["archivePath"])
+        try:
+            result = run_dispatcher("restore-plan", "--archive", str(archive_path), "-Json")
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            planned_paths = {entry["path"] for entry in payload["entries"]}
+            self.assertEqual(Path(payload["archivePath"]).resolve(), archive_path.resolve())
+            self.assertEqual(Path(payload["root"]).resolve(), ROOT)
+            self.assertFalse(payload["wouldModify"])
+            self.assertEqual(payload["manifest"]["profile"], "data-only")
+            self.assertIn("config", planned_paths)
+            self.assertIn("adapters", planned_paths)
+            self.assertIn("backup-manifest.json", payload["manifestPath"])
+            self.assertIn("--confirm-restore", payload["confirmCommand"])
+        finally:
+            if archive_path.exists():
+                archive_path.unlink()
+
+    def test_restore_plan_rejects_missing_archive(self):
+        missing_archive = ROOT / "data" / "backups" / "missing-restore-test.zip"
+
+        result = run_dispatcher("restore-plan", "--archive", str(missing_archive), "-Json")
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Backup archive not found", result.stderr)
+
+    def test_powershell_wrapper_allows_restore_plan(self):
+        backup = run_dispatcher("backup", "-Json")
+        self.assertEqual(backup.returncode, 0, backup.stderr)
+        archive_path = Path(json.loads(backup.stdout)["archivePath"])
+        try:
+            result = run_powershell_dispatcher("restore-plan", "-Json", "--archive", str(archive_path))
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertEqual(Path(payload["archivePath"]).resolve(), archive_path.resolve())
+            self.assertFalse(payload["wouldModify"])
+        finally:
+            if archive_path.exists():
+                archive_path.unlink()
+
     def test_status_reports_http_adapter_ready_when_endpoint_responds(self):
         temp_dir, temp_root, port = make_temp_http_usb_root()
         try:

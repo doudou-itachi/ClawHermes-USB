@@ -1,4 +1,4 @@
-import { adapterSetupPlan, appSourcePlan, checkoutAppSource, createBackup, getRoot, getStatus, initializeEnvFiles, installRuntimeFromArchive, markAdapterReady, portableEnv, prepareWsl, probeAppSources, readLogTail, runAdapterSetup, runtimePreparationPlan, serviceEnvironmentDiagnostic, setupDiagnostics, startSingleAdapter, startSkeleton, stopSkeleton, verifyAdapter, writeStatusSnapshot, wslDiagnostics, wslExport, wslImport, wslImportPlan, wslRootfsGuide, wslUnregister, wslUnregisterPlan, wslWorkflowPlan } from "./core";
+import { adapterSetupPlan, appSourcePlan, checkoutAppSource, createBackup, getRoot, getStatus, initializeEnvFiles, installRuntimeFromArchive, markAdapterReady, portableEnv, prepareWsl, probeAppSources, readLogTail, restorePlan, runAdapterSetup, runtimePreparationPlan, serviceEnvironmentDiagnostic, setupDiagnostics, startSingleAdapter, startSkeleton, stopSkeleton, verifyAdapter, writeStatusSnapshot, wslDiagnostics, wslExport, wslImport, wslImportPlan, wslRootfsGuide, wslUnregister, wslUnregisterPlan, wslWorkflowPlan } from "./core";
 import type { BackupProfile } from "./backup";
 
 type ParsedArgs = {
@@ -402,6 +402,18 @@ async function main(): Promise<void> {
       } else {
         console.log(result.message);
         for (const entry of result.entries) console.log(`- ${entry.path}`);
+      }
+      return;
+    }
+    case "restore-plan": {
+      const result = restorePlan(root, archive);
+      if (json) {
+        printJson(result);
+      } else {
+        console.log("ClawHermes-USB restore plan");
+        console.log(`Archive: ${result.archivePath}`);
+        for (const message of result.messages) console.log(`- ${message}`);
+        console.log(`Confirm command: ${result.confirmCommand}`);
       }
       return;
     }

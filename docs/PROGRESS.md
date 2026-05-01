@@ -2817,3 +2817,39 @@ Next steps:
 
 - Continue real Hermes Agent and OpenClaw WSL2 payload validation when a prepared distro is available.
 - Review whether portal action execution should remain command-only for MVP or move behind a separate confirmation flow later.
+
+### Backup Restore Planning
+
+Status: `Done`
+
+Summary:
+
+- Added a read-only `restore-plan --archive <zip>` command.
+- The command reads `backup-manifest.json` from a backup archive without extracting files.
+- Restore planning validates manifest paths, reports existing target conflicts, and emits a future explicit restore confirmation command.
+- Added PowerShell wrapper support for `restore-plan` and updated README status/examples.
+
+Changed areas:
+
+- `core/node/src/backup.ts`
+- `core/node/src/clawhermes.ts`
+- `core/node/src/core.ts`
+- `core/node/dist/`
+- `core/windows/clawhermes.ps1`
+- `README.md`
+- `docs/PROGRESS.md`
+- `tests/test_windows_core.py`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_restore_plan_reports_backup_manifest_without_extracting tests.test_windows_core.WindowsCoreTests.test_restore_plan_rejects_missing_archive tests.test_windows_core.WindowsCoreTests.test_powershell_wrapper_allows_restore_plan -v`
+- `npm test`
+- `git diff --check`
+- UTF-8 smoke check
+- C temp cleanup check
+
+Next steps:
+
+- Add guarded restore execution only after overwrite policy and recovery safety rules are defined.
+- Continue real Hermes Agent and OpenClaw WSL2 payload validation when a prepared distro is available.

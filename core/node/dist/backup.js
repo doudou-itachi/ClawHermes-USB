@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createBackup = createBackup;
+exports.restorePlan = restorePlan;
 const node_child_process_1 = require("node:child_process");
 const node_fs_1 = require("node:fs");
 const node_path_1 = require("node:path");
@@ -56,6 +57,37 @@ function createBackup(usbRoot, options = {}) {
         created: true,
         sizeBytes: (0, node_fs_1.statSync)(archivePath).size,
         message: `Created backup archive at ${archivePath}.`,
+    };
+}
+function restorePlan(usbRoot, archivePath) {
+    const root = (0, portable_1.getRoot)(usbRoot);
+    if (!archivePath)
+        throw new Error("--archive is required for restore-plan.");
+    if (!(0, node_fs_1.existsSync)(archivePath))
+        throw new Error(`Backup archive not found: ${archivePath}`);
+    if (!(0, node_fs_1.statSync)(archivePath).isFile())
+        throw new Error(`Backup archive is not a file: ${archivePath}`);
+    const manifest = readBackupManifest(archivePath);
+    const entries = manifest.entries.map((entry) => validateRestoreEntry(entry));
+    const conflicts = entries
+        .map((entry) => ({ ...entry, targetPath: (0, node_path_1.join)(root, entry.path), targetExists: (0, node_fs_1.existsSync)((0, node_path_1.join)(root, entry.path)) }))
+        .filter((entry) => entry.targetExists);
+    return {
+        root,
+        archivePath,
+        manifestPath: "backup-manifest.json",
+        manifest,
+        entries,
+        conflicts,
+        wouldModify: false,
+        confirmCommand: `node core/node/dist/clawhermes.js restore --archive ${quoteCommandArg(archivePath)} --confirm-restore --json`,
+        messages: [
+            `Backup archive contains ${entries.length} planned restore entries.`,
+            conflicts.length > 0
+                ? `${conflicts.length} restore target(s) already exist and would require overwrite handling.`
+                : "No existing restore targets were detected.",
+            "restore-plan is read-only and does not extract files.",
+        ],
     };
 }
 function backupEntries(root, profile, includeLogs) {
@@ -116,6 +148,40 @@ function compressDirectory(stagingRoot, archivePath) {
         "Compress-Archive -Path (Join-Path -Path $staging -ChildPath '*') -DestinationPath $archive -Force",
     ].join("; ");
     (0, node_child_process_1.execFileSync)("powershell", ["-NoProfile", "-Command", script], { stdio: "pipe" });
+}
+function readBackupManifest(archivePath) {
+    const script = [
+        "Add-Type -AssemblyName System.IO.Compression.FileSystem",
+        `$zip = [System.IO.Compression.ZipFile]::OpenRead(${powershellString(archivePath)})`,
+        "try {",
+        "  $entry = $zip.GetEntry('backup-manifest.json')",
+        "  if ($null -eq $entry) { throw 'backup-manifest.json not found in archive' }",
+        "  $stream = $entry.Open()",
+        "  try {",
+        "    $reader = [System.IO.StreamReader]::new($stream, [System.Text.Encoding]::UTF8)",
+        "    try { $reader.ReadToEnd() } finally { $reader.Dispose() }",
+        "  } finally { $stream.Dispose() }",
+        "} finally { $zip.Dispose() }",
+    ].join("; ");
+    const raw = (0, node_child_process_1.execFileSync)("powershell", ["-NoProfile", "-Command", script], { encoding: "utf8", timeout: 10000 }).trim();
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed.entries))
+        throw new Error("Backup manifest entries are missing or invalid.");
+    return parsed;
+}
+function validateRestoreEntry(entry) {
+    if (!entry || typeof entry.path !== "string")
+        throw new Error("Backup manifest contains an invalid entry path.");
+    if (entry.kind !== "directory" && entry.kind !== "file")
+        throw new Error(`Backup manifest contains an invalid entry kind for ${entry.path}.`);
+    const normalized = (0, node_path_1.normalize)(entry.path);
+    if ((0, node_path_1.isAbsolute)(entry.path) || normalized === ".." || normalized.startsWith(`..\\`) || normalized.startsWith("../")) {
+        throw new Error(`Backup manifest contains an unsafe restore path: ${entry.path}`);
+    }
+    return { path: normalized, kind: entry.kind };
+}
+function quoteCommandArg(value) {
+    return /\s/.test(value) ? `"${value.replaceAll('"', '\\"')}"` : value;
 }
 function powershellString(value) {
     return `'${value.replaceAll("'", "''")}'`;

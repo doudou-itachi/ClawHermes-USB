@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, isAbsolute, join, normalize } from "node:path";
 import { getRoot } from "./portable";
 
 export type BackupProfile = "data-only" | "full";
@@ -14,6 +14,13 @@ export type BackupOptions = {
 type BackupEntry = {
   path: string;
   kind: "directory" | "file";
+};
+
+type BackupManifest = {
+  createdAt: string;
+  profile: BackupProfile;
+  includeLogs: boolean;
+  entries: BackupEntry[];
 };
 
 export function createBackup(usbRoot: string, options: BackupOptions = {}) {
@@ -68,6 +75,35 @@ export function createBackup(usbRoot: string, options: BackupOptions = {}) {
     created: true,
     sizeBytes: statSync(archivePath).size,
     message: `Created backup archive at ${archivePath}.`,
+  };
+}
+
+export function restorePlan(usbRoot: string, archivePath: string | undefined) {
+  const root = getRoot(usbRoot);
+  if (!archivePath) throw new Error("--archive is required for restore-plan.");
+  if (!existsSync(archivePath)) throw new Error(`Backup archive not found: ${archivePath}`);
+  if (!statSync(archivePath).isFile()) throw new Error(`Backup archive is not a file: ${archivePath}`);
+  const manifest = readBackupManifest(archivePath);
+  const entries = manifest.entries.map((entry) => validateRestoreEntry(entry));
+  const conflicts = entries
+    .map((entry) => ({ ...entry, targetPath: join(root, entry.path), targetExists: existsSync(join(root, entry.path)) }))
+    .filter((entry) => entry.targetExists);
+  return {
+    root,
+    archivePath,
+    manifestPath: "backup-manifest.json",
+    manifest,
+    entries,
+    conflicts,
+    wouldModify: false,
+    confirmCommand: `node core/node/dist/clawhermes.js restore --archive ${quoteCommandArg(archivePath)} --confirm-restore --json`,
+    messages: [
+      `Backup archive contains ${entries.length} planned restore entries.`,
+      conflicts.length > 0
+        ? `${conflicts.length} restore target(s) already exist and would require overwrite handling.`
+        : "No existing restore targets were detected.",
+      "restore-plan is read-only and does not extract files.",
+    ],
   };
 }
 
@@ -129,6 +165,40 @@ function compressDirectory(stagingRoot: string, archivePath: string): void {
     "Compress-Archive -Path (Join-Path -Path $staging -ChildPath '*') -DestinationPath $archive -Force",
   ].join("; ");
   execFileSync("powershell", ["-NoProfile", "-Command", script], { stdio: "pipe" });
+}
+
+function readBackupManifest(archivePath: string): BackupManifest {
+  const script = [
+    "Add-Type -AssemblyName System.IO.Compression.FileSystem",
+    `$zip = [System.IO.Compression.ZipFile]::OpenRead(${powershellString(archivePath)})`,
+    "try {",
+    "  $entry = $zip.GetEntry('backup-manifest.json')",
+    "  if ($null -eq $entry) { throw 'backup-manifest.json not found in archive' }",
+    "  $stream = $entry.Open()",
+    "  try {",
+    "    $reader = [System.IO.StreamReader]::new($stream, [System.Text.Encoding]::UTF8)",
+    "    try { $reader.ReadToEnd() } finally { $reader.Dispose() }",
+    "  } finally { $stream.Dispose() }",
+    "} finally { $zip.Dispose() }",
+  ].join("; ");
+  const raw = execFileSync("powershell", ["-NoProfile", "-Command", script], { encoding: "utf8", timeout: 10000 }).trim();
+  const parsed = JSON.parse(raw) as BackupManifest;
+  if (!Array.isArray(parsed.entries)) throw new Error("Backup manifest entries are missing or invalid.");
+  return parsed;
+}
+
+function validateRestoreEntry(entry: BackupEntry): BackupEntry {
+  if (!entry || typeof entry.path !== "string") throw new Error("Backup manifest contains an invalid entry path.");
+  if (entry.kind !== "directory" && entry.kind !== "file") throw new Error(`Backup manifest contains an invalid entry kind for ${entry.path}.`);
+  const normalized = normalize(entry.path);
+  if (isAbsolute(entry.path) || normalized === ".." || normalized.startsWith(`..\\`) || normalized.startsWith("../")) {
+    throw new Error(`Backup manifest contains an unsafe restore path: ${entry.path}`);
+  }
+  return { path: normalized, kind: entry.kind };
+}
+
+function quoteCommandArg(value: string): string {
+  return /\s/.test(value) ? `"${value.replaceAll('"', '\\"')}"` : value;
 }
 
 function powershellString(value: string): string {
