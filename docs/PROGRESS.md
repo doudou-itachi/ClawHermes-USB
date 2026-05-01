@@ -95,6 +95,43 @@ Next steps:
 
 - Write an implementation plan for the Windows GUI control center.
 
+### Windows GUI Control Center Implementation
+
+Status: `Done`
+
+Summary:
+
+- Added `launcher/windows/ClawHermes-Control.bat` as the recommended double-click Windows entry for non-technical USB users.
+- Added a PowerShell Windows Forms GUI with left-side navigation for install guidance, service start/stop, opening OpenClaw Chat and Hermes Web UI, model configuration, logs, backup, repair/update, and theme switching.
+- Kept child command execution hidden with `CreateNoWindow = $true` so normal GUI actions do not open multiple command windows.
+- Added project-local GUI theme preference storage under `data\settings\gui.json`.
+- Added shared `model-config` and `model-config-status` core commands for OpenAI-compatible API URL, model name, API key, and apply target configuration.
+- The model configuration command writes OpenClaw settings under `data/openclaw/openclaw.json`, Hermes settings under `data/hermes/`, and redacts API keys from user-facing output.
+
+Changed areas:
+
+- `launcher/windows/ClawHermes-Control.bat`
+- `launcher/windows/ClawHermes-Control.ps1`
+- `core/node/src/model-config.ts`
+- `core/node/src/clawhermes.ts`
+- `core/node/src/core.ts`
+- `core/node/dist/`
+- `core/windows/clawhermes.ps1`
+- `README.md`
+- `README.zh-CN.md`
+- `tests/test_windows_core.py`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_model_config_rejects_missing_model_name tests.test_windows_core.WindowsCoreTests.test_model_config_applies_openclaw_and_hermes_without_printing_api_key -v`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_gui_control_launcher_calls_powershell_gui tests.test_windows_core.WindowsCoreTests.test_gui_control_script_exposes_left_nav_theme_and_hidden_runner tests.test_windows_core.WindowsCoreTests.test_gui_control_script_wires_pages_to_dispatcher_actions -v`
+
+Next steps:
+
+- Run full verification before handing the branch back.
+- Consider packaging the GUI entry as the only visible shortcut in a future release bundle while keeping numbered scripts as maintenance fallbacks.
+
 ## 2026-04-30
 
 ### Initial Project Foundation

@@ -812,6 +812,20 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertIn("--api-key", text)
         self.assertIn("--apply", text)
 
+    def test_gui_control_theme_preference_and_docs_are_user_facing(self):
+        text = (ROOT / "launcher" / "windows" / "ClawHermes-Control.ps1").read_text(encoding="utf-8")
+        readme_text = (ROOT / "README.md").read_text(encoding="utf-8")
+        readme_zh_text = (ROOT / "README.zh-CN.md").read_text(encoding="utf-8")
+
+        self.assertIn("data\\settings\\gui.json", text)
+        self.assertIn("Save-GuiSettings", text)
+        for theme in ["跟随系统", "浅色", "深色"]:
+            self.assertIn(theme, text)
+        self.assertIn("ClawHermes-Control.bat", readme_text)
+        self.assertIn("GUI control center", readme_text)
+        self.assertIn("图形控制中心", readme_zh_text)
+        self.assertIn("ClawHermes-Control.bat", readme_zh_text)
+
     def test_user_guide_script_exposes_safe_modes_and_noninteractive_switches(self):
         text = (ROOT / "launcher" / "windows" / "UserGuide.ps1").read_text(encoding="utf-8")
 

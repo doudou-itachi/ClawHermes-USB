@@ -37,6 +37,7 @@ npm run build
 运行 Windows 启动脚本：
 
 ```text
+launcher/windows/ClawHermes-Control.bat
 launcher/windows/Setup.bat
 launcher/windows/Start.bat
 launcher/windows/Status.bat
@@ -44,7 +45,11 @@ launcher/windows/Stop.bat
 launcher/windows/Backup.bat
 ```
 
-面向普通 U 盘用户时，按需要双击对应脚本；日常使用通常只用 1-5。
+面向普通 U 盘用户时，推荐先双击 `launcher/windows/ClawHermes-Control.bat`。它会打开一个“图形控制中心”，所有功能都在左侧竖排：安装向导、启动服务、停止服务、打开 OpenClaw Chat、打开 Hermes Web UI、模型配置、日志、备份、修复 / 更新，以及跟随系统 / 浅色 / 深色主题切换。主题偏好只保存在本项目的 `data\settings\gui.json`，后台命令不会再弹出多个命令行窗口。
+
+模型配置页面会让用户填写 API URL / Base URL、模型名称、API Key，并选择应用到 OpenClaw、Hermes 或两者。共享核心命令会把配置保存在 `data/settings/model-config.json`，把 OpenClaw 配置写入 `data/openclaw/openclaw.json`，把 Hermes 配置写入 `data/hermes/`；界面和状态输出会隐藏 API Key。
+
+编号脚本仍然保留，作为图形界面不可用时的备用入口；日常使用通常只用 1-5。
 
 日常使用脚本：
 
@@ -81,6 +86,8 @@ node core/node/dist/clawhermes.js mark-adapter-ready hermes-web-ui --confirm-rea
 node core/node/dist/clawhermes.js start --json
 node core/node/dist/clawhermes.js status --json
 node core/node/dist/clawhermes.js logs openclaw --lines 50 --json
+node core/node/dist/clawhermes.js model-config --provider-type openai-compatible --api-url https://api.example.com/v1 --model demo-model --api-key sk-example --apply both --json
+node core/node/dist/clawhermes.js model-config-status --json
 node core/node/dist/clawhermes.js backup --dry-run --json
 node core/node/dist/clawhermes.js restore-plan --archive data/backups/example.zip --json
 node core/node/dist/clawhermes.js restore --archive data/backups/example.zip --confirm-restore --json
