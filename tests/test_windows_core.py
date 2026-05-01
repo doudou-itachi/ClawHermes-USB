@@ -3329,6 +3329,57 @@ class WindowsCoreTests(unittest.TestCase):
         finally:
             temp_dir.cleanup()
 
+    def test_status_http_health_probe_requests_utf8_powershell_output(self):
+        temp_dir, temp_root, port = make_temp_http_usb_root(health_port=free_tcp_port())
+        try:
+            fake_powershell = temp_root / "powershell.cmd"
+            fake_powershell.write_text(
+                "\n".join(
+                    [
+                        "@echo off",
+                        "echo %* | findstr /C:\"OutputEncoding\" > nul",
+                        "if errorlevel 1 (",
+                        "  echo {\"ok\":false,\"statusCode\":null,\"error\":\"\\ufffd\\ufffd\"}",
+                        "  exit /b 0",
+                        ")",
+                        "echo {\"ok\":false,\"statusCode\":null,\"error\":\"readable-error\"}",
+                        "exit /b 0",
+                        "",
+                    ]
+                ),
+                encoding="ascii",
+            )
+            pid_dir = temp_root / "data" / "tmp" / "pids"
+            pid_dir.mkdir(parents=True, exist_ok=True)
+            (pid_dir / "http-service.pid").write_text(
+                json.dumps(
+                    {
+                        "serviceId": "http-service",
+                        "displayName": "HTTP Service",
+                        "status": "running",
+                        "processId": os.getpid(),
+                        "placeholder": False,
+                        "logFile": str(temp_root / "data" / "logs" / "http-service.log"),
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            status = run_dispatcher_for_root(
+                temp_root,
+                "status",
+                "-Json",
+                env={"CLAWHERMES_POWERSHELL_EXE": str(fake_powershell)},
+            )
+
+            self.assertEqual(status.returncode, 0, status.stderr)
+            services = {service["id"]: service for service in json.loads(status.stdout)["services"]}
+            reason = services["http-service"]["health"]["reason"]
+            self.assertIn("readable-error", reason)
+            self.assertNotIn("\ufffd", reason)
+        finally:
+            temp_dir.cleanup()
+
     def test_status_keeps_wsl2_http_service_running_when_wrapper_pid_exits_but_health_is_ready(self):
         temp_dir, temp_root, port = make_temp_http_usb_root()
         server = None

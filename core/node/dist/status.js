@@ -52,6 +52,9 @@ function httpAdapterHealth(adapter) {
 function probeHttpHealth(url, timeoutSeconds) {
     const timeoutMs = Math.max(1, Math.min(timeoutSeconds, 60)) * 1000;
     const script = [
+        "$utf8NoBom = New-Object System.Text.UTF8Encoding $false",
+        "[Console]::OutputEncoding = $utf8NoBom",
+        "$OutputEncoding = $utf8NoBom",
         "$ProgressPreference = 'SilentlyContinue'",
         `$timeoutMs = ${timeoutMs}`,
         `$request = [System.Net.WebRequest]::Create('${escapePowerShellSingleQuoted(url)}')`,
@@ -69,7 +72,7 @@ function probeHttpHealth(url, timeoutSeconds) {
         "}",
     ].join("; ");
     try {
-        const output = (0, node_child_process_1.execFileSync)("powershell", ["-NoProfile", "-Command", script], { encoding: "utf8", timeout: timeoutMs + 1000 }).trim();
+        const output = execPowerShell(script, timeoutMs + 1000).trim();
         const parsed = JSON.parse(output);
         if (parsed.ok === true) {
             return { ready: true, statusCode: parsed.statusCode ?? null, reason: `HTTP health endpoint responded with ${parsed.statusCode}.` };
@@ -83,6 +86,15 @@ function probeHttpHealth(url, timeoutSeconds) {
         const message = error instanceof Error ? error.message : String(error);
         return { ready: false, statusCode: null, reason: `HTTP health endpoint is unreachable: ${message}.` };
     }
+}
+function execPowerShell(script, timeout) {
+    const powershell = process.env.CLAWHERMES_POWERSHELL_EXE || "powershell";
+    const args = ["-NoProfile", "-Command", script];
+    const lower = powershell.toLowerCase();
+    if (lower.endsWith(".cmd") || lower.endsWith(".bat")) {
+        return (0, node_child_process_1.execFileSync)("cmd", ["/d", "/c", powershell, ...args], { encoding: "utf8", timeout });
+    }
+    return (0, node_child_process_1.execFileSync)(powershell, args, { encoding: "utf8", timeout });
 }
 function escapePowerShellSingleQuoted(value) {
     return value.replaceAll("'", "''");

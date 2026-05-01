@@ -42,6 +42,33 @@ Next steps:
 
 - Run full manual release verification on a clean Windows VM with prepared offline payloads before handing a USB package to end users.
 
+### Portal Health Text Encoding
+
+Status: `Done`
+
+Summary:
+
+- Fixed mojibake in Portal health details when Windows PowerShell returns localized HTTP probe errors.
+- The HTTP health probe now asks PowerShell to emit UTF-8 output before Node.js decodes the JSON response.
+- Added a regression test that fails if the health reason falls back to replacement characters.
+
+Changed areas:
+
+- `core/node/src/status.ts`
+- `core/node/dist/status.js`
+- `tests/test_windows_core.py`
+- `docs/PROGRESS.md`
+
+Validation performed:
+
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_status_http_health_probe_requests_utf8_powershell_output tests.test_windows_core.WindowsCoreTests.test_start_serves_portal_over_localhost_and_stop_shuts_it_down -v`
+- `npm test`
+- `git diff --check`
+
+Next steps:
+
+- Refresh or restart the Portal after updating so the regenerated status snapshot is shown in the browser.
+
 ## 2026-04-30
 
 ### Initial Project Foundation

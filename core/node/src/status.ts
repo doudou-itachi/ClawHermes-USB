@@ -51,6 +51,9 @@ function httpAdapterHealth(adapter: AdapterDescriptor) {
 function probeHttpHealth(url: string, timeoutSeconds: number): { ready: boolean; statusCode: number | null; reason: string } {
   const timeoutMs = Math.max(1, Math.min(timeoutSeconds, 60)) * 1000;
   const script = [
+    "$utf8NoBom = New-Object System.Text.UTF8Encoding $false",
+    "[Console]::OutputEncoding = $utf8NoBom",
+    "$OutputEncoding = $utf8NoBom",
     "$ProgressPreference = 'SilentlyContinue'",
     `$timeoutMs = ${timeoutMs}`,
     `$request = [System.Net.WebRequest]::Create('${escapePowerShellSingleQuoted(url)}')`,
@@ -68,7 +71,7 @@ function probeHttpHealth(url: string, timeoutSeconds: number): { ready: boolean;
     "}",
   ].join("; ");
   try {
-    const output = execFileSync("powershell", ["-NoProfile", "-Command", script], { encoding: "utf8", timeout: timeoutMs + 1000 }).trim();
+    const output = execPowerShell(script, timeoutMs + 1000).trim();
     const parsed = JSON.parse(output) as { ok?: boolean; statusCode?: number | null; error?: string | null };
     if (parsed.ok === true) {
       return { ready: true, statusCode: parsed.statusCode ?? null, reason: `HTTP health endpoint responded with ${parsed.statusCode}.` };
@@ -81,6 +84,16 @@ function probeHttpHealth(url: string, timeoutSeconds: number): { ready: boolean;
     const message = error instanceof Error ? error.message : String(error);
     return { ready: false, statusCode: null, reason: `HTTP health endpoint is unreachable: ${message}.` };
   }
+}
+
+function execPowerShell(script: string, timeout: number): string {
+  const powershell = process.env.CLAWHERMES_POWERSHELL_EXE || "powershell";
+  const args = ["-NoProfile", "-Command", script];
+  const lower = powershell.toLowerCase();
+  if (lower.endsWith(".cmd") || lower.endsWith(".bat")) {
+    return execFileSync("cmd", ["/d", "/c", powershell, ...args], { encoding: "utf8", timeout });
+  }
+  return execFileSync(powershell, args, { encoding: "utf8", timeout });
 }
 
 function escapePowerShellSingleQuoted(value: string): string {
