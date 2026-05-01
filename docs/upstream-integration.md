@@ -16,7 +16,9 @@ Current conclusion:
 - WSL2 is the more stable and recommended Windows path for the full OpenClaw experience.
 - Native Windows CLI and gateway flows exist, but upstream still documents caveats around onboarding, gateway install, Scheduled Tasks, and fallback Startup-folder behavior.
 - For portable USB use, `openclaw gateway run` is the safest candidate because it avoids installing a managed service.
+- A real upstream checkout is present locally at `apps/openclaw` for WSL2 validation, pinned for this verification pass at commit `e8f9c3e6`.
 - `adapters/openclaw/adapter.json` now models OpenClaw as a WSL2 adapter, but `commands.start` remains `null` until OpenClaw data path variables, gateway port, Control UI URL, and WebChat URL are verified from an installed payload.
+- Host WSL2 feature enablement has been completed, but Windows reports a pending reboot, so Ubuntu distro registration and real OpenClaw execution are blocked until after restart.
 
 Adapter status: `blocked`
 
@@ -34,7 +36,9 @@ Current conclusion:
 - The official site says native Windows support is experimental.
 - The Hermes gateway command suite handles `run`, `start`, `stop`, `restart`, `status`, `install`, `uninstall`, and `setup`.
 - For a portable process manager, foreground `hermes gateway run` is a better candidate than daemonizing `hermes gateway start`.
+- A real upstream checkout is present locally at `apps/hermes-agent` for WSL2 validation, pinned for this verification pass at commit `ec1443b`.
 - The adapter records `hermes gateway run` as a candidate command for future WSL2/container work, but bare-Windows production startup remains blocked.
+- Host WSL2 feature enablement has been completed, but Windows reports a pending reboot, so Ubuntu distro registration and real Hermes Agent execution are blocked until after restart.
 
 Adapter status: `blocked`
 
@@ -62,8 +66,9 @@ Adapter status: `verified`
 Before replacing placeholder services with real upstream processes:
 
 1. Place portable runtimes under `runtimes/windows/`.
-2. Install or check out upstream payloads under `apps/`.
-3. Verify each candidate command from the portable environment only.
-4. Confirm data writes stay under `data/`.
-5. Capture exact ports and health checks in adapter descriptors.
-6. Update `docs/PROGRESS.md` with validation evidence.
+2. Reboot Windows so newly enabled WSL2 features become usable.
+3. Register or import the Ubuntu WSL2 distribution used by ClawHermes-USB.
+4. Verify each candidate command from the WSL2 adapter environment only.
+5. Confirm data writes stay under `data/`.
+6. Capture exact ports and health checks in adapter descriptors.
+7. Update `docs/PROGRESS.md` with validation evidence.

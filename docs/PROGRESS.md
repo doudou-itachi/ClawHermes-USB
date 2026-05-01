@@ -2818,6 +2818,51 @@ Next steps:
 - Continue real Hermes Agent and OpenClaw WSL2 payload validation when a prepared distro is available.
 - Review whether portal action execution should remain command-only for MVP or move behind a separate confirmation flow later.
 
+### Real WSL2 Payload Host Preparation
+
+Status: `Blocked`
+
+Summary:
+
+- Enabled the Windows host features required by WSL2: `Microsoft-Windows-Subsystem-Linux` and `VirtualMachinePlatform`.
+- Confirmed the host now has a pending Windows reboot (`RebootPending` and `PendingFileRenameOperations` are present), so distro registration cannot complete in this session.
+- Checked out real upstream payloads locally under ignored runtime app directories:
+  - Hermes Agent: `apps/hermes-agent`, upstream commit `ec1443b`
+  - OpenClaw: `apps/openclaw`, upstream commit `e8f9c3e6`
+- Created local env files from committed examples with `init-env`; existing secrets would be skipped by that command.
+- Preserved parent-repo `.gitkeep` placeholders so the source repository stays clean while local ignored payloads remain available for runtime validation.
+- Verified that both WSL2 adapters now pass the real app-directory and env-file checks, but remain blocked by missing registered Ubuntu WSL2 distribution, missing setup logs, and unstarted health checks.
+
+Changed areas:
+
+- `apps/hermes-agent/` local ignored payload checkout
+- `apps/openclaw/` local ignored payload checkout
+- `config/env/*.env` local ignored env files
+- `docs/PROGRESS.md`
+- `docs/upstream-integration.md`
+
+Validation performed:
+
+- `node core\node\dist\clawhermes.js probe-sources hermes-agent --json`
+- `node core\node\dist\clawhermes.js probe-sources openclaw --json`
+- `git -c http.proxy= -c https.proxy= -c http.version=HTTP/1.1 clone --depth 1 --filter=blob:none --branch main https://github.com/NousResearch/hermes-agent apps/hermes-agent`
+- `git -c http.proxy= -c https.proxy= -c http.version=HTTP/1.1 clone --depth 1 --filter=blob:none --branch main https://github.com/openclaw/openclaw apps/openclaw`
+- `node core\node\dist\clawhermes.js init-env --json`
+- `node core\node\dist\clawhermes.js wsl --distro Ubuntu --json`
+- `node core\node\dist\clawhermes.js verify-adapter hermes-agent --json`
+- `node core\node\dist\clawhermes.js verify-adapter openclaw --json`
+- `node core\node\dist\clawhermes.js setup --json`
+
+Current blocker:
+
+- Windows must be rebooted before `wsl.exe --install -d Ubuntu` or managed `ClawHermes-Ubuntu` import/registration can proceed.
+
+Next steps after reboot:
+
+- Re-run `node core\node\dist\clawhermes.js wsl --distro Ubuntu --json`.
+- Complete Ubuntu WSL2 registration or import the managed `ClawHermes-Ubuntu` rootfs.
+- Run real WSL2 setup for Hermes Agent and OpenClaw, capture `data/logs/setup-*.log`, verify ports/health/data paths, then update adapter commands only with evidence.
+
 ### Backup Restore Planning
 
 Status: `Done`
