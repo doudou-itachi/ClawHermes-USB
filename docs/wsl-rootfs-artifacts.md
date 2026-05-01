@@ -17,7 +17,7 @@ runtimes/wsl/ubuntu-rootfs.tar
 runtimes/wsl/ubuntu-rootfs.tar.sha256
 ```
 
-The `.sha256` file is optional until a trusted artifact source is selected, but it should be stored next to the archive whenever available.
+The `.sha256` file is optional until a trusted artifact source is selected, but it should be stored next to the archive whenever available. If the sidecar exists, `wsl-import` verifies it before running WSL and refuses to import when the digest does not match.
 
 ## Rules
 
@@ -45,4 +45,4 @@ After placing the rootfs archive under `runtimes/wsl/`, explicitly confirm impor
 node core/node/dist/clawhermes.js wsl-import --distro Ubuntu --confirm-import --json
 ```
 
-This command fails before running WSL if `--confirm-import` is missing or if the rootfs archive is absent.
+This command fails before running WSL if `--confirm-import` is missing, if the rootfs archive is absent, or if an available `.sha256` sidecar does not match the archive.

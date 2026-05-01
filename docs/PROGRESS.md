@@ -2205,3 +2205,34 @@ Next steps:
 
 - Add checksum verification support for WSL rootfs archives before any import command runs.
 - Add user-facing guidance for obtaining a trusted Ubuntu rootfs artifact without automatic downloads.
+
+### WSL2 Rootfs Checksum Verification
+
+Status: `Done`
+
+Summary:
+
+- Added SHA256 sidecar detection to `wsl-import-plan` and `wsl-import`.
+- If `runtimes/wsl/<archive>.sha256` exists, `wsl-import` now verifies it before invoking WSL.
+- Mismatched checksums fail before WSL execution, so a bad rootfs artifact cannot be imported accidentally.
+- Missing checksum sidecars remain allowed for now but are reported as unverified in JSON.
+
+Changed areas:
+
+- `core/node/src/wsl-import.ts`
+- `core/node/dist/wsl-import.js`
+- `docs/ADAPTER_CONTRACT.md`
+- `docs/wsl-rootfs-artifacts.md`
+- `docs/PROGRESS.md`
+- `tests/test_windows_core.py`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_wsl_import_confirm_runs_fake_wsl_import_with_project_local_archive tests.test_windows_core.WindowsCoreTests.test_wsl_import_verifies_sha256_sidecar_before_running_wsl tests.test_windows_core.WindowsCoreTests.test_wsl_import_rejects_wrong_sha256_before_running_wsl -v`
+- `npm test`
+
+Next steps:
+
+- Add user-facing guidance for obtaining a trusted Ubuntu rootfs artifact without automatic downloads.
+- Consider requiring checksum sidecars once a trusted artifact source is chosen.

@@ -770,6 +770,8 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertTrue(payload["executed"])
             self.assertTrue(payload["confirmedImport"])
             self.assertTrue(payload["sourceArchiveExists"])
+            self.assertFalse(payload["checksum"]["exists"])
+            self.assertFalse(payload["checksum"]["verified"])
             self.assertEqual(payload["executablePath"], str(fake_wsl))
             self.assertTrue(marker.exists())
             args_text = args_file.read_text(encoding="utf-8")
@@ -777,6 +779,63 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertIn("ClawHermes-Ubuntu", args_text)
             self.assertIn(str(archive), args_text)
             self.assertIn("--version 2", args_text)
+        finally:
+            temp_dir.cleanup()
+
+    def test_wsl_import_verifies_sha256_sidecar_before_running_wsl(self):
+        temp_dir, temp_root = make_temp_usb_root()
+        try:
+            archive = temp_root / "runtimes" / "wsl" / "ubuntu-rootfs.tar"
+            archive.parent.mkdir(parents=True, exist_ok=True)
+            archive.write_text("tiny rootfs placeholder for checksum test\n", encoding="utf-8")
+            checksum = hashlib.sha256(archive.read_bytes()).hexdigest()
+            (archive.parent / "ubuntu-rootfs.tar.sha256").write_text(f"{checksum}  ubuntu-rootfs.tar\n", encoding="utf-8")
+            marker = temp_root / "data" / "tmp" / "fake-wsl-import.txt"
+            fake_wsl = make_fake_wsl_cmd(temp_root, stay_running=False, marker_path=marker)
+
+            result = run_dispatcher_for_root(
+                temp_root,
+                "wsl-import",
+                "--distro",
+                "Ubuntu",
+                "--confirm-import",
+                "-Json",
+                env={"CLAWHERMES_WSL_EXE": str(fake_wsl)},
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertTrue(payload["checksum"]["exists"])
+            self.assertTrue(payload["checksum"]["verified"])
+            self.assertEqual(payload["checksum"]["expected"], checksum)
+            self.assertEqual(payload["checksum"]["actual"], checksum)
+            self.assertTrue(marker.exists())
+        finally:
+            temp_dir.cleanup()
+
+    def test_wsl_import_rejects_wrong_sha256_before_running_wsl(self):
+        temp_dir, temp_root = make_temp_usb_root()
+        try:
+            archive = temp_root / "runtimes" / "wsl" / "ubuntu-rootfs.tar"
+            archive.parent.mkdir(parents=True, exist_ok=True)
+            archive.write_text("tiny rootfs placeholder for checksum failure\n", encoding="utf-8")
+            (archive.parent / "ubuntu-rootfs.tar.sha256").write_text("0" * 64 + "  ubuntu-rootfs.tar\n", encoding="utf-8")
+            marker = temp_root / "data" / "tmp" / "fake-wsl-import.txt"
+            fake_wsl = make_fake_wsl_cmd(temp_root, stay_running=False, marker_path=marker)
+
+            result = run_dispatcher_for_root(
+                temp_root,
+                "wsl-import",
+                "--distro",
+                "Ubuntu",
+                "--confirm-import",
+                "-Json",
+                env={"CLAWHERMES_WSL_EXE": str(fake_wsl)},
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("SHA256 mismatch", result.stderr)
+            self.assertFalse(marker.exists())
         finally:
             temp_dir.cleanup()
 

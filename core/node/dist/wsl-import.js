@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.wslImportPlan = wslImportPlan;
 exports.wslImport = wslImport;
 const node_child_process_1 = require("node:child_process");
+const node_crypto_1 = require("node:crypto");
 const node_fs_1 = require("node:fs");
 const node_path_1 = require("node:path");
 const portable_1 = require("./portable");
@@ -18,6 +19,7 @@ function wslImportPlan(usbRoot, options) {
     const sourceArchive = (0, node_path_1.join)(artifactDirectory, archiveName);
     const checksumFile = `${sourceArchive}.sha256`;
     const args = ["--import", distributionName, installLocation, sourceArchive, "--version", "2"];
+    const checksum = checksumStatus(sourceArchive, checksumFile);
     return {
         root,
         distro,
@@ -25,6 +27,7 @@ function wslImportPlan(usbRoot, options) {
         installLocation,
         sourceArchive,
         sourceArchiveExists: (0, node_fs_1.existsSync)(sourceArchive),
+        checksum,
         artifactPolicy: {
             directory: artifactDirectory,
             archiveName,
@@ -69,6 +72,9 @@ function wslImport(usbRoot, options) {
     if (!plan.sourceArchiveExists) {
         throw new Error(`Missing WSL rootfs archive: ${plan.sourceArchive}`);
     }
+    if (plan.checksum.exists && !plan.checksum.verified) {
+        throw new Error(`SHA256 mismatch for WSL rootfs archive: expected ${plan.checksum.expected}, got ${plan.checksum.actual}`);
+    }
     const executablePath = (0, wsl_1.resolveWslExecutable)();
     if (!executablePath) {
         throw new Error("wsl.exe not found. Install or enable WSL2 before importing a distribution.");
@@ -85,6 +91,33 @@ function wslImport(usbRoot, options) {
             `Executed WSL import for ${plan.distributionName}.`,
         ],
     };
+}
+function checksumStatus(sourceArchive, checksumFile) {
+    if (!(0, node_fs_1.existsSync)(checksumFile)) {
+        return {
+            path: checksumFile,
+            exists: false,
+            expected: null,
+            actual: null,
+            verified: false,
+        };
+    }
+    const expected = parseExpectedSha256((0, node_fs_1.readFileSync)(checksumFile, "utf8"));
+    const actual = (0, node_fs_1.existsSync)(sourceArchive) ? sha256File(sourceArchive) : null;
+    return {
+        path: checksumFile,
+        exists: true,
+        expected,
+        actual,
+        verified: expected !== null && actual !== null && expected.toLowerCase() === actual.toLowerCase(),
+    };
+}
+function parseExpectedSha256(value) {
+    const match = value.match(/[A-Fa-f0-9]{64}/);
+    return match ? match[0].toLowerCase() : null;
+}
+function sha256File(path) {
+    return (0, node_crypto_1.createHash)("sha256").update((0, node_fs_1.readFileSync)(path)).digest("hex");
 }
 function normalizeDistro(value) {
     const trimmed = value?.trim();
