@@ -49,6 +49,7 @@ Run the Node CLI directly:
 node core/node/dist/clawhermes.js setup --json
 node core/node/dist/clawhermes.js wsl --distro Ubuntu --json
 node core/node/dist/clawhermes.js prepare-wsl --distro Ubuntu --dry-run --json
+node core/node/dist/clawhermes.js wsl-workflow hermes-agent --json
 node core/node/dist/clawhermes.js adapters --json
 node core/node/dist/clawhermes.js adapters hermes-web-ui --json
 node core/node/dist/clawhermes.js sources --json

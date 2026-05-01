@@ -554,12 +554,14 @@ Before attempting WSL2 setup or startup, run:
 
 ```powershell
 node core/node/dist/clawhermes.js wsl --distro Ubuntu --json
+node core/node/dist/clawhermes.js wsl-workflow hermes-agent --json
 ```
 
 Rules:
 
 - The diagnostic is read-only.
 - Users must explicitly approve WSL2 preparation before WSL2 adapters can run; ClawHermes-USB must not silently enable Windows features or install Linux distributions.
+- `wsl-workflow <service-id>` is read-only and should show the full operator sequence from diagnostics through production-readiness metadata.
 - Inspect the host-level preparation plan with `node core/node/dist/clawhermes.js prepare-wsl --distro Ubuntu --dry-run --json`.
 - A typical explicit installation command is `wsl.exe --install -d Ubuntu`, followed by the standard WSL first-run initialization.
 - Real host preparation must require `--confirm-install`.

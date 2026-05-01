@@ -163,6 +163,24 @@ async function main() {
             }
             return;
         }
+        case "wsl-workflow": {
+            const result = (0, core_1.wslWorkflowPlan)(root, positional[0]);
+            if (json) {
+                printJson(result);
+            }
+            else {
+                console.log(`ClawHermes-USB WSL2 workflow: ${result.serviceId}`);
+                for (const message of result.messages)
+                    console.log(`- ${message}`);
+                for (const phase of result.phases) {
+                    console.log(`- [${phase.status}] ${phase.title}`);
+                    console.log(`  command: ${phase.command}`);
+                    if (phase.confirmCommand)
+                        console.log(`  confirm: ${phase.confirmCommand}`);
+                }
+            }
+            return;
+        }
         case "init-env": {
             const result = (0, core_1.initializeEnvFiles)(root, dryRun);
             if (json) {

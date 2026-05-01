@@ -1,4 +1,4 @@
-import { adapterSetupPlan, appSourcePlan, checkoutAppSource, createBackup, getRoot, getStatus, initializeEnvFiles, installRuntimeFromArchive, markAdapterReady, portableEnv, prepareWsl, probeAppSources, readLogTail, runAdapterSetup, runtimePreparationPlan, serviceEnvironmentDiagnostic, setupDiagnostics, startSingleAdapter, startSkeleton, stopSkeleton, verifyAdapter, writeStatusSnapshot, wslDiagnostics } from "./core";
+import { adapterSetupPlan, appSourcePlan, checkoutAppSource, createBackup, getRoot, getStatus, initializeEnvFiles, installRuntimeFromArchive, markAdapterReady, portableEnv, prepareWsl, probeAppSources, readLogTail, runAdapterSetup, runtimePreparationPlan, serviceEnvironmentDiagnostic, setupDiagnostics, startSingleAdapter, startSkeleton, stopSkeleton, verifyAdapter, writeStatusSnapshot, wslDiagnostics, wslWorkflowPlan } from "./core";
 import type { BackupProfile } from "./backup";
 
 type ParsedArgs = {
@@ -155,6 +155,21 @@ async function main(): Promise<void> {
         for (const change of result.hostChanges) console.log(`- ${change}`);
         for (const command of result.commands) console.log(`Command: ${command.commandLine}`);
         console.log(`Portable import note: ${result.portableImport.summary}`);
+      }
+      return;
+    }
+    case "wsl-workflow": {
+      const result = wslWorkflowPlan(root, positional[0]);
+      if (json) {
+        printJson(result);
+      } else {
+        console.log(`ClawHermes-USB WSL2 workflow: ${result.serviceId}`);
+        for (const message of result.messages) console.log(`- ${message}`);
+        for (const phase of result.phases) {
+          console.log(`- [${phase.status}] ${phase.title}`);
+          console.log(`  command: ${phase.command}`);
+          if (phase.confirmCommand) console.log(`  confirm: ${phase.confirmCommand}`);
+        }
       }
       return;
     }

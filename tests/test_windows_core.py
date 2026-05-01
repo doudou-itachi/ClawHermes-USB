@@ -625,6 +625,36 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("--confirm-install", result.stderr)
 
+    def test_wsl_workflow_reports_explicit_confirm_commands_for_hermes_agent(self):
+        missing_wsl = str(ROOT / "data" / "tmp" / "missing-wsl.exe")
+
+        result = run_dispatcher("wsl-workflow", "hermes-agent", "-Json", env={"CLAWHERMES_WSL_EXE": missing_wsl})
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["serviceId"], "hermes-agent")
+        self.assertEqual(payload["runner"], "wsl2")
+        self.assertEqual(payload["distro"], "Ubuntu")
+        self.assertFalse(payload["wslReady"])
+        phase_ids = [phase["id"] for phase in payload["phases"]]
+        self.assertEqual(
+            phase_ids,
+            ["diagnose", "prepare-host", "checkout-source", "setup-adapter", "start-adapter", "verify-adapter", "mark-ready"],
+        )
+        phases = {phase["id"]: phase for phase in payload["phases"]}
+        self.assertFalse(phases["diagnose"]["modifiesHost"])
+        self.assertFalse(phases["diagnose"]["modifiesProject"])
+        self.assertIn("wsl --distro Ubuntu --json", phases["diagnose"]["command"])
+        self.assertIn("prepare-wsl --distro Ubuntu --dry-run --json", phases["prepare-host"]["command"])
+        self.assertIn("--confirm-install", phases["prepare-host"]["confirmCommand"])
+        self.assertTrue(phases["prepare-host"]["modifiesHost"])
+        self.assertIn("--dry-run", phases["checkout-source"]["command"])
+        self.assertIn("--confirm-checkout", phases["checkout-source"]["confirmCommand"])
+        self.assertIn("--confirm-setup", phases["setup-adapter"]["confirmCommand"])
+        self.assertIn("--confirm-start", phases["start-adapter"]["confirmCommand"])
+        self.assertIn("verify-adapter hermes-agent --json", phases["verify-adapter"]["command"])
+        self.assertIn("--confirm-ready", phases["mark-ready"]["confirmCommand"])
+
     def test_setup_json_reports_wsl2_action_when_hermes_agent_needs_wsl2(self):
         missing_wsl = str(ROOT / "data" / "tmp" / "missing-wsl.exe")
 

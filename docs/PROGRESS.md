@@ -1997,3 +1997,37 @@ Next steps:
 
 - Add graceful WSL2 in-distro stop hooks before Windows-side process-tree termination.
 - Add an end-to-end WSL2 readiness checklist that ties prepare, setup, start, verify, and mark-ready into one guided workflow.
+
+### WSL2 Workflow Guide
+
+Status: `Done`
+
+Summary:
+
+- Added a read-only `wsl-workflow <service-id>` command for WSL2 adapters.
+- `wsl-workflow hermes-agent --json` reports the target distro, current WSL readiness, and an ordered operator checklist.
+- The workflow distinguishes read-only commands from host-modifying and project-modifying commands.
+- Every mutating phase shows the explicit confirmation command, such as `--confirm-install`, `--confirm-checkout`, `--confirm-setup`, `--confirm-start`, and `--confirm-ready`.
+- Documented the workflow in the README and adapter contract.
+
+Changed areas:
+
+- `core/node/src/wsl-workflow.ts`
+- `core/node/src/core.ts`
+- `core/node/src/clawhermes.ts`
+- `core/node/dist/`
+- `tests/test_windows_core.py`
+- `README.md`
+- `docs/ADAPTER_CONTRACT.md`
+- `docs/PROGRESS.md`
+- `docs/superpowers/plans/2026-05-01-wsl2-workflow-guide.md`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_wsl_workflow_reports_explicit_confirm_commands_for_hermes_agent -v`
+
+Next steps:
+
+- Add graceful WSL2 in-distro stop hooks before Windows-side process-tree termination.
+- Add optional portable `wsl --import` planning once a distro rootfs artifact policy is defined.
