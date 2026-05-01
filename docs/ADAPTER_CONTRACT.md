@@ -571,4 +571,5 @@ Rules:
 - WSL2 adapter setup/start commands must not run until the WSL2 diagnostic is healthy.
 - Confirmed WSL2 adapter setup executes through the same WSL adapter command plan and writes `data/logs/setup-<service-id>.log`.
 - Confirmed WSL2 adapter startup launches a Windows-side managed `wsl.exe` process and writes normal PID metadata.
-- `stop` terminates the managed Windows-side process tree recorded in the PID metadata. A later adapter-specific stop hook may add graceful in-distro shutdown before process termination.
+- If a WSL2 adapter declares `commands.stop`, `stop` runs that command inside the target distro before terminating the managed Windows-side process tree.
+- WSL2 stop hooks are best-effort. Hook failure is logged to the service log, and PID cleanup still proceeds so stale managed processes do not block shutdown.

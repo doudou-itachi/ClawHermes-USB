@@ -2031,3 +2031,35 @@ Next steps:
 
 - Add graceful WSL2 in-distro stop hooks before Windows-side process-tree termination.
 - Add optional portable `wsl --import` planning once a distro rootfs artifact policy is defined.
+
+### WSL2 Graceful Stop Hooks
+
+Status: `Done`
+
+Summary:
+
+- Added best-effort WSL2 in-distro stop hooks.
+- `wslAdapterCommandPlan` now supports the `stop` phase.
+- When PID metadata indicates `runner: wsl2` and the adapter declares `commands.stop`, `stop` runs that command through WSL before terminating the Windows-side managed process tree.
+- Stop hook output, exit code, and failures are appended to the service log.
+- PID cleanup still proceeds if the stop hook fails, so shutdown cannot be blocked by stale or broken WSL commands.
+
+Changed areas:
+
+- `core/node/src/wsl-adapter.ts`
+- `core/node/src/lifecycle.ts`
+- `core/node/dist/`
+- `tests/test_windows_core.py`
+- `docs/ADAPTER_CONTRACT.md`
+- `docs/PROGRESS.md`
+- `docs/superpowers/plans/2026-05-01-wsl2-graceful-stop.md`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_stop_runs_wsl2_adapter_stop_hook_before_killing_managed_process tests.test_windows_core.WindowsCoreTests.test_start_adapter_wsl2_confirm_launches_managed_wsl_process_and_stop_kills_it -v`
+
+Next steps:
+
+- Add optional portable `wsl --import` planning once a distro rootfs artifact policy is defined.
+- Add a workflow field that surfaces whether a WSL2 adapter declares a graceful stop hook.

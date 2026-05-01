@@ -1,9 +1,11 @@
-import { execFileSync, spawn } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import type { AdapterDescriptor, ServiceEnvironment } from "./types";
 import { resolveServiceEnvironment } from "./environment";
 import { resolveRelative, writeLog } from "./portable";
+import { wslAdapterCommandPlan } from "./wsl-adapter";
+import { wslExecutableInvocation } from "./wsl";
 
 export type ManagedProcessPlan = {
   runner?: string;
@@ -112,8 +114,11 @@ export function stopAdapter(root: string, adapter: AdapterDescriptor): boolean {
   const pidFile = resolveRelative(root, adapter.pidFile);
   if (!existsSync(pidFile)) return false;
 
-  const metadata = JSON.parse(readFileSync(pidFile, "utf8")) as { placeholder?: boolean; processId?: number };
+  const metadata = JSON.parse(readFileSync(pidFile, "utf8")) as { placeholder?: boolean; processId?: number; runner?: string };
   if (metadata.placeholder === false && metadata.processId) {
+    if (metadata.runner === "wsl2" && adapter.commands.stop) {
+      runWslStopHook(root, adapter);
+    }
     try {
       killProcessTree(metadata.processId);
     } catch {
@@ -123,6 +128,37 @@ export function stopAdapter(root: string, adapter: AdapterDescriptor): boolean {
   rmSync(pidFile, { force: true });
   writeLog(root, adapter.id, "INFO", metadata.placeholder === false ? "Stopped managed service." : "Stopped placeholder service.");
   return true;
+}
+
+function runWslStopHook(root: string, adapter: AdapterDescriptor): void {
+  const logFile = resolveRelative(root, adapter.logFile);
+  try {
+    const serviceEnv = resolveServiceEnvironment(root, adapter.id);
+    const plan = wslAdapterCommandPlan(root, adapter, serviceEnv, "stop");
+    const invocation = wslExecutableInvocation(plan.executablePath, plan.args);
+    const completed = spawnSync(invocation.executablePath, invocation.args, {
+      cwd: root,
+      env: process.env,
+      encoding: "utf8",
+      timeout: 10000,
+      windowsHide: true,
+    });
+    appendFileSync(
+      logFile,
+      [
+        `${new Date().toISOString()} [${adapter.id}] [INFO] WSL2 stop hook: ${plan.script}`,
+        `exitCode: ${completed.status ?? "unknown"}`,
+        completed.stdout ? `stdout:\n${completed.stdout}` : "stdout: <empty>",
+        completed.stderr ? `stderr:\n${completed.stderr}` : "stderr: <empty>",
+        completed.error ? `error: ${completed.error.message}` : "",
+        "",
+      ].filter(Boolean).join("\n"),
+      "utf8",
+    );
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    appendFileSync(logFile, `${new Date().toISOString()} [${adapter.id}] [WARN] WSL2 stop hook failed: ${message}\n`, "utf8");
+  }
 }
 
 export function killProcessTree(pid: number): void {

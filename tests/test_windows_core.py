@@ -109,12 +109,14 @@ def make_hermes_agent_app_ready(temp_root):
     (app_dir / "pyproject.toml").write_text("[project]\nname = \"hermes-agent-test\"\n", encoding="utf-8")
 
 
-def make_fake_wsl_cmd(temp_root, stay_running=True, marker_path=None, args_path=None):
+def make_fake_wsl_cmd(temp_root, stay_running=True, marker_path=None, args_path=None, stop_marker_path=None):
     fake_wsl = temp_root / "fake-wsl.cmd"
     marker = marker_path or (temp_root / "data" / "tmp" / "fake-wsl-started.txt")
     args = args_path or (temp_root / "data" / "tmp" / "fake-wsl-args.txt")
+    stop_marker = stop_marker_path or (temp_root / "data" / "tmp" / "fake-wsl-stopped.txt")
     marker.parent.mkdir(parents=True, exist_ok=True)
     args.parent.mkdir(parents=True, exist_ok=True)
+    stop_marker.parent.mkdir(parents=True, exist_ok=True)
     lines = [
         "@echo off",
         "if \"%~1\"==\"--status\" (",
@@ -128,6 +130,12 @@ def make_fake_wsl_cmd(temp_root, stay_running=True, marker_path=None, args_path=
         ")",
         f"echo started > \"{marker}\"",
         f"echo %* > \"{args}\"",
+        "echo %* | findstr /C:\"WSL_STOP_HOOK\" > nul",
+        "if not errorlevel 1 (",
+        f"  echo stopped > \"{stop_marker}\"",
+        "  echo fake wsl stopped",
+        "  exit /b 0",
+        ")",
     ]
     if stay_running:
         lines.extend([
@@ -462,6 +470,15 @@ def process_exists(pid):
         check=False,
     )
     return result.stdout.strip().lower() == "true"
+
+
+def wait_for_process_exit(pid):
+    deadline = time.time() + 5
+    while time.time() < deadline:
+        if not process_exists(pid):
+            return
+        time.sleep(0.1)
+    raise AssertionError(f"Process {pid} was still running")
 
 
 class WindowsCoreTests(unittest.TestCase):
@@ -1725,8 +1742,40 @@ class WindowsCoreTests(unittest.TestCase):
             run_dispatcher_for_root(temp_root, "stop", "-Json", env={"CLAWHERMES_WSL_EXE": str(temp_root / "fake-wsl.cmd")})
             temp_dir.cleanup()
 
+    def test_stop_runs_wsl2_adapter_stop_hook_before_killing_managed_process(self):
+        temp_dir, temp_root = make_temp_usb_root()
+        try:
+            make_hermes_agent_app_ready(temp_root)
+            adapter_path = temp_root / "adapters" / "hermes-agent" / "adapter.json"
+            adapter = json.loads(adapter_path.read_text(encoding="utf-8"))
+            adapter["commands"]["stop"] = "echo WSL_STOP_HOOK"
+            adapter_path.write_text(json.dumps(adapter, indent=2), encoding="utf-8")
+            marker = temp_root / "data" / "tmp" / "fake-wsl-started.txt"
+            args_file = temp_root / "data" / "tmp" / "fake-wsl-args.txt"
+            stop_marker = temp_root / "data" / "tmp" / "fake-wsl-stopped.txt"
+            fake_wsl = make_fake_wsl_cmd(temp_root, marker_path=marker, args_path=args_file, stop_marker_path=stop_marker)
+            env = {"CLAWHERMES_WSL_EXE": str(fake_wsl)}
+            start = run_dispatcher_for_root(temp_root, "start-adapter", "hermes-agent", "--confirm-start", "-Json", env=env)
+            self.assertEqual(start.returncode, 0, start.stderr)
+            process_id = json.loads(start.stdout)["metadata"]["processId"]
+            self.assertTrue(process_exists(process_id))
+
+            stop = run_dispatcher_for_root(temp_root, "stop", "-Json", env=env)
+
+            self.assertEqual(stop.returncode, 0, stop.stderr)
+            self.assertIn("hermes-agent", json.loads(stop.stdout)["stopped"])
+            self.assertTrue(stop_marker.exists())
+            self.assertFalse((temp_root / "data" / "tmp" / "pids" / "hermes-agent.pid").exists())
+            self.assertFalse(process_exists(process_id))
+            log_text = (temp_root / "data" / "logs" / "hermes-agent.log").read_text(encoding="utf-8")
+            self.assertIn("WSL2 stop hook", log_text)
+        finally:
+            run_dispatcher_for_root(temp_root, "stop", "-Json", env={"CLAWHERMES_WSL_EXE": str(temp_root / "fake-wsl.cmd")})
+            temp_dir.cleanup()
+
     def test_start_uses_wsl2_plan_for_production_ready_wsl_adapter(self):
         temp_dir, temp_root = make_temp_usb_root()
+        process_id = None
         try:
             defaults = temp_root / "config" / "defaults"
             defaults.mkdir(parents=True, exist_ok=True)
@@ -1754,12 +1803,15 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertIn("hermes-agent", json.loads(start.stdout)["started"])
             wait_for_file(marker)
             metadata = json.loads((temp_root / "data" / "tmp" / "pids" / "hermes-agent.pid").read_text(encoding="utf-8"))
+            process_id = metadata["processId"]
             self.assertEqual(metadata["runner"], "wsl2")
             self.assertFalse(metadata["placeholder"])
             self.assertIn("--distribution", metadata["wsl"]["args"])
-            self.assertTrue(process_exists(metadata["processId"]))
+            self.assertTrue(process_exists(process_id))
         finally:
             run_dispatcher_for_root(temp_root, "stop", "-Json", env={"CLAWHERMES_WSL_EXE": str(temp_root / "fake-wsl.cmd")})
+            if process_id:
+                wait_for_process_exit(process_id)
             temp_dir.cleanup()
 
     def test_status_removes_stale_managed_adapter_pid_file(self):

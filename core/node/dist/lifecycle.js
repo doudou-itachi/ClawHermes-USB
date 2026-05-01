@@ -8,6 +8,8 @@ const node_fs_1 = require("node:fs");
 const node_path_1 = require("node:path");
 const environment_1 = require("./environment");
 const portable_1 = require("./portable");
+const wsl_adapter_1 = require("./wsl-adapter");
+const wsl_1 = require("./wsl");
 function startAdapter(root, adapter, options = {}) {
     const pidFile = (0, portable_1.resolveRelative)(root, adapter.pidFile);
     const logFile = (0, portable_1.resolveRelative)(root, adapter.logFile);
@@ -106,6 +108,9 @@ function stopAdapter(root, adapter) {
         return false;
     const metadata = JSON.parse((0, node_fs_1.readFileSync)(pidFile, "utf8"));
     if (metadata.placeholder === false && metadata.processId) {
+        if (metadata.runner === "wsl2" && adapter.commands.stop) {
+            runWslStopHook(root, adapter);
+        }
         try {
             killProcessTree(metadata.processId);
         }
@@ -116,6 +121,33 @@ function stopAdapter(root, adapter) {
     (0, node_fs_1.rmSync)(pidFile, { force: true });
     (0, portable_1.writeLog)(root, adapter.id, "INFO", metadata.placeholder === false ? "Stopped managed service." : "Stopped placeholder service.");
     return true;
+}
+function runWslStopHook(root, adapter) {
+    const logFile = (0, portable_1.resolveRelative)(root, adapter.logFile);
+    try {
+        const serviceEnv = (0, environment_1.resolveServiceEnvironment)(root, adapter.id);
+        const plan = (0, wsl_adapter_1.wslAdapterCommandPlan)(root, adapter, serviceEnv, "stop");
+        const invocation = (0, wsl_1.wslExecutableInvocation)(plan.executablePath, plan.args);
+        const completed = (0, node_child_process_1.spawnSync)(invocation.executablePath, invocation.args, {
+            cwd: root,
+            env: process.env,
+            encoding: "utf8",
+            timeout: 10000,
+            windowsHide: true,
+        });
+        (0, node_fs_1.appendFileSync)(logFile, [
+            `${new Date().toISOString()} [${adapter.id}] [INFO] WSL2 stop hook: ${plan.script}`,
+            `exitCode: ${completed.status ?? "unknown"}`,
+            completed.stdout ? `stdout:\n${completed.stdout}` : "stdout: <empty>",
+            completed.stderr ? `stderr:\n${completed.stderr}` : "stderr: <empty>",
+            completed.error ? `error: ${completed.error.message}` : "",
+            "",
+        ].filter(Boolean).join("\n"), "utf8");
+    }
+    catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        (0, node_fs_1.appendFileSync)(logFile, `${new Date().toISOString()} [${adapter.id}] [WARN] WSL2 stop hook failed: ${message}\n`, "utf8");
+    }
 }
 function killProcessTree(pid) {
     if (process.platform === "win32") {

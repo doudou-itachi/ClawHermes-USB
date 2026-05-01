@@ -6,7 +6,7 @@ export function wslAdapterSetupPlan(root: string, adapter: AdapterDescriptor, se
   return wslAdapterCommandPlan(root, adapter, serviceEnv, "setup");
 }
 
-export function wslAdapterCommandPlan(root: string, adapter: AdapterDescriptor, serviceEnv: ServiceEnvironment, phase: "setup" | "start") {
+export function wslAdapterCommandPlan(root: string, adapter: AdapterDescriptor, serviceEnv: ServiceEnvironment, phase: "setup" | "start" | "stop") {
   const distro = adapter.runtime?.distro;
   const diagnostics = wslDiagnostics(root, distro);
   const workingDirectory = windowsPathToWslPath(resolveRelative(root, adapter.appDir));
