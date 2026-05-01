@@ -55,6 +55,33 @@ export function wslImportPlan(usbRoot: string, options: { distro?: string }) {
   };
 }
 
+export function wslRootfsGuide(usbRoot: string, options: { distro?: string }) {
+  const plan = wslImportPlan(usbRoot, options);
+  const archivePath = plan.sourceArchive;
+  const checksumPath = plan.checksum.path;
+  return {
+    root: plan.root,
+    distro: plan.distro,
+    archivePath,
+    checksumPath,
+    automaticDownload: false,
+    sourceStrategy: "manual-export",
+    exportCommand: `wsl.exe --export ${plan.distro} ${quoteCommandArg(archivePath)}`,
+    checksumCommand: `Get-FileHash -Algorithm SHA256 -LiteralPath ${quotePowerShellArg(archivePath)} | ForEach-Object { "$($_.Hash.ToLowerInvariant())  ${plan.artifactPolicy.archiveName}" } | Set-Content -Encoding UTF8 -LiteralPath ${quotePowerShellArg(checksumPath)}`,
+    nextCommands: [
+      `node core/node/dist/clawhermes.js wsl-import-plan --distro ${plan.distro} --json`,
+      `node core/node/dist/clawhermes.js wsl-import --distro ${plan.distro} --confirm-import --json`,
+    ],
+    docs: WSL_COMMAND_DOCS,
+    messages: [
+      "ClawHermes-USB does not download, build, or vendor WSL rootfs archives.",
+      `Export a user-managed, initialized ${plan.distro} distribution to ${archivePath}.`,
+      `Create a SHA256 sidecar at ${checksumPath} before importing when possible.`,
+      "Keep the archive under runtimes/wsl/ and outside system temp folders.",
+    ],
+  };
+}
+
 export function wslImport(usbRoot: string, options: { distro?: string; confirmImport: boolean }) {
   const plan = wslImportPlan(usbRoot, options);
   const result = {
@@ -133,4 +160,8 @@ function safeDistributionSuffix(value: string): string {
 
 function quoteCommandArg(value: string): string {
   return /\s/.test(value) ? `"${value.replaceAll('"', '\\"')}"` : value;
+}
+
+function quotePowerShellArg(value: string): string {
+  return `'${value.replaceAll("'", "''")}'`;
 }

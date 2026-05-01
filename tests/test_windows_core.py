@@ -726,7 +726,28 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertTrue(policy["mustNotUseSystemTemp"])
         self.assertIn("No automatic rootfs download", "\n".join(payload["messages"]))
 
+    def test_wsl_rootfs_guide_reports_manual_export_and_hash_steps(self):
+        result = run_dispatcher("wsl-rootfs-guide", "--distro", "Ubuntu", "-Json")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["distro"], "Ubuntu")
+        self.assertFalse(payload["automaticDownload"])
+        self.assertTrue(payload["archivePath"].replace("\\", "/").endswith("runtimes/wsl/ubuntu-rootfs.tar"))
+        self.assertTrue(payload["checksumPath"].replace("\\", "/").endswith("runtimes/wsl/ubuntu-rootfs.tar.sha256"))
+        self.assertIn("--export Ubuntu", payload["exportCommand"])
+        self.assertIn("Get-FileHash", payload["checksumCommand"])
+        next_commands = "\n".join(payload["nextCommands"])
+        self.assertIn("wsl-import-plan --distro Ubuntu --json", next_commands)
+        self.assertIn("wsl-import --distro Ubuntu --confirm-import --json", next_commands)
+        self.assertIn("learn.microsoft.com", payload["docs"])
+        self.assertIn("ClawHermes-USB does not download", "\n".join(payload["messages"]))
+
     def test_powershell_wrapper_allows_wsl_import_actions(self):
+        guide = run_powershell_dispatcher("wsl-rootfs-guide", "-Json", "--distro", "Ubuntu")
+        self.assertEqual(guide.returncode, 0, guide.stderr)
+        self.assertEqual(json.loads(guide.stdout)["distro"], "Ubuntu")
+
         result = run_powershell_dispatcher("wsl-import-plan", "-Json", "--distro", "Ubuntu")
 
         self.assertEqual(result.returncode, 0, result.stderr)

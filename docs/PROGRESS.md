@@ -2236,3 +2236,40 @@ Next steps:
 
 - Add user-facing guidance for obtaining a trusted Ubuntu rootfs artifact without automatic downloads.
 - Consider requiring checksum sidecars once a trusted artifact source is chosen.
+
+### WSL2 Rootfs Guide Command
+
+Status: `Done`
+
+Summary:
+
+- Added a read-only `wsl-rootfs-guide --distro Ubuntu --json` command.
+- The command reports the project-local archive path, SHA256 sidecar path, a manual `wsl.exe --export` command, and a PowerShell `Get-FileHash` command.
+- The guide reiterates that ClawHermes-USB does not download, build, or vendor WSL rootfs archives.
+- Added the action to the PowerShell wrapper whitelist so the thin outer script can call it.
+- Documented the guide in README, adapter contract, and rootfs artifact policy.
+
+Changed areas:
+
+- `core/node/src/wsl-import.ts`
+- `core/node/src/core.ts`
+- `core/node/src/clawhermes.ts`
+- `core/node/dist/`
+- `core/windows/clawhermes.ps1`
+- `README.md`
+- `docs/ADAPTER_CONTRACT.md`
+- `docs/wsl-rootfs-artifacts.md`
+- `docs/PROGRESS.md`
+- `tests/test_windows_core.py`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_wsl_rootfs_guide_reports_manual_export_and_hash_steps -v`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_wsl_rootfs_guide_reports_manual_export_and_hash_steps tests.test_windows_core.WindowsCoreTests.test_powershell_wrapper_allows_wsl_import_actions -v`
+- `npm test`
+
+Next steps:
+
+- Add an optional rootfs guide phase to `wsl-workflow` if the workflow output becomes too dense for operators.
+- Consider requiring checksum sidecars once a trusted artifact source is chosen.

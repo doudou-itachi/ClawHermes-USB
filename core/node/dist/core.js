@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.wslWorkflowPlan = exports.wslImportPlan = exports.wslImport = exports.wslDiagnostics = exports.prepareWsl = exports.writeStatusSnapshot = exports.runtimePreparationPlan = exports.runtimeDiagnostics = exports.loadRuntimeManifest = exports.installRuntimeFromArchive = exports.stopPortalServer = exports.startPortalServer = exports.getPortalStatus = exports.generatePortal = exports.PORTAL_URL = exports.writeSetupSnapshot = exports.setupDiagnostics = exports.readLogTail = exports.portDiagnostics = exports.pathDiagnostics = exports.serviceEnvironmentDiagnostic = exports.resolveServiceEnvironment = exports.initializeEnvFiles = exports.envFileDiagnostics = exports.createBackup = exports.verifyAdapter = exports.runAdapterSetup = exports.markAdapterReady = exports.probeAppSources = exports.checkoutAppSource = exports.appSourcePlan = exports.adapterSetupPlan = exports.validateAdapter = exports.serviceOrder = exports.loadAdapters = exports.integrationReadiness = exports.portableEnv = exports.getRoot = exports.dataWritable = void 0;
+exports.wslWorkflowPlan = exports.wslRootfsGuide = exports.wslImportPlan = exports.wslImport = exports.wslDiagnostics = exports.prepareWsl = exports.writeStatusSnapshot = exports.runtimePreparationPlan = exports.runtimeDiagnostics = exports.loadRuntimeManifest = exports.installRuntimeFromArchive = exports.stopPortalServer = exports.startPortalServer = exports.getPortalStatus = exports.generatePortal = exports.PORTAL_URL = exports.writeSetupSnapshot = exports.setupDiagnostics = exports.readLogTail = exports.portDiagnostics = exports.pathDiagnostics = exports.serviceEnvironmentDiagnostic = exports.resolveServiceEnvironment = exports.initializeEnvFiles = exports.envFileDiagnostics = exports.createBackup = exports.verifyAdapter = exports.runAdapterSetup = exports.markAdapterReady = exports.probeAppSources = exports.checkoutAppSource = exports.appSourcePlan = exports.adapterSetupPlan = exports.validateAdapter = exports.serviceOrder = exports.loadAdapters = exports.integrationReadiness = exports.portableEnv = exports.getRoot = exports.dataWritable = void 0;
 exports.startSkeleton = startSkeleton;
 exports.startSingleAdapter = startSingleAdapter;
 exports.getStatus = getStatus;
@@ -67,6 +67,7 @@ Object.defineProperty(exports, "wslDiagnostics", { enumerable: true, get: functi
 var wsl_import_1 = require("./wsl-import");
 Object.defineProperty(exports, "wslImport", { enumerable: true, get: function () { return wsl_import_1.wslImport; } });
 Object.defineProperty(exports, "wslImportPlan", { enumerable: true, get: function () { return wsl_import_1.wslImportPlan; } });
+Object.defineProperty(exports, "wslRootfsGuide", { enumerable: true, get: function () { return wsl_import_1.wslRootfsGuide; } });
 var wsl_workflow_1 = require("./wsl-workflow");
 Object.defineProperty(exports, "wslWorkflowPlan", { enumerable: true, get: function () { return wsl_workflow_1.wslWorkflowPlan; } });
 async function startSkeleton(usbRoot) {

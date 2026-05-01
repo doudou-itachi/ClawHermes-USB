@@ -198,6 +198,20 @@ async function main() {
             }
             return;
         }
+        case "wsl-rootfs-guide": {
+            const result = (0, core_1.wslRootfsGuide)(root, { distro });
+            if (json) {
+                printJson(result);
+            }
+            else {
+                console.log("ClawHermes-USB WSL2 rootfs guide");
+                for (const message of result.messages)
+                    console.log(`- ${message}`);
+                console.log(`Export: ${result.exportCommand}`);
+                console.log(`Checksum: ${result.checksumCommand}`);
+            }
+            return;
+        }
         case "wsl-import": {
             const result = (0, core_1.wslImport)(root, { distro, confirmImport });
             if (json) {

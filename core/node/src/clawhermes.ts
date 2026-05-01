@@ -1,4 +1,4 @@
-import { adapterSetupPlan, appSourcePlan, checkoutAppSource, createBackup, getRoot, getStatus, initializeEnvFiles, installRuntimeFromArchive, markAdapterReady, portableEnv, prepareWsl, probeAppSources, readLogTail, runAdapterSetup, runtimePreparationPlan, serviceEnvironmentDiagnostic, setupDiagnostics, startSingleAdapter, startSkeleton, stopSkeleton, verifyAdapter, writeStatusSnapshot, wslDiagnostics, wslImport, wslImportPlan, wslWorkflowPlan } from "./core";
+import { adapterSetupPlan, appSourcePlan, checkoutAppSource, createBackup, getRoot, getStatus, initializeEnvFiles, installRuntimeFromArchive, markAdapterReady, portableEnv, prepareWsl, probeAppSources, readLogTail, runAdapterSetup, runtimePreparationPlan, serviceEnvironmentDiagnostic, setupDiagnostics, startSingleAdapter, startSkeleton, stopSkeleton, verifyAdapter, writeStatusSnapshot, wslDiagnostics, wslImport, wslImportPlan, wslRootfsGuide, wslWorkflowPlan } from "./core";
 import type { BackupProfile } from "./backup";
 
 type ParsedArgs = {
@@ -185,6 +185,18 @@ async function main(): Promise<void> {
         console.log("ClawHermes-USB WSL2 import plan");
         for (const message of result.messages) console.log(`- ${message}`);
         console.log(`Command: ${result.command}`);
+      }
+      return;
+    }
+    case "wsl-rootfs-guide": {
+      const result = wslRootfsGuide(root, { distro });
+      if (json) {
+        printJson(result);
+      } else {
+        console.log("ClawHermes-USB WSL2 rootfs guide");
+        for (const message of result.messages) console.log(`- ${message}`);
+        console.log(`Export: ${result.exportCommand}`);
+        console.log(`Checksum: ${result.checksumCommand}`);
       }
       return;
     }

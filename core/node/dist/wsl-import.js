@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.wslImportPlan = wslImportPlan;
+exports.wslRootfsGuide = wslRootfsGuide;
 exports.wslImport = wslImport;
 const node_child_process_1 = require("node:child_process");
 const node_crypto_1 = require("node:crypto");
@@ -53,6 +54,32 @@ function wslImportPlan(usbRoot, options) {
             `Place the matching SHA256 file at ${checksumFile} when one is available from the artifact source.`,
             "No automatic rootfs download is performed; keep large rootfs artifacts out of git and outside system temp folders.",
             "This command is read-only and does not run wsl.exe.",
+        ],
+    };
+}
+function wslRootfsGuide(usbRoot, options) {
+    const plan = wslImportPlan(usbRoot, options);
+    const archivePath = plan.sourceArchive;
+    const checksumPath = plan.checksum.path;
+    return {
+        root: plan.root,
+        distro: plan.distro,
+        archivePath,
+        checksumPath,
+        automaticDownload: false,
+        sourceStrategy: "manual-export",
+        exportCommand: `wsl.exe --export ${plan.distro} ${quoteCommandArg(archivePath)}`,
+        checksumCommand: `Get-FileHash -Algorithm SHA256 -LiteralPath ${quotePowerShellArg(archivePath)} | ForEach-Object { "$($_.Hash.ToLowerInvariant())  ${plan.artifactPolicy.archiveName}" } | Set-Content -Encoding UTF8 -LiteralPath ${quotePowerShellArg(checksumPath)}`,
+        nextCommands: [
+            `node core/node/dist/clawhermes.js wsl-import-plan --distro ${plan.distro} --json`,
+            `node core/node/dist/clawhermes.js wsl-import --distro ${plan.distro} --confirm-import --json`,
+        ],
+        docs: WSL_COMMAND_DOCS,
+        messages: [
+            "ClawHermes-USB does not download, build, or vendor WSL rootfs archives.",
+            `Export a user-managed, initialized ${plan.distro} distribution to ${archivePath}.`,
+            `Create a SHA256 sidecar at ${checksumPath} before importing when possible.`,
+            "Keep the archive under runtimes/wsl/ and outside system temp folders.",
         ],
     };
 }
@@ -128,4 +155,7 @@ function safeDistributionSuffix(value) {
 }
 function quoteCommandArg(value) {
     return /\s/.test(value) ? `"${value.replaceAll('"', '\\"')}"` : value;
+}
+function quotePowerShellArg(value) {
+    return `'${value.replaceAll("'", "''")}'`;
 }

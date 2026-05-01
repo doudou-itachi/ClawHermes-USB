@@ -31,6 +31,14 @@ The `.sha256` file is optional until a trusted artifact source is selected, but 
 
 ## Current Command
 
+Inspect the read-only manual artifact guide:
+
+```powershell
+node core/node/dist/clawhermes.js wsl-rootfs-guide --distro Ubuntu --json
+```
+
+The guide reports a `wsl.exe --export` command, a PowerShell `Get-FileHash` command for the SHA256 sidecar, and the next import-plan/import commands. It does not run WSL and does not download anything.
+
 Inspect the read-only import plan:
 
 ```powershell
