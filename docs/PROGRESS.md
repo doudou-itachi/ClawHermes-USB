@@ -11,6 +11,37 @@ Update it whenever a milestone is completed, changed, blocked, or deferred.
 - `Blocked`: Waiting on external information or action.
 - `Deferred`: Intentionally postponed.
 
+## 2026-05-01
+
+### Windows User Launchers
+
+Status: `Done`
+
+Summary:
+
+- Added numbered double-click Windows launchers for install, start, stop, status, backup, host WSL uninstall, and advanced repair/update.
+- Added a shared PowerShell user guide that keeps Batch files thin and forwards real operations to the existing core dispatcher.
+- Kept the normal user flow offline-first while labeling repair/update as advanced maintenance.
+- Preserved explicit guardrails for WSL import and WSL unregister operations.
+
+Changed areas:
+
+- `launcher/windows/`
+- `tests/test_windows_core.py`
+- `README.md`
+- `README.zh-CN.md`
+- `docs/PROGRESS.md`
+
+Validation performed:
+
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_user_facing_batch_launchers_call_shared_user_guide tests.test_windows_core.WindowsCoreTests.test_user_guide_script_exposes_safe_modes_and_noninteractive_switches tests.test_windows_core.WindowsCoreTests.test_user_guide_status_runs_without_pausing_and_prints_services tests.test_windows_core.WindowsCoreTests.test_user_guide_install_plan_only_does_not_import_wsl_or_start_services tests.test_windows_core.WindowsCoreTests.test_user_guide_uninstall_plan_only_shows_guard_without_unregistering tests.test_windows_core.WindowsCoreTests.test_user_guide_start_opens_runtime_portal_url_text tests.test_windows_core.WindowsCoreTests.test_user_guide_backup_creates_data_backup_without_uninstall_words -v`
+- `npm test`
+- `git diff --check`
+
+Next steps:
+
+- Run full manual release verification on a clean Windows VM with prepared offline payloads before handing a USB package to end users.
+
 ## 2026-04-30
 
 ### Initial Project Foundation

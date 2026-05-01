@@ -51,6 +51,20 @@ launcher/windows/Stop.bat
 launcher/windows/Backup.bat
 ```
 
+For non-technical USB users, use the numbered double-click launchers:
+
+```text
+launcher/windows/1-Install-ClawHermes.bat
+launcher/windows/2-Start-ClawHermes.bat
+launcher/windows/3-Stop-ClawHermes.bat
+launcher/windows/4-Status-ClawHermes.bat
+launcher/windows/5-Backup-ClawHermes.bat
+launcher/windows/6-Uninstall-Host-WSL-ClawHermes.bat
+launcher/windows/Tools-Repair-Or-Update-ClawHermes.bat
+```
+
+The normal release path is offline-first: prepare portable runtimes, app payloads, and WSL artifacts before handing the USB drive to a user. The repair/update launcher is for advanced maintenance and may require network access.
+
 `Start.bat` opens the local portal after a successful start. If port `17000` is occupied, the core selects a free local port and `Start.bat` opens the assigned URL from `data/tmp/ports.json`. All Windows Batch launchers forward the core command exit code.
 
 Run the Node CLI directly:

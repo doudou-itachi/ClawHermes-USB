@@ -44,6 +44,20 @@ launcher/windows/Stop.bat
 launcher/windows/Backup.bat
 ```
 
+面向普通 U 盘用户时，优先使用这些按顺序编号的双击脚本：
+
+```text
+launcher/windows/1-Install-ClawHermes.bat
+launcher/windows/2-Start-ClawHermes.bat
+launcher/windows/3-Stop-ClawHermes.bat
+launcher/windows/4-Status-ClawHermes.bat
+launcher/windows/5-Backup-ClawHermes.bat
+launcher/windows/6-Uninstall-Host-WSL-ClawHermes.bat
+launcher/windows/Tools-Repair-Or-Update-ClawHermes.bat
+```
+
+推荐交付方式是离线优先：在交给用户之前，把便携运行时、上游应用 payload、WSL rootfs 或 WSL 备份包准备好。修复/更新入口用于高级维护，可能需要联网。
+
 也可以直接运行 Node CLI：
 
 ```powershell
