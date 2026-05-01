@@ -7,6 +7,7 @@ import { envFileDiagnostics } from "./environment";
 import { dataWritable, getRoot, resolveRelative } from "./portable";
 import { adapterRuntimeRequirementDiagnostics, runtimeDiagnostics } from "./runtimes";
 import { wslDiagnostics } from "./wsl";
+import { wslImportPlan } from "./wsl-import";
 
 export function setupDiagnostics(usbRoot: string) {
   const root = getRoot(usbRoot);
@@ -20,6 +21,8 @@ export function setupDiagnostics(usbRoot: string) {
   const paths = pathDiagnostics(root);
   const envFiles = envFileDiagnostics(root, adapters);
   const wsl = wslDiagnostics(root);
+  const wslAdapters = adapters.filter((adapter) => adapter.runtime?.kind === "wsl2" || adapter.integration?.platform === "wsl2");
+  const wslArtifacts = wslArtifactDiagnostics(root, wslAdapters);
   const writable = dataWritable(root);
   const messages: string[] = [];
   const actions: SetupAction[] = [];
@@ -71,7 +74,6 @@ export function setupDiagnostics(usbRoot: string) {
       });
     }
   }
-  const wslAdapters = adapters.filter((adapter) => adapter.runtime?.kind === "wsl2" || adapter.integration?.platform === "wsl2");
   for (const adapter of wslAdapters) {
     const adapterWsl = wslDiagnostics(root, adapter.runtime?.distro);
     const wslReady = adapter.runtime?.distro
@@ -89,6 +91,22 @@ export function setupDiagnostics(usbRoot: string) {
         command: wslPreparationCommand(adapter.runtime?.distro),
         docs: adapter.integration?.sources?.[0] ?? adapter.upstream?.installDocs,
         serviceId: adapter.id,
+      });
+    }
+  }
+  for (const artifact of wslArtifacts) {
+    if (!artifact.sourceArchiveExists) {
+      messages.push(`WSL rootfs archive missing for ${artifact.serviceId}: ${artifact.archivePath}.`);
+      actions.push({
+        id: `wsl-artifact:${artifact.serviceId}`,
+        category: "wsl-artifact",
+        severity: "warning",
+        title: `Prepare WSL rootfs archive for ${artifact.serviceId}`,
+        detail: `Place or export the rootfs archive at ${artifact.archivePath}, then rerun the WSL import plan.`,
+        command: artifact.guideCommand,
+        path: artifact.archivePath,
+        docs: artifact.docs,
+        serviceId: artifact.serviceId,
       });
     }
   }
@@ -145,7 +163,27 @@ export function setupDiagnostics(usbRoot: string) {
     });
   }
 
-  return { root, adapters: adapterResults, runtimes, adapterRuntimeRequirements, readiness, ports, paths, envFiles, wsl, dataWritable: writable, messages, actions };
+  return { root, adapters: adapterResults, runtimes, adapterRuntimeRequirements, readiness, ports, paths, envFiles, wsl, wslArtifacts, dataWritable: writable, messages, actions };
+}
+
+function wslArtifactDiagnostics(root: string, adapters: ReturnType<typeof loadAdapters>) {
+  return adapters.map((adapter) => {
+    const distro = adapter.runtime?.distro?.trim() || "Ubuntu";
+    const plan = wslImportPlan(root, { distro });
+    return {
+      serviceId: adapter.id,
+      distro: plan.distro,
+      distributionName: plan.distributionName,
+      archivePath: plan.sourceArchive,
+      installLocation: plan.installLocation,
+      sourceArchiveExists: plan.sourceArchiveExists,
+      checksum: plan.checksum,
+      guideCommand: `node core/node/dist/clawhermes.js wsl-rootfs-guide --distro ${plan.distro} --json`,
+      importPlanCommand: `node core/node/dist/clawhermes.js wsl-import-plan --distro ${plan.distro} --json`,
+      importCommand: `node core/node/dist/clawhermes.js wsl-import --distro ${plan.distro} --confirm-import --json`,
+      docs: plan.docs,
+    };
+  });
 }
 
 function wslPreparationCommand(distro: string | undefined): string {

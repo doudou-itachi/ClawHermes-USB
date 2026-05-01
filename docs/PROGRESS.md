@@ -2303,3 +2303,35 @@ Next steps:
 
 - Add rootfs/archive status summaries to setup diagnostics so first-run users can see WSL2 artifact readiness from `setup --json`.
 - Consider requiring checksum sidecars once a trusted artifact source is chosen.
+
+### WSL2 Artifact Setup Diagnostics
+
+Status: `Done`
+
+Summary:
+
+- Added `wslArtifacts` to `setup --json` for WSL2 adapters.
+- The setup payload now reports the expected rootfs archive path, import location, checksum status, and rootfs guide/import commands.
+- Missing rootfs archives add a `wsl-artifact:<service-id>` warning action pointing to `wsl-rootfs-guide`.
+- Documented the setup diagnostics behavior in the adapter contract and rootfs artifact policy.
+
+Changed areas:
+
+- `core/node/src/diagnostics.ts`
+- `core/node/src/types.ts`
+- `core/node/dist/`
+- `docs/ADAPTER_CONTRACT.md`
+- `docs/wsl-rootfs-artifacts.md`
+- `docs/PROGRESS.md`
+- `tests/test_windows_core.py`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_setup_json_reports_runtime_diagnostics_and_valid_adapters tests.test_windows_core.WindowsCoreTests.test_setup_json_reports_recommended_actions -v`
+- `npm test`
+
+Next steps:
+
+- Consider requiring checksum sidecars once a trusted artifact source is chosen.
+- Add a lifecycle safety check that prevents `wsl-import` from overwriting an existing `data/wsl/<distribution>` install directory.

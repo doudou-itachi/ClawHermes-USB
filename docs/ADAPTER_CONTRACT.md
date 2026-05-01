@@ -577,6 +577,7 @@ Rules:
 - When a `.sha256` sidecar exists next to the rootfs archive, `wsl-import` must verify it before running WSL and reject mismatches.
 - WSL rootfs artifacts are operator-managed payloads. They must stay under `runtimes/wsl/`, stay out of git, avoid system temp folders as durable storage, and never be downloaded automatically by setup/startup diagnostics.
 - Missing `wsl.exe`, missing distributions, and missing WSL2 distributions must be reported as setup actions.
+- Missing WSL rootfs archives for WSL2 adapters must be reported in `setup --json` under `wslArtifacts` and should add a `wsl-artifact:<service-id>` action pointing to `wsl-rootfs-guide`.
 - When `runtime.distro` is set, WSL commands must include `--distribution <name>` and diagnostics must verify that target distribution.
 - WSL2 adapter setup/start commands must not run until the WSL2 diagnostic is healthy.
 - Confirmed WSL2 adapter setup executes through the same WSL adapter command plan and writes `data/logs/setup-<service-id>.log`.

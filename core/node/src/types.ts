@@ -167,7 +167,7 @@ export type PathDiagnostic = {
 
 export type SetupAction = {
   id: string;
-  category: "runtime" | "adapter-integration" | "env-file" | "port" | "path" | "data" | "wsl2";
+  category: "runtime" | "adapter-integration" | "env-file" | "port" | "path" | "data" | "wsl2" | "wsl-artifact";
   severity: "info" | "warning" | "error";
   title: string;
   detail: string;

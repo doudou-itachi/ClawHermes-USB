@@ -579,6 +579,13 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertIn("Portable Node.js not found", "\n".join(payload["messages"]))
         self.assertIn("Portable Python not found", "\n".join(payload["messages"]))
         self.assertIn("Portable Git not found", "\n".join(payload["messages"]))
+        artifact = next(item for item in payload["wslArtifacts"] if item["serviceId"] == "hermes-agent")
+        self.assertEqual(artifact["distro"], "Ubuntu")
+        self.assertFalse(artifact["sourceArchiveExists"])
+        self.assertFalse(artifact["checksum"]["exists"])
+        self.assertTrue(artifact["archivePath"].replace("\\", "/").endswith("runtimes/wsl/ubuntu-rootfs.tar"))
+        self.assertIn("wsl-rootfs-guide --distro Ubuntu --json", artifact["guideCommand"])
+        self.assertIn("wsl-import-plan --distro Ubuntu --json", artifact["importPlanCommand"])
 
     def test_setup_json_reports_recommended_actions(self):
         result = run_dispatcher("setup", "-Json")
@@ -592,10 +599,12 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertIn("runtime", categories)
         self.assertIn("adapter-integration", categories)
         self.assertIn("env-file", categories)
+        self.assertIn("wsl-artifact", categories)
         self.assertIn("runtime:node", action_ids)
         self.assertIn("adapter-integration:openclaw", action_ids)
         self.assertNotIn("adapter-integration:hermes-web-ui", action_ids)
         self.assertIn("env-file:hermes-agent", action_ids)
+        self.assertIn("wsl-artifact:hermes-agent", action_ids)
 
         node_action = next(action for action in actions if action["id"] == "runtime:node")
         self.assertEqual(node_action["severity"], "warning")
@@ -604,6 +613,10 @@ class WindowsCoreTests(unittest.TestCase):
         env_action = next(action for action in actions if action["id"] == "env-file:hermes-agent")
         self.assertIn("init-env", env_action["command"])
         self.assertEqual(env_action["path"].replace("\\", "/"), "config/env/hermes.env")
+
+        artifact_action = next(action for action in actions if action["id"] == "wsl-artifact:hermes-agent")
+        self.assertEqual(artifact_action["severity"], "warning")
+        self.assertIn("wsl-rootfs-guide", artifact_action["command"])
 
     def test_wsl_json_reports_missing_host_wsl_without_throwing(self):
         missing_wsl = str(ROOT / "data" / "tmp" / "missing-wsl.exe")

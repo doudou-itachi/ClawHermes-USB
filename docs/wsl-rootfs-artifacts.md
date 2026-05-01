@@ -39,6 +39,14 @@ node core/node/dist/clawhermes.js wsl-rootfs-guide --distro Ubuntu --json
 
 The guide reports a `wsl.exe --export` command, a PowerShell `Get-FileHash` command for the SHA256 sidecar, and the next import-plan/import commands. It does not run WSL and does not download anything.
 
+First-run diagnostics also report artifact readiness:
+
+```powershell
+node core/node/dist/clawhermes.js setup --json
+```
+
+For WSL2 adapters, the `wslArtifacts` array reports the expected archive path, checksum status, import location, and guide/import commands. Missing archives add a `wsl-artifact:<service-id>` setup action.
+
 Inspect the read-only import plan:
 
 ```powershell
