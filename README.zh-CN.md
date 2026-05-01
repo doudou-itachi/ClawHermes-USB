@@ -46,24 +46,22 @@ launcher/windows/Backup.bat
 
 面向普通 U 盘用户时，按需要双击对应脚本；日常使用通常只用 1-5。
 
-日常使用：
+日常使用脚本：
 
-```text
-launcher/windows/1-Install-ClawHermes.bat
-launcher/windows/2-Start-ClawHermes.bat
-launcher/windows/3-Stop-ClawHermes.bat
-launcher/windows/4-Status-ClawHermes.bat
-launcher/windows/5-Backup-ClawHermes.bat
-```
+| 脚本 | 做什么 | 大致执行了什么 |
+| --- | --- | --- |
+| `launcher/windows/1-Install-ClawHermes.bat` | 第一次使用时安装和准备环境。 | 调用 `UserGuide.ps1 -Mode Install`，先检查当前 U 盘目录、payload、运行时和 WSL 计划；创建缺失的本地 env 文件；在用户输入确认后才导入 `ClawHermes-Ubuntu`；最后启动服务并打开本地门户。 |
+| `launcher/windows/2-Start-ClawHermes.bat` | 启动 ClawHermes 服务并打开网页入口。 | 调用 `UserGuide.ps1 -Mode Start`，执行核心 `start` 流程，启动 OpenClaw、Hermes Agent、Hermes Web UI 和本地 Portal；如果端口被占用，会读取运行时分配的门户地址再打开浏览器。 |
+| `launcher/windows/3-Stop-ClawHermes.bat` | 停止当前正在运行的服务。 | 调用 `UserGuide.ps1 -Mode Stop`，执行核心 `stop` 流程，停止受管进程和本地 Portal，并清理对应 PID 状态。 |
+| `launcher/windows/4-Status-ClawHermes.bat` | 查看当前是否安装完整、服务是否运行。 | 调用 `UserGuide.ps1 -Mode Status`，执行核心 `status --json`，把各服务状态和门户地址用更容易读的方式显示出来。 |
+| `launcher/windows/5-Backup-ClawHermes.bat` | 备份 U 盘里的配置和用户数据。 | 调用 `UserGuide.ps1 -Mode Backup`，执行核心 `backup` 流程，在 `data/backups/` 下生成带时间戳的备份包；不会卸载 WSL，也不会删除 payload。 |
 
-高级维护才使用：
+高级维护脚本：
 
-```text
-launcher/windows/6-Uninstall-Host-WSL-ClawHermes.bat
-launcher/windows/Tools-Repair-Or-Update-ClawHermes.bat
-```
-
-`6-Uninstall-Host-WSL-ClawHermes.bat` 不是日常步骤。它会在备份完成并再次确认后，清理当前 Windows 主机上的托管 WSL 发行版。`Tools-Repair-Or-Update-ClawHermes.bat` 用于高级维护，可能需要联网。
+| 脚本 | 做什么 | 大致执行了什么 |
+| --- | --- | --- |
+| `launcher/windows/6-Uninstall-Host-WSL-ClawHermes.bat` | 从当前 Windows 主机移除托管的 `ClawHermes-Ubuntu` WSL 环境。不是日常步骤。 | 调用 `UserGuide.ps1 -Mode Uninstall`，先显示 `wsl-unregister-plan`；真正注销前会停止服务，并要求已有项目本地 WSL 备份和用户输入明确确认，然后才执行 `wsl-unregister --confirm-unregister`。不会默认删除 U 盘项目、payload 或普通数据备份。 |
+| `launcher/windows/Tools-Repair-Or-Update-ClawHermes.bat` | 给维护人员排查、修复或更新时使用。普通用户一般不需要。 | 调用 `UserGuide.ps1 -Mode Repair`，执行 `setup`、`payloads`、`runtimes`、`sources` 等只读检查，帮助判断缺什么；后续高级修复/更新可能需要联网。 |
 
 推荐交付方式是离线优先：在交给用户之前，把便携运行时、上游应用 payload、WSL rootfs 或 WSL 备份包准备好。
 
