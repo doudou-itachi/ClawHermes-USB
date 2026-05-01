@@ -691,19 +691,36 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertIn("was not unregistered", result.stdout)
 
     def test_user_guide_uninstall_plan_only_does_not_stop_running_services(self):
-        start = run_dispatcher("start", "-Json")
-        self.assertEqual(start.returncode, 0, start.stderr)
-        wait_for_portal()
-
+        temp_dir, temp_root = make_temp_skeleton_usb_root()
         try:
-            result = run_user_guide("Uninstall", "-PlanOnly")
+            guide_path = temp_root / "launcher" / "windows" / "UserGuide.ps1"
+            guide_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(ROOT / "launcher" / "windows" / "UserGuide.ps1", guide_path)
+
+            dispatcher_path = temp_root / "core" / "windows" / "clawhermes.ps1"
+            dispatcher_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(ROOT / "core" / "windows" / "clawhermes.ps1", dispatcher_path)
+
+            start = run_dispatcher_for_root(temp_root, "start", "-Json")
+            self.assertEqual(start.returncode, 0, start.stderr)
+            start_payload = json.loads(start.stdout)
+            wait_for_url(start_payload["portal"]["url"])
+            portal_pid = temp_root / "data" / "tmp" / "pids" / "portal.pid"
+            self.assertTrue(portal_pid.exists())
+
+            result = run_user_guide("Uninstall", "-PlanOnly", root=temp_root)
 
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("Plan-only mode finished", result.stdout)
-            html = fetch_portal()
-            self.assertIn("ClawHermes-USB Portal", html)
+            self.assertTrue(portal_pid.exists())
+
+            status = run_dispatcher_for_root(temp_root, "status", "-Json")
+            self.assertEqual(status.returncode, 0, status.stderr)
+            services = {service["id"]: service for service in json.loads(status.stdout)["services"]}
+            self.assertEqual(services["portal"]["status"], "running")
         finally:
-            run_dispatcher("stop", "-Json")
+            run_dispatcher_for_root(temp_root, "stop", "-Json")
+            temp_dir.cleanup()
 
     def test_setup_json_reports_runtime_diagnostics_and_valid_adapters(self):
         result = run_dispatcher("setup", "-Json")
