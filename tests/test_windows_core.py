@@ -138,6 +138,28 @@ def make_temp_usb_root():
     return temp_dir, temp_root
 
 
+def make_temp_skeleton_usb_root():
+    temp_dir, temp_root = make_temp_usb_root()
+    for directory in [
+        temp_root / "config" / "defaults",
+        temp_root / "data" / "logs",
+        temp_root / "data" / "tmp",
+        temp_root / "portal",
+    ]:
+        directory.mkdir(parents=True, exist_ok=True)
+    for config_file in (ROOT / "config" / "defaults").glob("*.json"):
+        (temp_root / "config" / "defaults" / config_file.name).write_text(config_file.read_text(encoding="utf-8"), encoding="utf-8")
+    for service_id in ("openclaw", "hermes-agent", "hermes-web-ui"):
+        app_dir = temp_root / "apps" / service_id
+        data_dir = temp_root / "data" / service_id
+        app_dir.mkdir(parents=True, exist_ok=True)
+        data_dir.mkdir(parents=True, exist_ok=True)
+        (app_dir / ".gitkeep").write_text("", encoding="utf-8")
+        (data_dir / ".gitkeep").write_text("", encoding="utf-8")
+    copy_portal_dist(temp_root)
+    return temp_dir, temp_root
+
+
 def copy_portal_dist(temp_root):
     target = temp_root / "core" / "node" / "dist"
     target.mkdir(parents=True, exist_ok=True)
@@ -614,8 +636,10 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertIn("Portable Git not found", "\n".join(payload["messages"]))
         artifact = next(item for item in payload["wslArtifacts"] if item["serviceId"] == "hermes-agent")
         self.assertEqual(artifact["distro"], "Ubuntu")
-        self.assertFalse(artifact["sourceArchiveExists"])
-        self.assertFalse(artifact["checksum"]["exists"])
+        expected_archive = ROOT / "runtimes" / "wsl" / "ubuntu-rootfs.tar"
+        expected_checksum = ROOT / "runtimes" / "wsl" / "ubuntu-rootfs.tar.sha256"
+        self.assertEqual(artifact["sourceArchiveExists"], expected_archive.exists())
+        self.assertEqual(artifact["checksum"]["exists"], expected_checksum.exists())
         self.assertTrue(artifact["archivePath"].replace("\\", "/").endswith("runtimes/wsl/ubuntu-rootfs.tar"))
         self.assertIn("wsl-rootfs-guide --distro Ubuntu --json", artifact["guideCommand"])
         self.assertIn("wsl-import-plan --distro Ubuntu --json", artifact["importPlanCommand"])
@@ -623,36 +647,40 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertIn("openclaw", artifact_services)
 
     def test_setup_json_reports_recommended_actions(self):
-        result = run_dispatcher("setup", "-Json")
+        temp_dir, temp_root = make_temp_skeleton_usb_root()
+        try:
+            result = run_dispatcher_for_root(temp_root, "setup", "-Json")
 
-        self.assertEqual(result.returncode, 0, result.stderr)
-        payload = json.loads(result.stdout)
-        actions = payload["actions"]
-        categories = {action["category"] for action in actions}
-        action_ids = {action["id"] for action in actions}
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            actions = payload["actions"]
+            categories = {action["category"] for action in actions}
+            action_ids = {action["id"] for action in actions}
 
-        self.assertIn("runtime", categories)
-        self.assertIn("adapter-integration", categories)
-        self.assertIn("env-file", categories)
-        self.assertIn("wsl-artifact", categories)
-        self.assertIn("runtime:node", action_ids)
-        self.assertIn("adapter-integration:openclaw", action_ids)
-        self.assertNotIn("adapter-integration:hermes-web-ui", action_ids)
-        self.assertIn("env-file:hermes-agent", action_ids)
-        self.assertIn("wsl-artifact:hermes-agent", action_ids)
-        self.assertIn("wsl-artifact:openclaw", action_ids)
+            self.assertIn("runtime", categories)
+            self.assertIn("env-file", categories)
+            self.assertIn("wsl-artifact", categories)
+            self.assertIn("runtime:node", action_ids)
+            self.assertNotIn("adapter-integration:openclaw", action_ids)
+            self.assertNotIn("adapter-integration:hermes-agent", action_ids)
+            self.assertNotIn("adapter-integration:hermes-web-ui", action_ids)
+            self.assertIn("env-file:hermes-agent", action_ids)
+            self.assertIn("wsl-artifact:hermes-agent", action_ids)
+            self.assertIn("wsl-artifact:openclaw", action_ids)
 
-        node_action = next(action for action in actions if action["id"] == "runtime:node")
-        self.assertEqual(node_action["severity"], "warning")
-        self.assertIn("runtimes", node_action["command"])
+            node_action = next(action for action in actions if action["id"] == "runtime:node")
+            self.assertEqual(node_action["severity"], "warning")
+            self.assertIn("runtimes", node_action["command"])
 
-        env_action = next(action for action in actions if action["id"] == "env-file:hermes-agent")
-        self.assertIn("init-env", env_action["command"])
-        self.assertEqual(env_action["path"].replace("\\", "/"), "config/env/hermes.env")
+            env_action = next(action for action in actions if action["id"] == "env-file:hermes-agent")
+            self.assertIn("init-env", env_action["command"])
+            self.assertEqual(env_action["path"].replace("\\", "/"), "config/env/hermes.env")
 
-        artifact_action = next(action for action in actions if action["id"] == "wsl-artifact:hermes-agent")
-        self.assertEqual(artifact_action["severity"], "warning")
-        self.assertIn("wsl-rootfs-guide", artifact_action["command"])
+            artifact_action = next(action for action in actions if action["id"] == "wsl-artifact:hermes-agent")
+            self.assertEqual(artifact_action["severity"], "warning")
+            self.assertIn("wsl-rootfs-guide", artifact_action["command"])
+        finally:
+            temp_dir.cleanup()
 
     def test_wsl_json_reports_missing_host_wsl_without_throwing(self):
         missing_wsl = str(ROOT / "data" / "tmp" / "missing-wsl.exe")
@@ -712,93 +740,101 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertIn("--confirm-install", result.stderr)
 
     def test_wsl_workflow_reports_explicit_confirm_commands_for_hermes_agent(self):
-        missing_wsl = str(ROOT / "data" / "tmp" / "missing-wsl.exe")
+        temp_dir, temp_root = make_temp_skeleton_usb_root()
+        missing_wsl = str(temp_root / "data" / "tmp" / "missing-wsl.exe")
+        try:
+            result = run_dispatcher_for_root(temp_root, "wsl-workflow", "hermes-agent", "-Json", env={"CLAWHERMES_WSL_EXE": missing_wsl})
 
-        result = run_dispatcher("wsl-workflow", "hermes-agent", "-Json", env={"CLAWHERMES_WSL_EXE": missing_wsl})
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        payload = json.loads(result.stdout)
-        self.assertEqual(payload["serviceId"], "hermes-agent")
-        self.assertEqual(payload["runner"], "wsl2")
-        self.assertEqual(payload["distro"], "Ubuntu")
-        self.assertFalse(payload["wslReady"])
-        self.assertFalse(payload["stopHookDeclared"])
-        phase_ids = [phase["id"] for phase in payload["phases"]]
-        self.assertEqual(
-            phase_ids,
-            [
-                "diagnose",
-                "prepare-host",
-                "prepare-rootfs",
-                "import-distro",
-                "checkout-source",
-                "setup-adapter",
-                "start-adapter",
-                "verify-adapter",
-                "mark-ready",
-                "export-backup",
-                "unregister-distro",
-            ],
-        )
-        phases = {phase["id"]: phase for phase in payload["phases"]}
-        self.assertFalse(phases["diagnose"]["modifiesHost"])
-        self.assertFalse(phases["diagnose"]["modifiesProject"])
-        self.assertIn("wsl --distro Ubuntu --json", phases["diagnose"]["command"])
-        self.assertIn("prepare-wsl --distro Ubuntu --dry-run --json", phases["prepare-host"]["command"])
-        self.assertIn("--confirm-install", phases["prepare-host"]["confirmCommand"])
-        self.assertTrue(phases["prepare-host"]["modifiesHost"])
-        self.assertIn("wsl-rootfs-guide --distro Ubuntu --json", phases["prepare-rootfs"]["command"])
-        self.assertIsNone(phases["prepare-rootfs"]["confirmCommand"])
-        self.assertFalse(phases["prepare-rootfs"]["modifiesHost"])
-        self.assertFalse(phases["prepare-rootfs"]["modifiesProject"])
-        self.assertIn("wsl-import-plan --distro Ubuntu --json", phases["import-distro"]["command"])
-        self.assertIn("wsl-import --distro Ubuntu --confirm-import --json", phases["import-distro"]["confirmCommand"])
-        self.assertTrue(phases["import-distro"]["modifiesHost"])
-        self.assertTrue(phases["import-distro"]["modifiesProject"])
-        self.assertFalse(phases["import-distro"]["sourceArchiveExists"])
-        self.assertIn("--dry-run", phases["checkout-source"]["command"])
-        self.assertIn("--confirm-checkout", phases["checkout-source"]["confirmCommand"])
-        self.assertIn("--confirm-setup", phases["setup-adapter"]["confirmCommand"])
-        self.assertIn("--confirm-start", phases["start-adapter"]["confirmCommand"])
-        self.assertIn("verify-adapter hermes-agent --json", phases["verify-adapter"]["command"])
-        self.assertIn("--confirm-ready", phases["mark-ready"]["confirmCommand"])
-        self.assertIn("wsl-export --distro Ubuntu --confirm-export --json", phases["export-backup"]["confirmCommand"])
-        self.assertFalse(phases["export-backup"]["modifiesHost"])
-        self.assertTrue(phases["export-backup"]["modifiesProject"])
-        self.assertIn("wsl-unregister-plan --distro Ubuntu --json", phases["unregister-distro"]["command"])
-        self.assertIn("wsl-unregister --distro Ubuntu --confirm-unregister --json", phases["unregister-distro"]["confirmCommand"])
-        self.assertTrue(phases["unregister-distro"]["modifiesHost"])
-        self.assertFalse(phases["unregister-distro"]["modifiesProject"])
-        self.assertFalse(phases["unregister-distro"]["latestBackupExists"])
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["serviceId"], "hermes-agent")
+            self.assertEqual(payload["runner"], "wsl2")
+            self.assertEqual(payload["distro"], "ClawHermes-Ubuntu")
+            self.assertEqual(payload["sourceDistro"], "Ubuntu")
+            self.assertFalse(payload["wslReady"])
+            self.assertFalse(payload["stopHookDeclared"])
+            phase_ids = [phase["id"] for phase in payload["phases"]]
+            self.assertEqual(
+                phase_ids,
+                [
+                    "diagnose",
+                    "prepare-host",
+                    "prepare-rootfs",
+                    "import-distro",
+                    "checkout-source",
+                    "setup-adapter",
+                    "start-adapter",
+                    "verify-adapter",
+                    "mark-ready",
+                    "export-backup",
+                    "unregister-distro",
+                ],
+            )
+            phases = {phase["id"]: phase for phase in payload["phases"]}
+            self.assertFalse(phases["diagnose"]["modifiesHost"])
+            self.assertFalse(phases["diagnose"]["modifiesProject"])
+            self.assertIn("wsl --distro ClawHermes-Ubuntu --json", phases["diagnose"]["command"])
+            self.assertIn("prepare-wsl --distro Ubuntu --dry-run --json", phases["prepare-host"]["command"])
+            self.assertIn("--confirm-install", phases["prepare-host"]["confirmCommand"])
+            self.assertTrue(phases["prepare-host"]["modifiesHost"])
+            self.assertIn("wsl-rootfs-guide --distro Ubuntu --json", phases["prepare-rootfs"]["command"])
+            self.assertIsNone(phases["prepare-rootfs"]["confirmCommand"])
+            self.assertFalse(phases["prepare-rootfs"]["modifiesHost"])
+            self.assertFalse(phases["prepare-rootfs"]["modifiesProject"])
+            self.assertIn("wsl-import-plan --distro Ubuntu --json", phases["import-distro"]["command"])
+            self.assertIn("wsl-import --distro Ubuntu --confirm-import --json", phases["import-distro"]["confirmCommand"])
+            self.assertTrue(phases["import-distro"]["modifiesHost"])
+            self.assertTrue(phases["import-distro"]["modifiesProject"])
+            self.assertFalse(phases["import-distro"]["sourceArchiveExists"])
+            self.assertIn("--dry-run", phases["checkout-source"]["command"])
+            self.assertIn("--confirm-checkout", phases["checkout-source"]["confirmCommand"])
+            self.assertIn("--confirm-setup", phases["setup-adapter"]["confirmCommand"])
+            self.assertIn("--confirm-start", phases["start-adapter"]["confirmCommand"])
+            self.assertIn("verify-adapter hermes-agent --json", phases["verify-adapter"]["command"])
+            self.assertIn("--confirm-ready", phases["mark-ready"]["confirmCommand"])
+            self.assertIn("wsl-export --distro Ubuntu --confirm-export --json", phases["export-backup"]["confirmCommand"])
+            self.assertFalse(phases["export-backup"]["modifiesHost"])
+            self.assertTrue(phases["export-backup"]["modifiesProject"])
+            self.assertIn("wsl-unregister-plan --distro Ubuntu --json", phases["unregister-distro"]["command"])
+            self.assertIn("wsl-unregister --distro Ubuntu --confirm-unregister --json", phases["unregister-distro"]["confirmCommand"])
+            self.assertTrue(phases["unregister-distro"]["modifiesHost"])
+            self.assertFalse(phases["unregister-distro"]["modifiesProject"])
+            self.assertFalse(phases["unregister-distro"]["latestBackupExists"])
+        finally:
+            temp_dir.cleanup()
 
     def test_wsl_import_plan_reports_usb_storage_command_without_running_wsl(self):
-        result = run_dispatcher("wsl-import-plan", "--distro", "Ubuntu", "-Json")
+        temp_dir, temp_root = make_temp_skeleton_usb_root()
+        try:
+            result = run_dispatcher_for_root(temp_root, "wsl-import-plan", "--distro", "Ubuntu", "-Json")
 
-        self.assertEqual(result.returncode, 0, result.stderr)
-        payload = json.loads(result.stdout)
-        self.assertTrue(payload["dryRun"])
-        self.assertFalse(payload["executed"])
-        self.assertEqual(payload["distro"], "Ubuntu")
-        self.assertEqual(payload["distributionName"], "ClawHermes-Ubuntu")
-        self.assertTrue(payload["installLocation"].replace("\\", "/").endswith("data/wsl/ClawHermes-Ubuntu"))
-        self.assertFalse(payload["installLocationExists"])
-        self.assertTrue(payload["sourceArchive"].replace("\\", "/").endswith("runtimes/wsl/ubuntu-rootfs.tar"))
-        self.assertFalse(payload["sourceArchiveExists"])
-        self.assertTrue(payload["wouldModifyHost"])
-        self.assertTrue(payload["wouldUseProjectStorage"])
-        self.assertIn("--import", payload["args"])
-        self.assertIn("--version", payload["args"])
-        self.assertIn("2", payload["args"])
-        self.assertIn("registered on this Windows host", "\n".join(payload["messages"]))
-        self.assertIn("learn.microsoft.com", payload["docs"])
-        policy = payload["artifactPolicy"]
-        self.assertFalse(policy["automaticDownload"])
-        self.assertEqual(policy["archiveName"], "ubuntu-rootfs.tar")
-        self.assertTrue(policy["directory"].replace("\\", "/").endswith("runtimes/wsl"))
-        self.assertTrue(policy["checksumFile"].replace("\\", "/").endswith("runtimes/wsl/ubuntu-rootfs.tar.sha256"))
-        self.assertTrue(policy["mustRemainProjectLocal"])
-        self.assertTrue(policy["mustNotUseSystemTemp"])
-        self.assertIn("No automatic rootfs download", "\n".join(payload["messages"]))
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertTrue(payload["dryRun"])
+            self.assertFalse(payload["executed"])
+            self.assertEqual(payload["distro"], "Ubuntu")
+            self.assertEqual(payload["distributionName"], "ClawHermes-Ubuntu")
+            self.assertTrue(payload["installLocation"].replace("\\", "/").endswith("data/wsl/ClawHermes-Ubuntu"))
+            self.assertFalse(payload["installLocationExists"])
+            self.assertTrue(payload["sourceArchive"].replace("\\", "/").endswith("runtimes/wsl/ubuntu-rootfs.tar"))
+            self.assertFalse(payload["sourceArchiveExists"])
+            self.assertTrue(payload["wouldModifyHost"])
+            self.assertTrue(payload["wouldUseProjectStorage"])
+            self.assertIn("--import", payload["args"])
+            self.assertIn("--version", payload["args"])
+            self.assertIn("2", payload["args"])
+            self.assertIn("registered on this Windows host", "\n".join(payload["messages"]))
+            self.assertIn("learn.microsoft.com", payload["docs"])
+            policy = payload["artifactPolicy"]
+            self.assertFalse(policy["automaticDownload"])
+            self.assertEqual(policy["archiveName"], "ubuntu-rootfs.tar")
+            self.assertTrue(policy["directory"].replace("\\", "/").endswith("runtimes/wsl"))
+            self.assertTrue(policy["checksumFile"].replace("\\", "/").endswith("runtimes/wsl/ubuntu-rootfs.tar.sha256"))
+            self.assertTrue(policy["mustRemainProjectLocal"])
+            self.assertTrue(policy["mustNotUseSystemTemp"])
+            self.assertIn("No automatic rootfs download", "\n".join(payload["messages"]))
+        finally:
+            temp_dir.cleanup()
 
     def test_wsl_rootfs_guide_reports_manual_export_and_hash_steps(self):
         result = run_dispatcher("wsl-rootfs-guide", "--distro", "Ubuntu", "-Json")
@@ -1236,8 +1272,7 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertEqual(action["category"], "wsl2")
         self.assertEqual(action["severity"], "warning")
         self.assertIn("Install or enable WSL2", action["title"])
-        self.assertIn("prepare-wsl", action["command"])
-        self.assertIn("--dry-run", action["command"])
+        self.assertIn("wsl-workflow hermes-agent", action["command"])
 
     def test_chinese_docs_are_readable_utf8(self):
         docs = [
@@ -1352,25 +1387,29 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertEqual(paths["data/logs"]["type"], "directory")
 
     def test_setup_json_reports_env_template_diagnostics(self):
-        result = run_dispatcher("setup", "-Json")
+        temp_dir, temp_root = make_temp_skeleton_usb_root()
+        try:
+            result = run_dispatcher_for_root(temp_root, "setup", "-Json")
 
-        self.assertEqual(result.returncode, 0, result.stderr)
-        payload = json.loads(result.stdout)
-        env_files = {item["path"]: item for item in payload["envFiles"]}
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            env_files = {item["path"]: item for item in payload["envFiles"]}
 
-        for env_file in [
-            "config/env/hermes.env",
-            "config/env/hermes-web-ui.env",
-            "config/env/openclaw.env",
-        ]:
-            self.assertIn(env_file, env_files)
-            self.assertFalse(env_files[env_file]["exists"])
-            self.assertTrue(env_files[env_file]["exampleExists"])
-            self.assertTrue(env_files[env_file]["examplePath"].endswith(".env.example"))
+            for env_file in [
+                "config/env/hermes.env",
+                "config/env/hermes-web-ui.env",
+                "config/env/openclaw.env",
+            ]:
+                self.assertIn(env_file, env_files)
+                self.assertFalse(env_files[env_file]["exists"])
+                self.assertTrue(env_files[env_file]["exampleExists"])
+                self.assertTrue(env_files[env_file]["examplePath"].endswith(".env.example"))
 
-        messages = "\n".join(payload["messages"])
-        self.assertIn("Env file missing: config/env/hermes.env", messages)
-        self.assertIn("copy config/env/hermes.env.example", messages)
+            messages = "\n".join(payload["messages"])
+            self.assertIn("Env file missing: config/env/hermes.env", messages)
+            self.assertIn("copy config/env/hermes.env.example", messages)
+        finally:
+            temp_dir.cleanup()
 
     def test_init_env_json_creates_missing_env_files_without_overwriting_existing_values(self):
         temp_dir, temp_root = make_temp_usb_root()
@@ -1486,21 +1525,21 @@ class WindowsCoreTests(unittest.TestCase):
         payload = json.loads(result.stdout)
         readiness = {item["id"]: item for item in payload["readiness"]}
 
-        self.assertEqual(readiness["openclaw"]["status"], "blocked")
-        self.assertFalse(readiness["openclaw"]["productionReady"])
-        self.assertIn("WSL2", readiness["openclaw"]["summary"])
+        self.assertEqual(readiness["openclaw"]["status"], "verified")
+        self.assertTrue(readiness["openclaw"]["productionReady"])
+        self.assertIn("OpenClaw", readiness["openclaw"]["summary"])
 
-        self.assertEqual(readiness["hermes-agent"]["status"], "blocked")
-        self.assertFalse(readiness["hermes-agent"]["productionReady"])
-        self.assertIn("WSL2", readiness["hermes-agent"]["summary"])
+        self.assertEqual(readiness["hermes-agent"]["status"], "verified")
+        self.assertTrue(readiness["hermes-agent"]["productionReady"])
+        self.assertIn("Hermes", readiness["hermes-agent"]["summary"])
 
         self.assertEqual(readiness["hermes-web-ui"]["status"], "verified")
         self.assertTrue(readiness["hermes-web-ui"]["productionReady"])
         self.assertIn("portable Node 24.15.0", readiness["hermes-web-ui"]["summary"])
 
         messages = "\n".join(payload["messages"])
-        self.assertIn("Adapter openclaw integration is not production-ready", messages)
-        self.assertIn("Adapter hermes-agent integration is not production-ready", messages)
+        self.assertNotIn("Adapter openclaw integration is not production-ready", messages)
+        self.assertNotIn("Adapter hermes-agent integration is not production-ready", messages)
         self.assertNotIn("Adapter hermes-web-ui integration is not production-ready", messages)
 
     def test_adapters_json_reports_preparation_plan(self):
@@ -1512,10 +1551,10 @@ class WindowsCoreTests(unittest.TestCase):
 
         self.assertEqual(set(adapters), {"openclaw", "hermes-agent", "hermes-web-ui"})
         self.assertTrue(adapters["openclaw"]["appDirExists"])
-        self.assertFalse(adapters["openclaw"]["integration"]["productionReady"])
+        self.assertTrue(adapters["openclaw"]["integration"]["productionReady"])
         self.assertTrue(adapters["hermes-web-ui"]["integration"]["productionReady"])
         self.assertIn("config/env/openclaw.env", [item["path"] for item in adapters["openclaw"]["envFiles"]])
-        self.assertTrue(any("init-env" in step for step in adapters["openclaw"]["nextSteps"]))
+        self.assertEqual(adapters["openclaw"]["commands"]["start"], "node openclaw.mjs gateway --port 18789 --verbose --allow-unconfigured")
 
     def test_adapters_json_can_filter_one_adapter(self):
         result = run_dispatcher("adapters", "hermes-web-ui", "-Json")
@@ -1556,7 +1595,8 @@ class WindowsCoreTests(unittest.TestCase):
         adapter = json.loads(result.stdout)["adapters"][0]
         self.assertEqual(adapter["runtime"]["kind"], "wsl2")
         self.assertEqual(adapter["runtime"]["requiredExecutable"], "wsl.exe")
-        self.assertEqual(adapter["runtime"]["distro"], "Ubuntu")
+        self.assertEqual(adapter["runtime"]["distro"], "ClawHermes-Ubuntu")
+        self.assertEqual(adapter["runtime"]["sourceDistro"], "Ubuntu")
         self.assertEqual(adapter["integration"]["platform"], "wsl2")
         self.assertEqual(adapter["integration"]["strategy"], "wsl2-adapter")
 
@@ -1567,10 +1607,11 @@ class WindowsCoreTests(unittest.TestCase):
         adapter = json.loads(result.stdout)["adapters"][0]
         self.assertEqual(adapter["runtime"]["kind"], "wsl2")
         self.assertEqual(adapter["runtime"]["requiredExecutable"], "wsl.exe")
-        self.assertEqual(adapter["runtime"]["distro"], "Ubuntu")
+        self.assertEqual(adapter["runtime"]["distro"], "ClawHermes-Ubuntu")
+        self.assertEqual(adapter["runtime"]["sourceDistro"], "Ubuntu")
         self.assertEqual(adapter["integration"]["platform"], "wsl2")
         self.assertEqual(adapter["integration"]["strategy"], "wsl2-adapter")
-        self.assertFalse(adapter["integration"]["productionReady"])
+        self.assertTrue(adapter["integration"]["productionReady"])
 
     def test_adapters_unknown_service_fails_with_actionable_message(self):
         result = run_dispatcher("adapters", "missing-service", "-Json")
@@ -1782,14 +1823,14 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertFalse(payload["wouldModify"])
             self.assertFalse(payload["executed"])
             self.assertEqual(payload["runner"], "wsl2")
-            self.assertEqual(payload["command"], "python -m pip install -e .")
+            self.assertEqual(payload["command"], "sed -i 's/\\r$//' ./setup-hermes.sh && printf 'n\\nn\\n' | bash ./setup-hermes.sh")
             self.assertIn("--cd", payload["wsl"]["args"])
             self.assertIn("--distribution", payload["wsl"]["args"])
-            self.assertIn("Ubuntu", payload["wsl"]["args"])
+            self.assertIn("ClawHermes-Ubuntu", payload["wsl"]["args"])
             self.assertTrue(payload["wsl"]["workingDirectory"].startswith("/mnt/"))
             self.assertIn("bash", payload["wsl"]["args"])
             self.assertIn("HERMES_HOME=", payload["wsl"]["script"])
-            self.assertIn("python -m pip install -e .", payload["wsl"]["script"])
+            self.assertIn("./setup-hermes.sh", payload["wsl"]["script"])
         finally:
             temp_dir.cleanup()
 
@@ -1812,7 +1853,7 @@ class WindowsCoreTests(unittest.TestCase):
             make_hermes_agent_app_ready(temp_root)
             marker = temp_root / "data" / "tmp" / "fake-wsl-setup.txt"
             args_file = temp_root / "data" / "tmp" / "fake-wsl-setup-args.txt"
-            fake_wsl = make_fake_wsl_cmd(temp_root, stay_running=False, marker_path=marker, args_path=args_file)
+            fake_wsl = make_fake_wsl_cmd(temp_root, stay_running=False, marker_path=marker, args_path=args_file, list_distribution="ClawHermes-Ubuntu")
             env = {
                 "CLAWHERMES_WSL_EXE": str(fake_wsl),
             }
@@ -1826,8 +1867,8 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertEqual(payload["exitCode"], 0)
             wait_for_file(marker)
             self.assertIn("--distribution", payload["wsl"]["args"])
-            self.assertIn("Ubuntu", payload["wsl"]["args"])
-            self.assertIn("python -m pip install -e .", payload["wsl"]["script"])
+            self.assertIn("ClawHermes-Ubuntu", payload["wsl"]["args"])
+            self.assertIn("./setup-hermes.sh", payload["wsl"]["script"])
             log_text = Path(payload["logFile"]).read_text(encoding="utf-8")
             self.assertIn("exitCode: 0", log_text)
             self.assertIn("fake wsl completed", log_text)
@@ -1877,6 +1918,7 @@ class WindowsCoreTests(unittest.TestCase):
             adapter_path = temp_root / "adapters" / "hermes-agent" / "adapter.json"
             adapter = json.loads(adapter_path.read_text(encoding="utf-8"))
             adapter["health"]["timeoutSeconds"] = 1
+            adapter["health"]["url"] = f"http://127.0.0.1:{free_tcp_port()}/health"
             adapter_path.write_text(json.dumps(adapter, indent=2), encoding="utf-8")
             (temp_root / "config" / "env" / "hermes.env").write_text("HERMES_HOME=data/hermes\n", encoding="utf-8")
             setup_log = temp_root / "data" / "logs" / "setup-hermes-agent.log"
@@ -1904,12 +1946,13 @@ class WindowsCoreTests(unittest.TestCase):
             adapter_path = temp_root / "adapters" / "hermes-agent" / "adapter.json"
             adapter = json.loads(adapter_path.read_text(encoding="utf-8"))
             adapter["health"]["timeoutSeconds"] = 1
+            adapter["health"]["url"] = f"http://127.0.0.1:{free_tcp_port()}/health"
             adapter_path.write_text(json.dumps(adapter, indent=2), encoding="utf-8")
             (temp_root / "config" / "env" / "hermes.env").write_text("HERMES_HOME=data/hermes\n", encoding="utf-8")
             setup_log = temp_root / "data" / "logs" / "setup-hermes-agent.log"
             setup_log.parent.mkdir(parents=True, exist_ok=True)
             setup_log.write_text("exitCode: 0\n", encoding="utf-8")
-            fake_wsl = make_fake_wsl_cmd(temp_root, stay_running=False, list_distribution="Ubuntu")
+            fake_wsl = make_fake_wsl_cmd(temp_root, stay_running=False, list_distribution="ClawHermes-Ubuntu")
 
             result = run_dispatcher_for_root(temp_root, "verify-adapter", "hermes-agent", "-Json", env={"CLAWHERMES_WSL_EXE": str(fake_wsl)})
 
@@ -1918,7 +1961,7 @@ class WindowsCoreTests(unittest.TestCase):
             checks = {check["id"]: check for check in payload["checks"]}
             self.assertEqual(checks["wsl-executable"]["status"], "pass")
             self.assertEqual(checks["wsl-target-distro"]["status"], "pass")
-            self.assertEqual(payload["wsl"]["desiredDistro"], "Ubuntu")
+            self.assertEqual(payload["wsl"]["desiredDistro"], "ClawHermes-Ubuntu")
             self.assertEqual(payload["wsl"]["desiredDistroVersion"], 2)
             self.assertFalse(payload["productionReadyCandidate"])
             self.assertEqual(checks["health-behavior"]["status"], "fail")
@@ -2093,60 +2136,65 @@ class WindowsCoreTests(unittest.TestCase):
                 path.unlink()
 
     def test_start_status_stop_manage_placeholder_pid_metadata(self):
-        start = run_dispatcher("start", "-Json")
+        temp_dir, temp_root = make_temp_skeleton_usb_root()
+        try:
+            start = run_dispatcher_for_root(temp_root, "start", "-Json")
 
-        self.assertEqual(start.returncode, 0, start.stderr)
-        start_payload = json.loads(start.stdout)
-        self.assertEqual(start_payload["started"], ["openclaw", "hermes-agent", "hermes-web-ui"])
+            self.assertEqual(start.returncode, 0, start.stderr)
+            start_payload = json.loads(start.stdout)
+            self.assertEqual(start_payload["started"], ["openclaw", "hermes-agent", "hermes-web-ui"])
 
-        pid_dir = ROOT / "data" / "tmp" / "pids"
-        for service_id in start_payload["started"]:
-            pid_file = pid_dir / f"{service_id}.pid"
-            self.assertTrue(pid_file.exists(), f"{pid_file} was not created")
-            metadata = json.loads(pid_file.read_text(encoding="utf-8"))
-            self.assertEqual(metadata["serviceId"], service_id)
-            self.assertEqual(metadata["status"], "placeholder-started")
-            self.assertTrue(Path(metadata["logFile"]).is_absolute())
-            self.assertIn("environment", metadata)
-            self.assertIn("variables", metadata["environment"])
-            self.assertIn("files", metadata["environment"])
-            self.assertIn("USB_ROOT", metadata["environment"]["variables"])
-            self.assertNotIn(str(ROOT), json.dumps(metadata["environment"]))
+            pid_dir = temp_root / "data" / "tmp" / "pids"
+            for service_id in start_payload["started"]:
+                pid_file = pid_dir / f"{service_id}.pid"
+                self.assertTrue(pid_file.exists(), f"{pid_file} was not created")
+                metadata = json.loads(pid_file.read_text(encoding="utf-8"))
+                self.assertEqual(metadata["serviceId"], service_id)
+                self.assertEqual(metadata["status"], "placeholder-started")
+                self.assertTrue(Path(metadata["logFile"]).is_absolute())
+                self.assertIn("environment", metadata)
+                self.assertIn("variables", metadata["environment"])
+                self.assertIn("files", metadata["environment"])
+                self.assertIn("USB_ROOT", metadata["environment"]["variables"])
+                self.assertNotIn(str(temp_root), json.dumps(metadata["environment"]))
 
-        launcher_log = ROOT / "data" / "logs" / "launcher.log"
-        self.assertTrue(launcher_log.exists())
-        self.assertIn("Started placeholder service", launcher_log.read_text(encoding="utf-8"))
+            launcher_log = temp_root / "data" / "logs" / "launcher.log"
+            self.assertTrue(launcher_log.exists())
+            self.assertIn("Started placeholder service", launcher_log.read_text(encoding="utf-8"))
 
-        status = run_dispatcher("status", "-Json")
-        self.assertEqual(status.returncode, 0, status.stderr)
-        status_payload = json.loads(status.stdout)
-        services = {service["id"]: service for service in status_payload["services"]}
-        self.assertEqual(services["openclaw"]["status"], "placeholder-started")
-        self.assertEqual(services["hermes-agent"]["status"], "placeholder-started")
-        self.assertEqual(services["hermes-web-ui"]["status"], "placeholder-started")
-        self.assertTrue(services["openclaw"]["placeholder"])
-        self.assertIsNone(services["openclaw"]["processId"])
-        self.assertFalse(services["openclaw"]["health"]["ready"])
-        self.assertEqual(services["openclaw"]["health"]["type"], "process")
+            status = run_dispatcher_for_root(temp_root, "status", "-Json")
+            self.assertEqual(status.returncode, 0, status.stderr)
+            status_payload = json.loads(status.stdout)
+            services = {service["id"]: service for service in status_payload["services"]}
+            self.assertEqual(services["openclaw"]["status"], "placeholder-started")
+            self.assertEqual(services["hermes-agent"]["status"], "placeholder-started")
+            self.assertEqual(services["hermes-web-ui"]["status"], "placeholder-started")
+            self.assertTrue(services["openclaw"]["placeholder"])
+            self.assertIsNone(services["openclaw"]["processId"])
+            self.assertFalse(services["openclaw"]["health"]["ready"])
+            self.assertEqual(services["openclaw"]["health"]["type"], "http")
 
-        snapshot_path = ROOT / "data" / "tmp" / "status.json"
-        self.assertTrue(snapshot_path.exists())
-        snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
-        self.assertEqual(Path(snapshot["root"]).resolve(), ROOT)
-        self.assertIn("generatedAt", snapshot)
-        snapshot_services = {service["id"]: service for service in snapshot["services"]}
-        self.assertEqual(snapshot_services["openclaw"]["health"]["type"], "process")
+            snapshot_path = temp_root / "data" / "tmp" / "status.json"
+            self.assertTrue(snapshot_path.exists())
+            snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
+            self.assertTrue(Path(snapshot["root"]).samefile(temp_root))
+            self.assertIn("generatedAt", snapshot)
+            snapshot_services = {service["id"]: service for service in snapshot["services"]}
+            self.assertEqual(snapshot_services["openclaw"]["health"]["type"], "http")
 
-        stop = run_dispatcher("stop", "-Json")
-        self.assertEqual(stop.returncode, 0, stop.stderr)
-        stop_payload = json.loads(stop.stdout)
-        self.assertEqual(
-            stop_payload["stopped"],
-            ["portal", "hermes-web-ui", "hermes-agent", "openclaw"],
-        )
+            stop = run_dispatcher_for_root(temp_root, "stop", "-Json")
+            self.assertEqual(stop.returncode, 0, stop.stderr)
+            stop_payload = json.loads(stop.stdout)
+            self.assertEqual(
+                stop_payload["stopped"],
+                ["portal", "hermes-web-ui", "hermes-agent", "openclaw"],
+            )
 
-        for service_id in start_payload["started"]:
-            self.assertFalse((pid_dir / f"{service_id}.pid").exists())
+            for service_id in start_payload["started"]:
+                self.assertFalse((pid_dir / f"{service_id}.pid").exists())
+        finally:
+            run_dispatcher_for_root(temp_root, "stop", "-Json")
+            temp_dir.cleanup()
 
     def test_start_runs_production_ready_adapter_process_and_stop_kills_it(self):
         temp_dir, temp_root = make_temp_process_usb_root()
@@ -2282,12 +2330,12 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertFalse(payload["wouldModify"])
             self.assertFalse(payload["started"])
             self.assertEqual(payload["runner"], "wsl2")
-            self.assertEqual(payload["command"], "hermes gateway run")
+            self.assertEqual(payload["command"], "./venv/bin/hermes gateway run")
             self.assertIn("--cd", payload["wsl"]["args"])
             self.assertIn("--distribution", payload["wsl"]["args"])
-            self.assertIn("Ubuntu", payload["wsl"]["args"])
+            self.assertIn("ClawHermes-Ubuntu", payload["wsl"]["args"])
             self.assertTrue(payload["wsl"]["workingDirectory"].startswith("/mnt/"))
-            self.assertIn("hermes gateway run", payload["wsl"]["script"])
+            self.assertIn("./venv/bin/hermes gateway run", payload["wsl"]["script"])
         finally:
             temp_dir.cleanup()
 
@@ -2310,7 +2358,7 @@ class WindowsCoreTests(unittest.TestCase):
             make_hermes_agent_app_ready(temp_root)
             marker = temp_root / "data" / "tmp" / "fake-wsl-started.txt"
             args_file = temp_root / "data" / "tmp" / "fake-wsl-args.txt"
-            fake_wsl = make_fake_wsl_cmd(temp_root, marker_path=marker, args_path=args_file)
+            fake_wsl = make_fake_wsl_cmd(temp_root, marker_path=marker, args_path=args_file, list_distribution="ClawHermes-Ubuntu")
             env = {
                 "CLAWHERMES_WSL_EXE": str(fake_wsl),
             }
@@ -2332,8 +2380,8 @@ class WindowsCoreTests(unittest.TestCase):
             wait_for_file(marker)
             wait_for_file(args_file)
             launched_args = args_file.read_text(encoding="utf-8")
-            self.assertIn("--distribution Ubuntu", launched_args)
-            self.assertIn("hermes gateway run", launched_args)
+            self.assertIn("--distribution ClawHermes-Ubuntu", launched_args)
+            self.assertIn("./venv/bin/hermes gateway run", launched_args)
 
             pid_file = temp_root / "data" / "tmp" / "pids" / "hermes-agent.pid"
             self.assertTrue(pid_file.exists())
@@ -2367,7 +2415,7 @@ class WindowsCoreTests(unittest.TestCase):
             marker = temp_root / "data" / "tmp" / "fake-wsl-started.txt"
             args_file = temp_root / "data" / "tmp" / "fake-wsl-args.txt"
             stop_marker = temp_root / "data" / "tmp" / "fake-wsl-stopped.txt"
-            fake_wsl = make_fake_wsl_cmd(temp_root, marker_path=marker, args_path=args_file, stop_marker_path=stop_marker)
+            fake_wsl = make_fake_wsl_cmd(temp_root, marker_path=marker, args_path=args_file, stop_marker_path=stop_marker, list_distribution="ClawHermes-Ubuntu")
             env = {"CLAWHERMES_WSL_EXE": str(fake_wsl)}
             start = run_dispatcher_for_root(temp_root, "start-adapter", "hermes-agent", "--confirm-start", "-Json", env=env)
             self.assertEqual(start.returncode, 0, start.stderr)
@@ -2404,7 +2452,7 @@ class WindowsCoreTests(unittest.TestCase):
             mark_adapter_production_ready(temp_root, "hermes-agent")
             marker = temp_root / "data" / "tmp" / "fake-wsl-started.txt"
             args_file = temp_root / "data" / "tmp" / "fake-wsl-args.txt"
-            fake_wsl = make_fake_wsl_cmd(temp_root, marker_path=marker, args_path=args_file)
+            fake_wsl = make_fake_wsl_cmd(temp_root, marker_path=marker, args_path=args_file, list_distribution="ClawHermes-Ubuntu")
             env = {
                 "CLAWHERMES_WSL_EXE": str(fake_wsl),
             }
@@ -2457,11 +2505,12 @@ class WindowsCoreTests(unittest.TestCase):
             temp_dir.cleanup()
 
     def test_logs_json_tails_known_service_log(self):
+        temp_dir, temp_root = make_temp_skeleton_usb_root()
         try:
-            start = run_dispatcher("start", "-Json")
+            start = run_dispatcher_for_root(temp_root, "start", "-Json")
             self.assertEqual(start.returncode, 0, start.stderr)
 
-            result = run_dispatcher("logs", "openclaw", "--lines", "1", "-Json")
+            result = run_dispatcher_for_root(temp_root, "logs", "openclaw", "--lines", "1", "-Json")
 
             self.assertEqual(result.returncode, 0, result.stderr)
             payload = json.loads(result.stdout)
@@ -2472,13 +2521,14 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertEqual(len(payload["lines"]), 1)
             self.assertIn("Placeholder service started", payload["lines"][0])
 
-            portal = run_dispatcher("logs", "portal", "--lines", "5", "-Json")
+            portal = run_dispatcher_for_root(temp_root, "logs", "portal", "--lines", "5", "-Json")
             self.assertEqual(portal.returncode, 0, portal.stderr)
             portal_payload = json.loads(portal.stdout)
             self.assertEqual(portal_payload["target"], "portal")
             self.assertTrue(portal_payload["exists"])
         finally:
-            run_dispatcher("stop", "-Json")
+            run_dispatcher_for_root(temp_root, "stop", "-Json")
+            temp_dir.cleanup()
 
     def test_logs_unknown_target_fails_with_actionable_message(self):
         result = run_dispatcher("logs", "missing-service", "-Json")
@@ -2696,17 +2746,18 @@ class WindowsCoreTests(unittest.TestCase):
             temp_dir.cleanup()
 
     def test_start_generates_portal_from_adapter_metadata(self):
+        temp_dir, temp_root = make_temp_skeleton_usb_root()
         try:
-            start = run_dispatcher("start", "-Json")
+            start = run_dispatcher_for_root(temp_root, "start", "-Json")
 
             self.assertEqual(start.returncode, 0, start.stderr)
-            portal_index = ROOT / "portal" / "index.html"
+            portal_index = temp_root / "portal" / "index.html"
             self.assertTrue(portal_index.exists())
 
             html = portal_index.read_text(encoding="utf-8")
             self.assertIn("ClawHermes-USB Portal", html)
-            self.assertIn(str(ROOT), html)
-            self.assertIn(str(ROOT / "data"), html)
+            self.assertIn(str(temp_root), html)
+            self.assertIn(str(temp_root / "data"), html)
             self.assertIn("OpenClaw", html)
             self.assertIn("Hermes Agent", html)
             self.assertIn("Hermes Web UI", html)
@@ -2734,61 +2785,70 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertIn("data-operation-actions", html)
             self.assertIn("fetch('/operations.json'", html)
         finally:
-            run_dispatcher("stop", "-Json")
+            run_dispatcher_for_root(temp_root, "stop", "-Json")
+            temp_dir.cleanup()
 
     def test_start_serves_portal_over_localhost_and_stop_shuts_it_down(self):
-        start = run_dispatcher("start", "-Json")
+        temp_dir, temp_root = make_temp_skeleton_usb_root()
+        try:
+            start = run_dispatcher_for_root(temp_root, "start", "-Json")
 
-        self.assertEqual(start.returncode, 0, start.stderr)
-        html = wait_for_portal()
-        self.assertIn("ClawHermes-USB Portal", html)
+            self.assertEqual(start.returncode, 0, start.stderr)
+            html = wait_for_portal()
+            self.assertIn("ClawHermes-USB Portal", html)
 
-        status = run_dispatcher("status", "-Json")
-        self.assertEqual(status.returncode, 0, status.stderr)
-        status_payload = json.loads(status.stdout)
-        statuses = {service["id"]: service["status"] for service in status_payload["services"]}
-        self.assertEqual(statuses["portal"], "running")
+            status = run_dispatcher_for_root(temp_root, "status", "-Json")
+            self.assertEqual(status.returncode, 0, status.stderr)
+            status_payload = json.loads(status.stdout)
+            statuses = {service["id"]: service["status"] for service in status_payload["services"]}
+            self.assertEqual(statuses["portal"], "running")
 
-        portal_status = fetch_portal_status()
-        self.assertIn("generatedAt", portal_status)
-        portal_services = {service["id"]: service for service in portal_status["services"]}
-        self.assertEqual(portal_services["portal"]["status"], "running")
-        self.assertIn("health", portal_services["portal"])
+            portal_status = fetch_portal_status()
+            self.assertIn("generatedAt", portal_status)
+            portal_services = {service["id"]: service for service in portal_status["services"]}
+            self.assertEqual(portal_services["portal"]["status"], "running")
+            self.assertIn("health", portal_services["portal"])
 
-        portal_pid = ROOT / "data" / "tmp" / "pids" / "portal.pid"
-        self.assertTrue(portal_pid.exists())
-        metadata = json.loads(portal_pid.read_text(encoding="utf-8"))
-        self.assertEqual(metadata["serviceId"], "portal")
-        self.assertEqual(metadata["url"], PORTAL_URL)
+            portal_pid = temp_root / "data" / "tmp" / "pids" / "portal.pid"
+            self.assertTrue(portal_pid.exists())
+            metadata = json.loads(portal_pid.read_text(encoding="utf-8"))
+            self.assertEqual(metadata["serviceId"], "portal")
+            self.assertEqual(metadata["url"], PORTAL_URL)
 
-        stop = run_dispatcher("stop", "-Json")
-        self.assertEqual(stop.returncode, 0, stop.stderr)
-        self.assertFalse(portal_pid.exists())
-        assert_portal_unreachable(self)
+            stop = run_dispatcher_for_root(temp_root, "stop", "-Json")
+            self.assertEqual(stop.returncode, 0, stop.stderr)
+            self.assertFalse(portal_pid.exists())
+            assert_portal_unreachable(self)
+        finally:
+            run_dispatcher_for_root(temp_root, "stop", "-Json")
+            temp_dir.cleanup()
 
     def test_portal_serves_setup_actions_snapshot(self):
+        temp_dir, temp_root = make_temp_skeleton_usb_root()
         try:
-            start = run_dispatcher("start", "-Json")
+            start = run_dispatcher_for_root(temp_root, "start", "-Json")
             self.assertEqual(start.returncode, 0, start.stderr)
             html = wait_for_portal()
             self.assertIn("Setup actions", html)
             self.assertIn("WSL2 readiness", html)
 
-            setup_path = ROOT / "data" / "tmp" / "setup.json"
+            setup_path = temp_root / "data" / "tmp" / "setup.json"
             self.assertTrue(setup_path.exists())
             setup_payload = fetch_portal_setup()
             action_ids = {action["id"] for action in setup_payload["actions"]}
 
-            self.assertEqual(Path(setup_payload["root"]).resolve(), ROOT)
+            self.assertTrue(Path(setup_payload["root"]).samefile(temp_root))
             self.assertIn("runtime:node", action_ids)
             self.assertIn("env-file:hermes-agent", action_ids)
             self.assertTrue(any(item["serviceId"] == "openclaw" for item in setup_payload["wslArtifacts"]))
         finally:
-            run_dispatcher("stop", "-Json")
+            run_dispatcher_for_root(temp_root, "stop", "-Json")
+            temp_dir.cleanup()
 
     def test_portal_serves_adapter_verification_snapshot(self):
+        temp_dir, temp_root = make_temp_skeleton_usb_root()
         try:
-            start = run_dispatcher("start", "-Json")
+            start = run_dispatcher_for_root(temp_root, "start", "-Json")
             self.assertEqual(start.returncode, 0, start.stderr)
             wait_for_portal()
 
@@ -2796,7 +2856,7 @@ class WindowsCoreTests(unittest.TestCase):
             adapters = {item["serviceId"]: item for item in payload["adapters"]}
             openclaw_checks = {item["id"] for item in adapters["openclaw"]["checks"]}
 
-            self.assertEqual(Path(payload["root"]).resolve(), ROOT)
+            self.assertTrue(Path(payload["root"]).samefile(temp_root))
             self.assertIn("generatedAt", payload)
             self.assertIn("openclaw", adapters)
             self.assertFalse(adapters["openclaw"]["productionReadyCandidate"])
@@ -2804,18 +2864,20 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertIn("wsl-target-distro", openclaw_checks)
             self.assertGreaterEqual(len(adapters["openclaw"]["nextSteps"]), 1)
         finally:
-            run_dispatcher("stop", "-Json")
+            run_dispatcher_for_root(temp_root, "stop", "-Json")
+            temp_dir.cleanup()
 
     def test_portal_serves_log_snapshot(self):
+        temp_dir, temp_root = make_temp_skeleton_usb_root()
         try:
-            start = run_dispatcher("start", "-Json")
+            start = run_dispatcher_for_root(temp_root, "start", "-Json")
             self.assertEqual(start.returncode, 0, start.stderr)
             wait_for_portal()
 
             payload = fetch_portal_logs(timeout=5)
             logs = {item["target"]: item for item in payload["logs"]}
 
-            self.assertEqual(Path(payload["root"]).resolve(), ROOT)
+            self.assertTrue(Path(payload["root"]).samefile(temp_root))
             self.assertIn("generatedAt", payload)
             self.assertIn("launcher", logs)
             self.assertIn("portal", logs)
@@ -2824,18 +2886,20 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertTrue(logs["launcher"]["exists"])
             self.assertLessEqual(len(logs["launcher"]["lines"]), logs["launcher"]["requestedLines"])
         finally:
-            run_dispatcher("stop", "-Json")
+            run_dispatcher_for_root(temp_root, "stop", "-Json")
+            temp_dir.cleanup()
 
     def test_portal_serves_operation_actions(self):
+        temp_dir, temp_root = make_temp_skeleton_usb_root()
         try:
-            start = run_dispatcher("start", "-Json")
+            start = run_dispatcher_for_root(temp_root, "start", "-Json")
             self.assertEqual(start.returncode, 0, start.stderr)
             wait_for_portal()
 
             payload = fetch_portal_operations(timeout=5)
             actions = {item["id"]: item for item in payload["actions"]}
 
-            self.assertEqual(Path(payload["root"]).resolve(), ROOT)
+            self.assertTrue(Path(payload["root"]).samefile(temp_root))
             self.assertIn("status", actions)
             self.assertIn("backup", actions)
             self.assertIn("stop", actions)
@@ -2845,28 +2909,31 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertIn("launcher/windows/Backup.bat", actions["backup"]["batchCommand"])
             self.assertIn("launcher/windows/Stop.bat", actions["stop"]["batchCommand"])
         finally:
-            run_dispatcher("stop", "-Json")
+            run_dispatcher_for_root(temp_root, "stop", "-Json")
+            temp_dir.cleanup()
 
     def test_portal_serves_backup_status(self):
-        backup = run_dispatcher("backup", "-Json")
+        temp_dir, temp_root = make_temp_skeleton_usb_root()
+        backup = run_dispatcher_for_root(temp_root, "backup", "-Json")
         self.assertEqual(backup.returncode, 0, backup.stderr)
         backup_payload = json.loads(backup.stdout)
         archive_path = Path(backup_payload["archivePath"])
         try:
-            start = run_dispatcher("start", "-Json")
+            start = run_dispatcher_for_root(temp_root, "start", "-Json")
             self.assertEqual(start.returncode, 0, start.stderr)
             wait_for_portal()
 
             backups = fetch_portal_backups()
 
-            self.assertEqual(Path(backups["backupRoot"]).resolve(), ROOT / "data" / "backups")
+            self.assertTrue(Path(backups["backupRoot"]).samefile(temp_root / "data" / "backups"))
             self.assertGreaterEqual(backups["count"], 1)
             self.assertEqual(backups["latest"]["fileName"], archive_path.name)
             self.assertEqual(Path(backups["latest"]["path"]).resolve(), archive_path.resolve())
         finally:
-            run_dispatcher("stop", "-Json")
+            run_dispatcher_for_root(temp_root, "stop", "-Json")
             if archive_path.exists():
                 archive_path.unlink()
+            temp_dir.cleanup()
 
     def test_status_removes_portal_pid_when_process_is_not_portal_server(self):
         pid_dir = ROOT / "data" / "tmp" / "pids"

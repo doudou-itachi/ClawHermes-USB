@@ -19,6 +19,11 @@ runtimes/wsl/ubuntu-rootfs.tar.sha256
 
 The `.sha256` file is optional until a trusted artifact source is selected, but it should be stored next to the archive whenever available. If the sidecar exists, `wsl-import` verifies it before running WSL and refuses to import when the digest does not match.
 
+Imported adapters may use two distro names:
+
+- `runtime.sourceDistro`, such as `Ubuntu`, identifies the base distro/rootfs artifact.
+- `runtime.distro`, such as `ClawHermes-Ubuntu`, identifies the managed execution target used by setup, start, status, and verification.
+
 ## Rules
 
 - Rootfs archives are operator-managed payloads, not source files.
@@ -78,6 +83,8 @@ node core/node/dist/clawhermes.js wsl-export --distro Ubuntu --confirm-export --
 ```
 
 By default, the archive is written under `data/backups/wsl/`. Archive overrides under the system temp directory are rejected unless the current project root itself is a disposable test root under temp.
+
+Current local verification exported `ClawHermes-Ubuntu` to `data/backups/wsl/` after stopping Hermes Agent and OpenClaw. The archive and its `.sha256` sidecar are runtime artifacts and remain ignored by git.
 
 After a project-local backup exists, unregistering still requires explicit confirmation:
 

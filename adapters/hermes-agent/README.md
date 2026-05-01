@@ -15,12 +15,19 @@ This adapter runs Hermes Agent as the backend runtime for Hermes Web UI.
 - API port: `8642`
 - Data root: `data/hermes`
 
-## Notes
-
-The command in `adapter.json` is a candidate foreground gateway command. The real implementation must verify the current official Hermes Agent behavior on Windows before enabling production startup.
-
 ## 2026-04-30 Upstream Check
 
 Hermes Agent public docs list Linux, macOS, and WSL2 as the supported installation path, with native Windows described as experimental. The gateway command suite includes `run`, `start`, `stop`, `restart`, `status`, `install`, `uninstall`, and `setup`.
 
-For ClawHermes-USB, `hermes gateway run` is the preferred candidate because it can be managed by our process manager without installing a host service. Production startup remains blocked until native Windows or WSL2 strategy and `HERMES_HOME` behavior are verified locally.
+For ClawHermes-USB, foreground gateway execution is preferred because it can be managed by our process manager without installing a host service.
+
+## 2026-05-01 WSL2 Verification
+
+- Verified in the project-managed `ClawHermes-Ubuntu` WSL2 distribution.
+- Real upstream checkout: `apps/hermes-agent`, commit `ec1443b`.
+- Setup command: `sed -i 's/\r$//' ./setup-hermes.sh && printf 'n\nn\n' | bash ./setup-hermes.sh`.
+- Start command: `./venv/bin/hermes gateway run`.
+- Health URL: `http://127.0.0.1:8642/health`.
+- `verify-adapter hermes-agent --json` reported `productionReadyCandidate: true`.
+
+Adapter status: `verified`

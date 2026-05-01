@@ -50,7 +50,7 @@ function httpAdapterHealth(adapter) {
     };
 }
 function probeHttpHealth(url, timeoutSeconds) {
-    const timeoutMs = Math.max(1, Math.min(timeoutSeconds, 10)) * 1000;
+    const timeoutMs = Math.max(1, Math.min(timeoutSeconds, 60)) * 1000;
     const script = [
         "$ProgressPreference = 'SilentlyContinue'",
         `$timeoutMs = ${timeoutMs}`,

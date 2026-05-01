@@ -2816,6 +2816,59 @@ Validation performed:
 Next steps:
 
 - Continue real Hermes Agent and OpenClaw WSL2 payload validation when a prepared distro is available.
+
+### Real WSL2 Payload Verification
+
+Status: `Done`
+
+Summary:
+
+- Updated WSL to `2.6.3.0` and completed Ubuntu WSL2 registration after reboot.
+- Exported an Ubuntu rootfs artifact under `runtimes/wsl/` and imported the project-managed `ClawHermes-Ubuntu` distribution under `data/wsl/`.
+- Added adapter support for separate `runtime.distro` and `runtime.sourceDistro` values so setup/start/verification target `ClawHermes-Ubuntu` while rootfs/import/export planning still uses `Ubuntu`.
+- Verified real Hermes Agent setup and startup from `apps/hermes-agent` commit `ec1443b`; `http://127.0.0.1:8642/health` returned `200`.
+- Verified real OpenClaw setup and startup from `apps/openclaw` commit `e8f9c3e6` with Node.js `24.15.0` and pnpm `10.33.2`; `http://127.0.0.1:18789/healthz` returned `200`.
+- Increased the HTTP health probe cap so OpenClaw's slower real gateway health response can use the adapter-declared 30-second timeout.
+- Marked both Hermes Agent and OpenClaw integration metadata as `verified` and `productionReady: true`.
+- Stopped the verified services and exported a project-local WSL backup: `data/backups/wsl/ClawHermes-Ubuntu-2026-05-01T07-31-33-554Z.tar`, size `1936445440` bytes, SHA256 `606f49fa3f32ffadf4f7c8b5e1c88cfb1cd66591ca30bf1cde46460d11a9c24c`.
+- Kept rootfs, WSL backup, app dependency folders, local env files, and generated runtime data ignored and outside git.
+
+Changed areas:
+
+- `adapters/hermes-agent/adapter.json`
+- `adapters/hermes-agent/README.md`
+- `adapters/openclaw/adapter.json`
+- `adapters/openclaw/README.md`
+- `config/env/openclaw.env.example`
+- `core/node/src/`
+- `core/node/dist/`
+- `docs/ADAPTER_CONTRACT.md`
+- `docs/wsl-rootfs-artifacts.md`
+- `docs/upstream-integration.md`
+- `docs/PROGRESS.md`
+- `tests/test_windows_core.py`
+
+Validation performed:
+
+- `wsl --version`
+- `wsl.exe -d ClawHermes-Ubuntu --user root -- bash -lc "id; cat /etc/os-release"`
+- `node core\node\dist\clawhermes.js setup-adapter hermes-agent --confirm-setup --json`
+- `node core\node\dist\clawhermes.js start-adapter hermes-agent --confirm-start --json`
+- `node core\node\dist\clawhermes.js verify-adapter hermes-agent --json`
+- `node core\node\dist\clawhermes.js setup-adapter openclaw --confirm-setup --json`
+- `node core\node\dist\clawhermes.js start-adapter openclaw --confirm-start --json`
+- `curl.exe --max-time 30 http://127.0.0.1:18789/healthz`
+- `node core\node\dist\clawhermes.js verify-adapter openclaw --json`
+- `node core\node\dist\clawhermes.js status --json`
+- `node core\node\dist\clawhermes.js mark-adapter-ready hermes-agent --confirm-ready --summary "..."`
+- `node core\node\dist\clawhermes.js mark-adapter-ready openclaw --confirm-ready --summary "..."`
+- `node core\node\dist\clawhermes.js stop --json`
+- `node core\node\dist\clawhermes.js wsl-export --distro Ubuntu --confirm-export --json`
+
+Next steps:
+
+- Run the full test suite after documentation and adapter changes settle.
+- Review packaging expectations for distributing or regenerating the ignored WSL/app payload artifacts.
 - Review whether portal action execution should remain command-only for MVP or move behind a separate confirmation flow later.
 
 ### Real WSL2 Payload Host Preparation

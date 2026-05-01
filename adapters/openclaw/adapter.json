@@ -9,7 +9,8 @@
     "kind": "wsl2",
     "platform": "windows",
     "requiredExecutable": "wsl.exe",
-    "distro": "Ubuntu"
+    "distro": "ClawHermes-Ubuntu",
+    "sourceDistro": "Ubuntu"
   },
   "upstream": {
     "name": "openclaw/openclaw",
@@ -20,8 +21,8 @@
     "notes": "Official Windows docs recommend WSL2 for the full experience; native Windows remains a caveated path."
   },
   "commands": {
-    "setup": null,
-    "start": null,
+    "setup": "if ! command -v node >/dev/null 2>&1 || ! node -e \"const [major, minor] = process.versions.node.split('.').map(Number); process.exit(major > 22 || (major === 22 && minor >= 14) ? 0 : 1)\"; then apt-get update && apt-get install -y ca-certificates curl gnupg && curl -fsSL https://deb.nodesource.com/setup_24.x | bash - && apt-get install -y nodejs; fi && corepack enable && corepack prepare pnpm@10.33.2 --activate && if [ ! -f dist/entry.js ] || [ ! -d node_modules ]; then pnpm install && pnpm build; fi && mkdir -p ../../data/openclaw ../../data/logs && node -e \"const fs=require('fs'), path=require('path'); const p=process.env.OPENCLAW_CONFIG_PATH || path.resolve(process.cwd(),'../../data/openclaw/openclaw.json'); let c={}; try { c=JSON.parse(fs.readFileSync(p,'utf8')); } catch {} c.gateway={ mode:'local', bind:'loopback', ...(c.gateway||{}) }; c.logging={ ...(c.logging||{}), file:path.resolve(process.cwd(),'../../data/logs/openclaw-runtime.log') }; fs.writeFileSync(p, JSON.stringify(c,null,2));\"",
+    "start": "node openclaw.mjs gateway --port 18789 --verbose --allow-unconfigured",
     "stop": null
   },
   "env": {
@@ -32,26 +33,30 @@
       "HOME": "${USB_ROOT}/data/home",
       "USERPROFILE": "${USB_ROOT}/data/home",
       "OPENCLAW_HOME": "${USB_ROOT}/data/openclaw",
-      "OPENCLAW_DATA_DIR": "${USB_ROOT}/data/openclaw"
+      "OPENCLAW_DATA_DIR": "${USB_ROOT}/data/openclaw",
+      "OPENCLAW_STATE_DIR": "${USB_ROOT}/data/openclaw",
+      "OPENCLAW_CONFIG_PATH": "${USB_ROOT}/data/openclaw/openclaw.json",
+      "OPENCLAW_GATEWAY_PORT": "18789"
     }
   },
   "dataDir": "data/openclaw",
   "logFile": "data/logs/openclaw.log",
   "pidFile": "data/tmp/pids/openclaw.pid",
   "health": {
-    "type": "process",
+    "type": "http",
+    "url": "http://127.0.0.1:18789/healthz",
     "timeoutSeconds": 30
   },
   "portal": {
     "label": "OpenClaw",
-    "url": null,
+    "url": "http://127.0.0.1:18789/",
     "group": "OpenClaw"
   },
   "integration": {
-    "status": "blocked",
-    "productionReady": false,
+    "status": "verified",
+    "productionReady": true,
     "verifiedAt": "2026-05-01",
-    "summary": "Official Windows guidance says WSL2 is the more stable and recommended path for the full experience. Native Windows gateway use exists but has service-install caveats, so OpenClaw remains blocked until WSL2 data path, gateway port, and UI behavior are verified from an installed payload.",
+    "summary": "Verified real OpenClaw source payload in managed ClawHermes-Ubuntu WSL2 distro with Node 24, pnpm 10.33.2, local gateway config, project-local state/log paths, and http://127.0.0.1:18789/healthz returning 200.",
     "platform": "wsl2",
     "strategy": "wsl2-adapter",
     "sources": [

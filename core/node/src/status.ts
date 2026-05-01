@@ -49,7 +49,7 @@ function httpAdapterHealth(adapter: AdapterDescriptor) {
 }
 
 function probeHttpHealth(url: string, timeoutSeconds: number): { ready: boolean; statusCode: number | null; reason: string } {
-  const timeoutMs = Math.max(1, Math.min(timeoutSeconds, 10)) * 1000;
+  const timeoutMs = Math.max(1, Math.min(timeoutSeconds, 60)) * 1000;
   const script = [
     "$ProgressPreference = 'SilentlyContinue'",
     `$timeoutMs = ${timeoutMs}`,

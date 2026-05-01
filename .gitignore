@@ -34,6 +34,8 @@ data/**
 !data/
 !data/**/
 !data/**/.gitkeep
+data/openclaw/.openclaw/
+data/**/.git/
 
 # OS/editor
 Thumbs.db

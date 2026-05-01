@@ -77,6 +77,7 @@ export type AdapterDescriptor = {
     requiredExecutable: string;
     versionRequirement?: string;
     distro?: string;
+    sourceDistro?: string;
   };
   upstream?: {
     name: string;

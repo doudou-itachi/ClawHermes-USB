@@ -15,10 +15,11 @@ function wslWorkflowPlan(usbRoot, serviceId) {
     if (adapter.runtime?.kind !== "wsl2")
         throw new Error(`Adapter ${serviceId} is not a WSL2 adapter.`);
     const distro = adapter.runtime.distro?.trim() || "Ubuntu";
+    const sourceDistro = adapter.runtime.sourceDistro?.trim() || distro;
     const diagnostics = (0, wsl_1.wslDiagnostics)(root, distro);
     const wslReady = diagnostics.hasDesiredDistro && diagnostics.desiredDistroVersion === 2;
-    const importPlan = (0, wsl_import_1.wslImportPlan)(root, { distro });
-    const unregisterPlan = (0, wsl_import_1.wslUnregisterPlan)(root, { distro });
+    const importPlan = (0, wsl_import_1.wslImportPlan)(root, { distro: sourceDistro });
+    const unregisterPlan = (0, wsl_import_1.wslUnregisterPlan)(root, { distro: sourceDistro });
     const commandPrefix = "node core/node/dist/clawhermes.js";
     const phases = [
         {
@@ -35,8 +36,8 @@ function wslWorkflowPlan(usbRoot, serviceId) {
             id: "prepare-host",
             title: "Prepare WSL2 host explicitly",
             status: wslReady ? "ready" : "needed",
-            command: `${commandPrefix} prepare-wsl --distro ${distro} --dry-run --json`,
-            confirmCommand: `${commandPrefix} prepare-wsl --distro ${distro} --confirm-install --json`,
+            command: `${commandPrefix} prepare-wsl --distro ${sourceDistro} --dry-run --json`,
+            confirmCommand: `${commandPrefix} prepare-wsl --distro ${sourceDistro} --confirm-install --json`,
             modifiesHost: true,
             modifiesProject: false,
             detail: "Host-level WSL2 preparation requires explicit confirmation.",
@@ -45,7 +46,7 @@ function wslWorkflowPlan(usbRoot, serviceId) {
             id: "prepare-rootfs",
             title: "Prepare project-local rootfs artifact",
             status: importPlan.sourceArchiveExists ? "ready" : "manual",
-            command: `${commandPrefix} wsl-rootfs-guide --distro ${distro} --json`,
+            command: `${commandPrefix} wsl-rootfs-guide --distro ${sourceDistro} --json`,
             confirmCommand: null,
             modifiesHost: false,
             modifiesProject: false,
@@ -56,8 +57,8 @@ function wslWorkflowPlan(usbRoot, serviceId) {
             id: "import-distro",
             title: "Optionally import project-local WSL2 distro",
             status: wslReady ? "ready" : "manual",
-            command: `${commandPrefix} wsl-import-plan --distro ${distro} --json`,
-            confirmCommand: `${commandPrefix} wsl-import --distro ${distro} --confirm-import --json`,
+            command: `${commandPrefix} wsl-import-plan --distro ${sourceDistro} --json`,
+            confirmCommand: `${commandPrefix} wsl-import --distro ${sourceDistro} --confirm-import --json`,
             modifiesHost: true,
             modifiesProject: true,
             detail: "Optional import path uses a rootfs archive under runtimes/wsl/ and still registers the distro on this Windows host.",
@@ -117,8 +118,8 @@ function wslWorkflowPlan(usbRoot, serviceId) {
             id: "export-backup",
             title: "Export managed WSL2 distro backup",
             status: unregisterPlan.registered ? "manual" : "blocked",
-            command: `${commandPrefix} wsl-unregister-plan --distro ${distro} --json`,
-            confirmCommand: `${commandPrefix} wsl-export --distro ${distro} --confirm-export --json`,
+            command: `${commandPrefix} wsl-unregister-plan --distro ${sourceDistro} --json`,
+            confirmCommand: `${commandPrefix} wsl-export --distro ${sourceDistro} --confirm-export --json`,
             modifiesHost: false,
             modifiesProject: true,
             detail: "Backup export writes a project-local archive under data/backups/wsl/ before any destructive cleanup.",
@@ -128,8 +129,8 @@ function wslWorkflowPlan(usbRoot, serviceId) {
             id: "unregister-distro",
             title: "Optionally unregister managed WSL2 distro",
             status: unregisterPlan.latestBackup.exists && unregisterPlan.registered ? "manual" : "blocked",
-            command: `${commandPrefix} wsl-unregister-plan --distro ${distro} --json`,
-            confirmCommand: `${commandPrefix} wsl-unregister --distro ${distro} --confirm-unregister --json`,
+            command: `${commandPrefix} wsl-unregister-plan --distro ${sourceDistro} --json`,
+            confirmCommand: `${commandPrefix} wsl-unregister --distro ${sourceDistro} --confirm-unregister --json`,
             modifiesHost: true,
             modifiesProject: false,
             detail: "Destructive host cleanup is blocked until a project-local backup exists and still requires explicit confirmation.",
@@ -142,6 +143,7 @@ function wslWorkflowPlan(usbRoot, serviceId) {
         displayName: adapter.displayName,
         runner: "wsl2",
         distro,
+        sourceDistro,
         wslReady,
         stopHookDeclared: Boolean(adapter.commands.stop),
         diagnostics,

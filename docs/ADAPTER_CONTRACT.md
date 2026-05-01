@@ -541,7 +541,9 @@ Adapters that must run inside WSL2 should declare their Windows-side launcher de
   "runtime": {
     "kind": "wsl2",
     "platform": "windows",
-    "requiredExecutable": "wsl.exe"
+    "requiredExecutable": "wsl.exe",
+    "distro": "ClawHermes-Ubuntu",
+    "sourceDistro": "Ubuntu"
   },
   "integration": {
     "platform": "wsl2",
@@ -567,6 +569,7 @@ Rules:
 
 - The diagnostic is read-only.
 - Users must explicitly approve WSL2 preparation before WSL2 adapters can run; ClawHermes-USB must not silently enable Windows features or install Linux distributions.
+- For project-managed WSL2 adapters, `runtime.distro` is the execution target and `runtime.sourceDistro` is the base/rootfs planning source. For Ubuntu-based adapters, this normally means `runtime.distro: ClawHermes-Ubuntu` and `runtime.sourceDistro: Ubuntu`.
 - `wsl-workflow <service-id>` is read-only and should show the full operator sequence from diagnostics through production-readiness metadata and optional cleanup.
 - `wsl-workflow <service-id>` should include the rootfs guide step, optional project-local import step, export-backup cleanup step, guarded unregister cleanup step, and a `stopHookDeclared` field so operators can see whether graceful in-distro shutdown is configured.
 - `wsl-rootfs-guide --distro <name>` is read-only and should explain manual export/checksum steps for preparing `runtimes/wsl/<distro>-rootfs.tar` without automatic downloads.
@@ -588,7 +591,8 @@ Rules:
 - WSL rootfs artifacts are operator-managed payloads. They must stay under `runtimes/wsl/`, stay out of git, avoid system temp folders as durable storage, and never be downloaded automatically by setup/startup diagnostics.
 - Missing `wsl.exe`, missing distributions, and missing WSL2 distributions must be reported as setup actions.
 - Missing WSL rootfs archives for WSL2 adapters must be reported in `setup --json` under `wslArtifacts` and should add a `wsl-artifact:<service-id>` action pointing to `wsl-rootfs-guide`.
-- When `runtime.distro` is set, WSL commands must include `--distribution <name>` and diagnostics must verify that target distribution.
+- When `runtime.distro` is set, setup/start/verification WSL commands must include `--distribution <name>` and diagnostics must verify that target distribution.
+- When `runtime.sourceDistro` is set, rootfs guide/import/export/unregister workflow commands should use the source distro name while still producing or managing the derived `ClawHermes-<sourceDistro>` distribution.
 - WSL2 adapter setup/start commands must not run until the WSL2 diagnostic is healthy.
 - Confirmed WSL2 adapter setup executes through the same WSL adapter command plan and writes `data/logs/setup-<service-id>.log`.
 - Confirmed WSL2 adapter startup launches a Windows-side managed `wsl.exe` process and writes normal PID metadata.

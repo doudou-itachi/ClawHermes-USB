@@ -9,7 +9,8 @@
     "kind": "wsl2",
     "platform": "windows",
     "requiredExecutable": "wsl.exe",
-    "distro": "Ubuntu"
+    "distro": "ClawHermes-Ubuntu",
+    "sourceDistro": "Ubuntu"
   },
   "upstream": {
     "name": "NousResearch/hermes-agent",
@@ -20,8 +21,8 @@
     "notes": "Official README says native Windows is not supported and Windows users should run Hermes Agent in WSL2."
   },
   "commands": {
-    "setup": "python -m pip install -e .",
-    "start": "hermes gateway run",
+    "setup": "sed -i 's/\\r$//' ./setup-hermes.sh && printf 'n\\nn\\n' | bash ./setup-hermes.sh",
+    "start": "./venv/bin/hermes gateway run",
     "stop": null
   },
   "env": {
@@ -48,10 +49,10 @@
     "group": "Hermes"
   },
   "integration": {
-    "status": "blocked",
-    "productionReady": false,
+    "status": "verified",
+    "productionReady": true,
     "verifiedAt": "2026-05-01",
-    "summary": "Official README says native Windows is not supported and Windows users should install WSL2. Official site also describes native Windows as experimental, so the bare-Windows portable adapter remains blocked.",
+    "summary": "Verified on 2026-05-01 in project-managed ClawHermes-Ubuntu WSL2: setup-adapter completed, start-adapter launched ./venv/bin/hermes gateway run, and http://127.0.0.1:8642/health returned 200.",
     "platform": "wsl2",
     "strategy": "wsl2-adapter",
     "sources": [

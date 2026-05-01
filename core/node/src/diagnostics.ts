@@ -88,7 +88,9 @@ export function setupDiagnostics(usbRoot: string) {
         severity: "warning",
         title: `Install or enable WSL2 for ${adapter.id}`,
         detail,
-        command: wslPreparationCommand(adapter.runtime?.distro),
+        command: adapter.runtime?.sourceDistro
+          ? `node core/node/dist/clawhermes.js wsl-workflow ${adapter.id} --json`
+          : wslPreparationCommand(adapter.runtime?.distro),
         docs: adapter.integration?.sources?.[0] ?? adapter.upstream?.installDocs,
         serviceId: adapter.id,
       });
@@ -168,7 +170,7 @@ export function setupDiagnostics(usbRoot: string) {
 
 function wslArtifactDiagnostics(root: string, adapters: ReturnType<typeof loadAdapters>) {
   return adapters.map((adapter) => {
-    const distro = adapter.runtime?.distro?.trim() || "Ubuntu";
+    const distro = adapter.runtime?.sourceDistro?.trim() || adapter.runtime?.distro?.trim() || "Ubuntu";
     const plan = wslImportPlan(root, { distro });
     return {
       serviceId: adapter.id,

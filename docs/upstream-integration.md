@@ -15,12 +15,14 @@ Current conclusion:
 
 - WSL2 is the more stable and recommended Windows path for the full OpenClaw experience.
 - Native Windows CLI and gateway flows exist, but upstream still documents caveats around onboarding, gateway install, Scheduled Tasks, and fallback Startup-folder behavior.
-- For portable USB use, `openclaw gateway run` is the safest candidate because it avoids installing a managed service.
+- For portable USB use, foreground `node openclaw.mjs gateway --port 18789 --verbose --allow-unconfigured` is the verified source-checkout startup path because it avoids installing a managed service.
 - A real upstream checkout is present locally at `apps/openclaw` for WSL2 validation, pinned for this verification pass at commit `e8f9c3e6`.
-- `adapters/openclaw/adapter.json` now models OpenClaw as a WSL2 adapter, but `commands.start` remains `null` until OpenClaw data path variables, gateway port, Control UI URL, and WebChat URL are verified from an installed payload.
-- Host WSL2 feature enablement has been completed, but Windows reports a pending reboot, so Ubuntu distro registration and real OpenClaw execution are blocked until after restart.
+- `adapters/openclaw/adapter.json` now models OpenClaw as a WSL2 adapter targeting the managed `ClawHermes-Ubuntu` distribution, with `sourceDistro: Ubuntu` used for rootfs/import/export planning.
+- Real setup was verified in WSL2 with Node.js 24.15.0, pnpm 10.33.2, project-local `data/openclaw/openclaw.json`, and project-local runtime logs at `data/logs/openclaw-runtime.log`.
+- `status --json` and `verify-adapter openclaw --json` reported `http://127.0.0.1:18789/healthz` ready with status code `200`.
+- OpenClaw health checks may take more than 10 seconds during startup or high event-loop load, so the adapter uses a 30-second HTTP health timeout.
 
-Adapter status: `blocked`
+Adapter status: `verified`
 
 ## Hermes Agent
 
@@ -37,10 +39,12 @@ Current conclusion:
 - The Hermes gateway command suite handles `run`, `start`, `stop`, `restart`, `status`, `install`, `uninstall`, and `setup`.
 - For a portable process manager, foreground `hermes gateway run` is a better candidate than daemonizing `hermes gateway start`.
 - A real upstream checkout is present locally at `apps/hermes-agent` for WSL2 validation, pinned for this verification pass at commit `ec1443b`.
-- The adapter records `hermes gateway run` as a candidate command for future WSL2/container work, but bare-Windows production startup remains blocked.
-- Host WSL2 feature enablement has been completed, but Windows reports a pending reboot, so Ubuntu distro registration and real Hermes Agent execution are blocked until after restart.
+- `adapters/hermes-agent/adapter.json` now models Hermes Agent as a WSL2 adapter targeting the managed `ClawHermes-Ubuntu` distribution, with `sourceDistro: Ubuntu` used for rootfs/import/export planning.
+- Real setup was verified in WSL2 with the upstream `setup-hermes.sh` script after normalizing CRLF line endings and declining interactive optional prompts.
+- Foreground startup is verified with `./venv/bin/hermes gateway run`.
+- `status --json` and `verify-adapter hermes-agent --json` reported `http://127.0.0.1:8642/health` ready with status code `200`.
 
-Adapter status: `blocked`
+Adapter status: `verified`
 
 ## Hermes Web UI
 
@@ -61,14 +65,6 @@ Current conclusion:
 
 Adapter status: `verified`
 
-## Next Integration Gate
+## Current Integration Gate
 
-Before replacing placeholder services with real upstream processes:
-
-1. Place portable runtimes under `runtimes/windows/`.
-2. Reboot Windows so newly enabled WSL2 features become usable.
-3. Register or import the Ubuntu WSL2 distribution used by ClawHermes-USB.
-4. Verify each candidate command from the WSL2 adapter environment only.
-5. Confirm data writes stay under `data/`.
-6. Capture exact ports and health checks in adapter descriptors.
-7. Update `docs/PROGRESS.md` with validation evidence.
+Hermes Agent, OpenClaw, and Hermes Web UI are now verified adapters. Remaining production-hardening work should focus on packaging, repeatable operator setup, and keeping large WSL/app payloads out of git while preserving project-local backup and restore paths.
