@@ -783,6 +783,35 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertIn("小白模式", text)
         self.assertNotIn("setx ", text.lower())
 
+    def test_gui_control_script_wires_pages_to_dispatcher_actions(self):
+        text = (ROOT / "launcher" / "windows" / "ClawHermes-Control.ps1").read_text(encoding="utf-8")
+        dispatcher = (ROOT / "core" / "windows" / "clawhermes.ps1").read_text(encoding="utf-8")
+
+        for action in [
+            "setup-wizard",
+            "payloads",
+            "wsl-import-plan",
+            "wsl-import",
+            "model-config",
+            "model-config-status",
+            "start",
+            "stop",
+            "status",
+            "backup",
+            "logs",
+        ]:
+            self.assertIn(action, text)
+            self.assertIn(action, dispatcher)
+        self.assertIn("打开 OpenClaw Chat", text)
+        self.assertIn("打开 Hermes Web UI", text)
+        self.assertIn("API URL / Base URL", text)
+        self.assertIn("API Key", text)
+        self.assertIn("--provider-type", text)
+        self.assertIn("--api-url", text)
+        self.assertIn("--model", text)
+        self.assertIn("--api-key", text)
+        self.assertIn("--apply", text)
+
     def test_user_guide_script_exposes_safe_modes_and_noninteractive_switches(self):
         text = (ROOT / "launcher" / "windows" / "UserGuide.ps1").read_text(encoding="utf-8")
 
