@@ -55,13 +55,16 @@ Source:
 Current conclusion:
 
 - Upstream source checkout under `apps/hermes-web-ui` works with official portable Node.js 24.15.0.
-- `npm install` completed successfully in a disposable Windows lab root.
+- A real upstream checkout is present locally at `apps/hermes-web-ui` for current-root validation, pinned for this verification pass at commit `b508de843fc8c9add284264759dee18c525b4f69`.
+- `npm install` completed successfully in the current USB root through `setup-adapter hermes-web-ui --confirm-setup`.
 - `npm run start` launched through `start-adapter hermes-web-ui --confirm-start`.
 - Default UI URL is `http://127.0.0.1:8648`.
 - The BFF server proxies to Hermes Gateway on port `8642`.
-- `status --json` reported HTTP health ready with status code `200`.
+- With Hermes Agent running from the managed WSL2 adapter, `http://127.0.0.1:8642/health` returned `{"status": "ok", "platform": "hermes-agent"}`.
+- `http://127.0.0.1:8648` returned HTTP `200` with the Vite HTML app shell.
+- `status --json` reported Hermes Agent and Hermes Web UI HTTP health ready with status code `200`.
 - `verify-adapter hermes-web-ui --json` reported `productionReadyCandidate: true`.
-- The default repository still keeps only a `.gitkeep` app placeholder; normal `start` stays in placeholder mode until the current USB root has a real checkout.
+- The default repository keeps only a `.gitkeep` app placeholder; the real app checkout and `node_modules` stay ignored local payload content.
 
 Adapter status: `verified`
 

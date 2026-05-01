@@ -2938,6 +2938,44 @@ Next steps:
 - Use `payload-export --dry-run --json` before creating a real full-size package because the current verified WSL backup/rootfs artifacts are multi-GB files.
 - Review whether portal action execution should remain command-only for MVP or move behind a separate confirmation flow later.
 
+### Hermes Web UI Current-Root Payload Verification
+
+Status: `Done`
+
+Summary:
+
+- Checked out the real upstream Hermes Web UI payload under ignored `apps/hermes-web-ui` content.
+- Verified the checkout at upstream commit `b508de843fc8c9add284264759dee18c525b4f69`.
+- Installed dependencies with official portable Node.js `v24.15.0` through the guarded adapter setup command.
+- Started Hermes Agent and Hermes Web UI through the adapter lifecycle commands.
+- Confirmed Hermes Agent returned `{"status": "ok", "platform": "hermes-agent"}` from `http://127.0.0.1:8642/health`.
+- Confirmed Hermes Web UI returned HTTP `200` from `http://127.0.0.1:8648`.
+- Preserved the parent repository `.gitkeep` placeholder while leaving the real app checkout and `node_modules` ignored.
+
+Changed areas:
+
+- `apps/hermes-web-ui/.gitkeep`
+- `adapters/hermes-web-ui/README.md`
+- `docs/upstream-integration.md`
+- `docs/PROGRESS.md`
+
+Validation performed:
+
+- `runtimes\windows\node\node.exe --version`
+- `runtimes\windows\node\npm.cmd --version`
+- `node core\node\dist\clawhermes.js setup-adapter hermes-web-ui --confirm-setup --json`
+- `node core\node\dist\clawhermes.js start-adapter hermes-agent --confirm-start --json`
+- `node core\node\dist\clawhermes.js start-adapter hermes-web-ui --confirm-start --json`
+- `Invoke-WebRequest -UseBasicParsing http://127.0.0.1:8642/health`
+- `Invoke-WebRequest -UseBasicParsing http://127.0.0.1:8648`
+- `node core\node\dist\clawhermes.js verify-adapter hermes-web-ui --json`
+- `node core\node\dist\clawhermes.js stop --json`
+
+Next steps:
+
+- Keep Hermes Web UI as an ignored payload in normal source control.
+- Include this app payload in guarded export packages when operators intentionally run `payload-export --confirm-export`.
+
 ### Real WSL2 Payload Host Preparation
 
 Status: `Done`

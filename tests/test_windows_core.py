@@ -1578,11 +1578,11 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         adapter = json.loads(result.stdout)["adapters"][0]
 
-        self.assertFalse(adapter["appDirReady"])
+        self.assertTrue(adapter["appDirReady"])
         self.assertEqual(adapter["upstream"]["name"], "EKKOLearnAI/hermes-web-ui")
         self.assertEqual(adapter["upstream"]["repositoryUrl"], "https://github.com/EKKOLearnAI/hermes-web-ui")
         self.assertEqual(adapter["upstream"]["installMode"], "source-checkout")
-        self.assertTrue(any("Checkout upstream source" in step for step in adapter["nextSteps"]))
+        self.assertTrue(any("Run the adapter setup command" in step for step in adapter["nextSteps"]))
 
     def test_adapters_json_reports_runtime_version_requirement(self):
         result = run_dispatcher("adapters", "hermes-web-ui", "-Json")

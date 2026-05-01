@@ -52,7 +52,7 @@
     "status": "verified",
     "productionReady": true,
     "verifiedAt": "2026-05-01",
-    "summary": "Verified in disposable Windows lab with official portable Node 24.15.0: checkout-source, npm install setup, init-env, start-adapter, HTTP 200 on http://127.0.0.1:8648, and verify-adapter productionReadyCandidate=true.",
+    "summary": "Verified in the current USB root with official portable Node 24.15.0: upstream checkout b508de843fc8c9add284264759dee18c525b4f69, npm install setup, Hermes Agent dependency running, HTTP 200 on http://127.0.0.1:8648, and verify-adapter productionReadyCandidate=true.",
     "sources": [
       "https://github.com/EKKOLearnAI/hermes-web-ui"
     ]
