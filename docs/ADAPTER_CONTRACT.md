@@ -569,6 +569,7 @@ Rules:
 - Real host preparation must require `--confirm-install`.
 - A future `wsl --import` workflow may store distro files under the USB/project path, but the imported distro is still registered on the current Windows host.
 - `wsl-import-plan` is read-only. It expects a compatible rootfs tar archive under `runtimes/wsl/` and reports the official `wsl.exe --import <name> <install-location> <archive> --version 2` command.
+- WSL rootfs artifacts are operator-managed payloads. They must stay under `runtimes/wsl/`, stay out of git, avoid system temp folders as durable storage, and never be downloaded automatically by setup/startup diagnostics.
 - Missing `wsl.exe`, missing distributions, and missing WSL2 distributions must be reported as setup actions.
 - When `runtime.distro` is set, WSL commands must include `--distribution <name>` and diagnostics must verify that target distribution.
 - WSL2 adapter setup/start commands must not run until the WSL2 diagnostic is healthy.

@@ -73,7 +73,7 @@ Run verification:
 npm test
 ```
 
-WSL2 note: `prepare-wsl` is guarded because enabling WSL2 and registering a Linux distribution modify the current Windows host. The command only prints a plan by default; real host preparation requires `--confirm-install`.
+WSL2 note: `prepare-wsl` is guarded because enabling WSL2 and registering a Linux distribution modify the current Windows host. The command only prints a plan by default; real host preparation requires `--confirm-install`. Rootfs archives for `wsl-import-plan` are operator-managed payloads under `runtimes/wsl/`; see [WSL2 Rootfs Artifact Policy](docs/wsl-rootfs-artifacts.md).
 
 ## Core Documents
 

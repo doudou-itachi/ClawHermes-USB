@@ -2097,3 +2097,41 @@ Next steps:
 
 - Add rootfs artifact policy documentation before allowing any guarded import execution.
 - Add a workflow field that surfaces whether a WSL2 adapter declares a graceful stop hook.
+
+### WSL2 Rootfs Artifact Policy
+
+Status: `Done`
+
+Summary:
+
+- Added a documented rootfs artifact policy for the optional WSL2 import path.
+- `wsl-import-plan --json` now reports `artifactPolicy` with the expected `runtimes/wsl/` directory, archive name, checksum file, and no-auto-download guarantees.
+- Added `.gitignore` coverage so WSL rootfs tar payloads and checksum sidecars are not accidentally committed.
+- Added `runtimes/wsl/.gitkeep` as the durable project-local artifact directory placeholder.
+- Documented that rootfs archives are operator-managed payloads and must not use system temp folders as durable storage.
+
+Changed areas:
+
+- `.gitignore`
+- `runtimes/wsl/.gitkeep`
+- `core/node/src/wsl-import.ts`
+- `core/node/dist/wsl-import.js`
+- `docs/wsl-rootfs-artifacts.md`
+- `README.md`
+- `docs/ADAPTER_CONTRACT.md`
+- `docs/PROGRESS.md`
+- `tests/test_windows_core.py`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_wsl_import_plan_reports_usb_storage_command_without_running_wsl tests.test_windows_core.WindowsCoreTests.test_gitignore_excludes_wsl_rootfs_payloads -v`
+- `npm test`
+- `git diff --check`
+- UTF-8 smoke check
+- C temp cleanup check
+
+Next steps:
+
+- Add a guarded WSL import execution command that requires explicit user confirmation and remains testable through the fake WSL shim.
+- Add a workflow field that surfaces whether a WSL2 adapter declares a graceful stop hook.

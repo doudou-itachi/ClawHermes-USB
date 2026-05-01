@@ -691,6 +691,20 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertIn("2", payload["args"])
         self.assertIn("registered on this Windows host", "\n".join(payload["messages"]))
         self.assertIn("learn.microsoft.com", payload["docs"])
+        policy = payload["artifactPolicy"]
+        self.assertFalse(policy["automaticDownload"])
+        self.assertEqual(policy["archiveName"], "ubuntu-rootfs.tar")
+        self.assertTrue(policy["directory"].replace("\\", "/").endswith("runtimes/wsl"))
+        self.assertTrue(policy["checksumFile"].replace("\\", "/").endswith("runtimes/wsl/ubuntu-rootfs.tar.sha256"))
+        self.assertTrue(policy["mustRemainProjectLocal"])
+        self.assertTrue(policy["mustNotUseSystemTemp"])
+        self.assertIn("No automatic rootfs download", "\n".join(payload["messages"]))
+
+    def test_gitignore_excludes_wsl_rootfs_payloads(self):
+        gitignore = (ROOT / ".gitignore").read_text(encoding="utf-8")
+
+        self.assertIn("runtimes/wsl/*.tar", gitignore)
+        self.assertIn("!runtimes/wsl/.gitkeep", gitignore)
 
     def test_setup_json_reports_wsl2_action_when_hermes_agent_needs_wsl2(self):
         missing_wsl = str(ROOT / "data" / "tmp" / "missing-wsl.exe")

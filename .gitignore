@@ -9,6 +9,8 @@ runtimes/windows/git/*
 runtimes/macos/node/*
 runtimes/macos/python/*
 runtimes/macos/git/*
+runtimes/wsl/*.tar
+runtimes/wsl/*.tar.*
 
 # Upstream application payloads
 apps/openclaw/*
@@ -25,6 +27,7 @@ apps/hermes-web-ui/*
 !runtimes/macos/node/.gitkeep
 !runtimes/macos/python/.gitkeep
 !runtimes/macos/git/.gitkeep
+!runtimes/wsl/.gitkeep
 
 # Portable data
 data/**
