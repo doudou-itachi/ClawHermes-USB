@@ -616,18 +616,19 @@ class WindowsCoreTests(unittest.TestCase):
         }
 
         for file_name, mode in launchers.items():
-            text = (ROOT / "launcher" / "windows" / file_name).read_text(encoding="utf-8")
-            self.assertIn("@echo off", text)
-            self.assertIn("setlocal", text)
-            self.assertIn("set SCRIPT_DIR=%~dp0", text)
-            self.assertIn('for %%I in ("%SCRIPT_DIR%..\\..") do set USB_ROOT=%%~fI', text)
-            self.assertIn("UserGuide.ps1", text)
-            self.assertIn(
-                f'powershell -NoProfile -ExecutionPolicy Bypass -File "%USB_ROOT%\\launcher\\windows\\UserGuide.ps1" -Mode {mode} -UsbRoot "%USB_ROOT%"',
-                text,
+            lines = (ROOT / "launcher" / "windows" / file_name).read_text(encoding="utf-8").splitlines()
+            self.assertEqual(
+                lines,
+                [
+                    "@echo off",
+                    "setlocal",
+                    "set SCRIPT_DIR=%~dp0",
+                    'for %%I in ("%SCRIPT_DIR%..\\..") do set USB_ROOT=%%~fI',
+                    f'powershell -NoProfile -ExecutionPolicy Bypass -File "%USB_ROOT%\\launcher\\windows\\UserGuide.ps1" -Mode {mode} -UsbRoot "%USB_ROOT%"',
+                    "set CLAWHERMES_EXIT=%ERRORLEVEL%",
+                    "endlocal & exit /b %CLAWHERMES_EXIT%",
+                ],
             )
-            self.assertIn("set CLAWHERMES_EXIT=%ERRORLEVEL%", text)
-            self.assertIn("endlocal & exit /b %CLAWHERMES_EXIT%", text)
 
     def test_setup_json_reports_runtime_diagnostics_and_valid_adapters(self):
         result = run_dispatcher("setup", "-Json")
