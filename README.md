@@ -140,6 +140,8 @@ Local auth note: the default portable env templates set OpenClaw gateway token, 
 Chinese versions:
 
 - [README.zh-CN.md](README.zh-CN.md)
+- [Developer Local Runbook.zh-CN](docs/developer-local-runbook.zh-CN.md)
+- [USB Deployment Guide.zh-CN](docs/usb-deployment.zh-CN.md)
 - [PRD.zh-CN.md](docs/PRD.zh-CN.md)
 - [DESIGN.zh-CN.md](docs/DESIGN.zh-CN.md)
 - [ADAPTER_CONTRACT.zh-CN.md](docs/ADAPTER_CONTRACT.zh-CN.md)

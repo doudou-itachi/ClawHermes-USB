@@ -1,0 +1,206 @@
+# U 盘部署与交付指南
+
+本文说明如何把 ClawHermes-USB 做成普通用户可双击运行的 U 盘交付包，并回答两个关键问题：U 盘速度是否会拖慢运行、是否可以不把源码直接放到 U 盘。
+
+## 结论
+
+这些担心不是多虑，确实会存在。
+
+- U 盘读写速度会影响体验，尤其是 WSL 文件系统、`node_modules`、SQLite、日志、缓存和大量小文件。
+- 普通用户不应该在 U 盘上执行 `npm install`、`pnpm install`、`pip install` 或 `uv sync`。
+- 可以不把源码直接放到 U 盘，但必须准备好可运行产物、上游应用 payload、运行时和许可证说明。
+- 最稳妥的交付方式是在开发机或构建机上完成依赖安装、构建和 WSL rootfs 准备，然后把预构建结果复制到 U 盘。
+
+## 推荐交付模式
+
+### 开发仓库
+
+开发者保留完整源码：
+
+```text
+core/node/src/
+tests/
+docs/
+scripts/
+package.json
+package-lock.json
+.git/
+```
+
+开发者在本地 SSD 上执行：
+
+```powershell
+npm install
+npm run build
+npm test
+```
+
+### 用户 U 盘
+
+用户 U 盘只放运行需要的内容：
+
+```text
+launcher/
+core/node/dist/
+core/windows/
+adapters/
+config/
+portal/
+runtimes/
+apps/
+data/
+README.zh-CN.md
+docs/
+```
+
+其中 `apps/` 和 `runtimes/` 应该是已经准备好的 payload，而不是要求用户现场安装依赖的源码工作树。
+
+## 关于 U 盘速度
+
+U 盘速度会影响以下部分：
+
+- WSL 导入目录 `data/wsl/<distribution-name>/`。
+- 上游 Node 应用的 `node_modules`，因为里面有大量小文件。
+- Python 虚拟环境、包缓存和模型缓存。
+- SQLite 数据库、会话记录、日志、任务状态文件。
+- OpenClaw 和 Hermes 首次启动时的配置读取、索引和缓存写入。
+
+建议：
+
+- 使用 USB 3.x 高速 U 盘或移动 SSD，不建议 USB 2.0 或廉价低速 U 盘。
+- 依赖安装和构建都在开发机 SSD 上完成，再复制到 U 盘。
+- 尽量减少 U 盘上的小文件写入，把日志和缓存做轮转。
+- WSL rootfs、上游依赖和 Web UI 构建产物都提前准备好。
+- 用户只做“启动、停止、模型配置、备份”，不要做构建和依赖安装。
+
+## 关于不放源码
+
+可以不把源码放到 U 盘，但要区分 ClawHermes 自己的代码和上游应用。
+
+### ClawHermes 自己的代码
+
+运行时主要需要：
+
+```text
+core/node/dist/
+core/windows/
+launcher/
+adapters/
+config/
+portal/
+```
+
+交付给普通用户时，可以不放：
+
+```text
+core/node/src/
+tests/
+.git/
+node_modules/
+```
+
+但如果未来 `core/node/dist/` 依赖第三方 npm 包，就要同时交付生产依赖或做 bundling。当前原则是：用户盘必须能离线运行，不能要求用户再安装依赖。
+
+### 上游应用
+
+建议交付预构建或预安装 payload：
+
+- `apps/openclaw`：放已经能运行的 OpenClaw payload，或把 OpenClaw 和它的依赖预装进 WSL rootfs。
+- `apps/hermes-agent`：放已经准备好的 Hermes Agent payload，Python 依赖建议预装进 WSL rootfs 或随运行时交付。
+- `apps/hermes-web-ui`：放已经构建好的 Web UI 服务端和前端产物，避免用户现场 `npm install`。
+
+如果上游项目许可证要求附带源码或许可证文本，需要按许可证保留相应 notice。不要为了“隐藏源码”违反上游许可证。
+
+## WSL rootfs 交付
+
+推荐流程：
+
+1. 在开发机或构建机上准备 `ClawHermes-Ubuntu`。
+2. 在 WSL 内安装 OpenClaw、Hermes Agent 需要的 Node、pnpm、Python、uv、依赖和配置。
+3. 停止服务，清理临时缓存和无用日志。
+4. 导出 rootfs：
+
+```powershell
+node core/node/dist/clawhermes.js wsl-export --distro Ubuntu --confirm-export --json
+```
+
+或按 `wsl-rootfs-guide` 生成 operator-managed rootfs：
+
+```powershell
+node core/node/dist/clawhermes.js wsl-rootfs-guide --distro Ubuntu --json
+```
+
+5. 把 rootfs 放到：
+
+```text
+runtimes/wsl/ubuntu-rootfs.tar
+runtimes/wsl/ubuntu-rootfs.tar.sha256
+```
+
+6. 在干净 Windows 机器上测试导入：
+
+```powershell
+node core/node/dist/clawhermes.js wsl-import-plan --distro Ubuntu --json
+node core/node/dist/clawhermes.js wsl-import --distro Ubuntu --confirm-import --json
+```
+
+注意：如果把 WSL 导入目录放在 U 盘上，便携性更好，但性能依赖 U 盘速度。性能优先时，可以考虑未来增加“导入到宿主机本地磁盘”的可选模式，但这会增加宿主机残留和卸载复杂度。
+
+## 推荐打包步骤
+
+在开发机上：
+
+```powershell
+npm install
+npm run build
+npm test
+```
+
+准备上游 payload：
+
+```text
+apps/openclaw
+apps/hermes-agent
+apps/hermes-web-ui
+runtimes/windows
+runtimes/wsl
+```
+
+创建交付目录，例如：
+
+```text
+D:\release\ClawHermes-USB
+```
+
+复制运行所需目录，排除开发文件：
+
+```powershell
+robocopy . D:\release\ClawHermes-USB /MIR ^
+  /XD .git node_modules tests core\node\src ^
+  /XF *.tsbuildinfo
+```
+
+如果 `apps/` 中仍然是源码工作树，请改为复制预构建 payload，而不是直接把开发 checkout 原样放上 U 盘。
+
+## 交付前检查清单
+
+- `launcher/windows/ClawHermes-Control.vbs` 可以双击打开。
+- GUI 点击“刷新状态”不会卡死或闪退。
+- “安装向导”能说明缺少什么 payload。
+- “模型配置”可以保存 API URL、模型名称和 API Key。
+- `apps/openclaw`、`apps/hermes-agent`、`apps/hermes-web-ui` 已准备好。
+- `runtimes/wsl/ubuntu-rootfs.tar` 和 `.sha256` 已准备好。
+- 用户不需要运行 `npm install`、`pnpm install`、`pip install`。
+- `data/logs/`、`data/tmp/`、`data/backups/` 可写。
+- 在一台干净 Windows 机器上完成启动、停止、备份、重启测试。
+
+## 给普通用户的最短说明
+
+把 U 盘插入 Windows 电脑后：
+
+1. 打开 U 盘里的 `ClawHermes-USB` 文件夹。
+2. 双击 `launcher/windows/ClawHermes-Control.vbs`。
+3. 第一次使用点“安装向导”。
+4. 配好模型后点“启动服务”。
+5. 点“打开界面”进入 OpenClaw 或 Hermes Web UI。
+6. 结束使用前点“停止服务”。

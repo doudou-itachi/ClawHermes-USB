@@ -1824,6 +1824,8 @@ class WindowsCoreTests(unittest.TestCase):
             ROOT / "docs" / "PRD.zh-CN.md",
             ROOT / "docs" / "DESIGN.zh-CN.md",
             ROOT / "docs" / "ADAPTER_CONTRACT.zh-CN.md",
+            ROOT / "docs" / "developer-local-runbook.zh-CN.md",
+            ROOT / "docs" / "usb-deployment.zh-CN.md",
         ]
         mojibake_markers = ["鏄", "鐨", "鍜", "锛", "銆", "鈥", "�"]
         required_phrases = ["ClawHermes-USB", "便携"]

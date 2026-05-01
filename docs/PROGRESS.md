@@ -13,6 +13,34 @@ Update it whenever a milestone is completed, changed, blocked, or deferred.
 
 ## 2026-05-02
 
+### Developer And USB Deployment Documentation
+
+Status: `Done`
+
+Summary:
+
+- Added a Chinese local developer runbook that explains clone/build/run steps, the `.vbs` GUI entry, fallback PowerShell command, and GUI self-tests.
+- Added a Chinese USB deployment guide covering U disk performance risk, prebuilt payload expectations, source-free delivery boundaries, WSL rootfs storage, and release validation.
+- Rewrote the Chinese README into readable UTF-8 and linked the new developer and USB deployment documents.
+
+Changed areas:
+
+- `README.md`
+- `README.zh-CN.md`
+- `docs/developer-local-runbook.zh-CN.md`
+- `docs/usb-deployment.zh-CN.md`
+- `docs/PROGRESS.md`
+- `tests/test_windows_core.py`
+
+Validation performed:
+
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_chinese_docs_are_readable_utf8 tests.test_windows_core.WindowsCoreTests.test_gui_control_theme_preference_and_docs_are_user_facing -v`
+- `git diff --check`
+
+Next steps:
+
+- Keep release packaging scripts aligned with the USB deployment guide when payload export matures.
+
 ### GUI Responsiveness And No-Console Entry
 
 Status: `Done`
