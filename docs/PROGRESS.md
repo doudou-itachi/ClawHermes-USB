@@ -2784,3 +2784,36 @@ Next steps:
 
 - Add explicit portal stop/backup action surfaces while keeping execution guarded through the existing Batch/CLI commands.
 - Continue real Hermes Agent and OpenClaw WSL2 payload validation when a prepared distro is available.
+
+### Portal Operation Actions
+
+Status: `Done`
+
+Summary:
+
+- Added a read-only `/operations.json` portal endpoint.
+- The endpoint exposes status, backup, and stop commands as structured operation actions.
+- Portal HTML now renders the operation commands, while state-changing operations remain guarded by explicit user-run Batch or CLI commands.
+- This closes the MVP portal requirement for visible stop and backup guidance without adding unsafe browser-triggered host mutations.
+
+Changed areas:
+
+- `core/node/src/portal-server.ts`
+- `core/node/src/portal.ts`
+- `core/node/dist/`
+- `docs/PROGRESS.md`
+- `tests/test_windows_core.py`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_start_generates_portal_from_adapter_metadata tests.test_windows_core.WindowsCoreTests.test_portal_serves_operation_actions -v`
+- `npm test`
+- `git diff --check`
+- UTF-8 smoke check
+- C temp cleanup check
+
+Next steps:
+
+- Continue real Hermes Agent and OpenClaw WSL2 payload validation when a prepared distro is available.
+- Review whether portal action execution should remain command-only for MVP or move behind a separate confirmation flow later.

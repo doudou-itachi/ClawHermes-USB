@@ -91,6 +91,11 @@ def fetch_portal_logs(timeout=0.5):
         return json.loads(response.read().decode("utf-8"))
 
 
+def fetch_portal_operations(timeout=0.5):
+    with urllib.request.urlopen(f"{PORTAL_URL}operations.json", timeout=timeout) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
 def wait_for_portal():
     deadline = time.time() + 5
     last_error = None
@@ -2610,6 +2615,8 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertIn("Logs", html)
             self.assertIn("data-log-viewer", html)
             self.assertIn("fetch('/logs.json'", html)
+            self.assertIn("data-operation-actions", html)
+            self.assertIn("fetch('/operations.json'", html)
         finally:
             run_dispatcher("stop", "-Json")
 
@@ -2700,6 +2707,27 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertIn("setup-openclaw", logs)
             self.assertTrue(logs["launcher"]["exists"])
             self.assertLessEqual(len(logs["launcher"]["lines"]), logs["launcher"]["requestedLines"])
+        finally:
+            run_dispatcher("stop", "-Json")
+
+    def test_portal_serves_operation_actions(self):
+        try:
+            start = run_dispatcher("start", "-Json")
+            self.assertEqual(start.returncode, 0, start.stderr)
+            wait_for_portal()
+
+            payload = fetch_portal_operations(timeout=5)
+            actions = {item["id"]: item for item in payload["actions"]}
+
+            self.assertEqual(Path(payload["root"]).resolve(), ROOT)
+            self.assertIn("status", actions)
+            self.assertIn("backup", actions)
+            self.assertIn("stop", actions)
+            self.assertFalse(actions["status"]["mutatesState"])
+            self.assertTrue(actions["backup"]["mutatesState"])
+            self.assertTrue(actions["stop"]["mutatesState"])
+            self.assertIn("launcher/windows/Backup.bat", actions["backup"]["batchCommand"])
+            self.assertIn("launcher/windows/Stop.bat", actions["stop"]["batchCommand"])
         finally:
             run_dispatcher("stop", "-Json")
 

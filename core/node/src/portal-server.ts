@@ -86,6 +86,14 @@ const server = createServer((request, response) => {
       response.end(JSON.stringify(logsSnapshot(), null, 2));
       return;
     }
+    if (request.url === "/operations.json") {
+      response.writeHead(200, {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+      });
+      response.end(JSON.stringify(operationsSnapshot(), null, 2));
+      return;
+    }
     if (request.url !== "/" && request.url !== "/index.html") {
       response.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
       response.end("Not found");
@@ -166,6 +174,29 @@ function logsSnapshot() {
     root: usbRoot,
     generatedAt: new Date().toISOString(),
     logs: targets.map((target) => readLogTail(usbRoot, target, 80)),
+  };
+}
+
+function operationsSnapshot() {
+  return {
+    root: usbRoot,
+    generatedAt: new Date().toISOString(),
+    actions: [
+      operationAction("status", "Refresh status", "launcher/windows/Status.bat", "node core/node/dist/clawhermes.js status --json", false),
+      operationAction("backup", "Create backup", "launcher/windows/Backup.bat", "node core/node/dist/clawhermes.js backup --json", true),
+      operationAction("stop", "Stop services", "launcher/windows/Stop.bat", "node core/node/dist/clawhermes.js stop --json", true),
+    ],
+  };
+}
+
+function operationAction(id: string, label: string, batchCommand: string, cliCommand: string, mutatesState: boolean) {
+  return {
+    id,
+    label,
+    batchCommand,
+    cliCommand,
+    mutatesState,
+    requiresUserIntent: true,
   };
 }
 

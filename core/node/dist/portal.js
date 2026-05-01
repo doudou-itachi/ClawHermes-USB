@@ -67,6 +67,9 @@ function generatePortal(usbRoot, services) {
       <h2>Operations</h2>
       <p>Use <code>launcher/windows/Status.bat</code> to refresh service state and <code>launcher/windows/Stop.bat</code> to stop placeholder services.</p>
       <p>Use <code>launcher/windows/Backup.bat</code> to create a portable backup. Latest backup: <span data-backup-latest>Checking...</span></p>
+      <ul data-operation-actions>
+        <li>Checking operation commands...</li>
+      </ul>
     </section>
     <section>
       <h2>Setup actions</h2>
@@ -248,16 +251,46 @@ function generatePortal(usbRoot, services) {
         // Log viewing should never prevent the rest of the portal from rendering.
       }
     }
+    async function refreshOperations() {
+      try {
+        const response = await fetch('/operations.json', { cache: 'no-store' });
+        if (!response.ok) return;
+        const payload = await response.json();
+        const target = document.querySelector('[data-operation-actions]');
+        if (!target) return;
+        const actions = payload.actions || [];
+        if (actions.length === 0) {
+          target.innerHTML = '<li>No operation commands are available.</li>';
+          return;
+        }
+        target.innerHTML = '';
+        for (const action of actions) {
+          const item = document.createElement('li');
+          const label = document.createElement('strong');
+          label.textContent = action.label || action.id || 'Operation';
+          const command = document.createElement('code');
+          command.textContent = action.batchCommand || action.cliCommand || '';
+          item.appendChild(label);
+          item.appendChild(document.createTextNode(action.mutatesState ? ' requires explicit user action: ' : ' '));
+          item.appendChild(command);
+          target.appendChild(item);
+        }
+      } catch {
+        // Operation commands are static guidance; keep the existing text visible if refresh fails.
+      }
+    }
     refreshStatus();
     refreshSetupActions();
     refreshBackups();
     refreshAdapterVerification();
     refreshLogs();
+    refreshOperations();
     window.setInterval(refreshStatus, 5000);
     window.setInterval(refreshSetupActions, 15000);
     window.setInterval(refreshBackups, 15000);
     window.setInterval(refreshAdapterVerification, 30000);
     window.setInterval(refreshLogs, 15000);
+    window.setInterval(refreshOperations, 30000);
   </script>
 </body>
 </html>
