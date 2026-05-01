@@ -101,6 +101,7 @@ WSL2 note: `prepare-wsl` is guarded because enabling WSL2 and registering a Linu
 - [Architecture Design](docs/DESIGN.md)
 - [Adapter Contract](docs/ADAPTER_CONTRACT.md)
 - [Progress Log](docs/PROGRESS.md)
+- [Release Checklist](docs/release-checklist.md)
 
 Chinese versions:
 

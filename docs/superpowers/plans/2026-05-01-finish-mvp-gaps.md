@@ -88,6 +88,6 @@
 - Modify: `README.md`
 - Modify: `docs/PROGRESS.md`
 
-- [ ] Add release checklist covering clean git, tests, payload inventory, payload export, WSL backup, C temp cleanup, service start/stop smoke, and artifact locations.
-- [ ] Link the checklist from README and progress docs.
-- [ ] Run docs/UTF-8 checks and commit.
+- [x] Add release checklist covering clean git, tests, payload inventory, payload export, WSL backup, C temp cleanup, service start/stop smoke, and artifact locations.
+- [x] Link the checklist from README and progress docs.
+- [x] Run docs/UTF-8 checks and commit.

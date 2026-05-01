@@ -3078,6 +3078,32 @@ Next steps:
 - Keep setup wizard commands read-only unless the operator copies and runs a guarded command explicitly.
 - Link the release checklist once the checklist document is added.
 
+### Release Checklist
+
+Status: `Done`
+
+Summary:
+
+- Added `docs/release-checklist.md`.
+- The checklist covers source cleanliness, build/tests, payload inventory/export, WSL2 exports, runtime smoke verification, C drive/temp cleanup, and artifact locations.
+- Linked the checklist from `README.md`.
+
+Changed areas:
+
+- `docs/release-checklist.md`
+- `README.md`
+- `docs/PROGRESS.md`
+- `docs/superpowers/plans/2026-05-01-finish-mvp-gaps.md`
+
+Validation performed:
+
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_chinese_docs_are_readable_utf8 -v`
+- `git diff --check`
+
+Next steps:
+
+- Use the checklist before publishing release archives or handing the USB root to another host.
+
 ### Real WSL2 Payload Host Preparation
 
 Status: `Done`
