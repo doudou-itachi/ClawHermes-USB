@@ -187,11 +187,24 @@ function getStatus(usbRoot) {
         let status = "stopped";
         let processId = null;
         let placeholder = null;
+        let healthOverride = null;
         if ((0, node_fs_1.existsSync)(pidFile)) {
             const metadata = JSON.parse((0, node_fs_1.readFileSync)(pidFile, "utf8"));
             if (metadata.placeholder === false && metadata.processId && !(0, status_1.processExists)(metadata.processId)) {
-                (0, node_fs_1.rmSync)(pidFile, { force: true });
-                status = "stopped";
+                const candidateStatus = metadata.status ?? "running";
+                const candidateHealth = adapter.runtime?.kind === "wsl2" && adapter.health?.type === "http"
+                    ? (0, status_1.adapterHealth)(adapter, candidateStatus, false)
+                    : null;
+                if (candidateHealth?.ready) {
+                    status = candidateStatus;
+                    processId = null;
+                    placeholder = false;
+                    healthOverride = candidateHealth;
+                }
+                else {
+                    (0, node_fs_1.rmSync)(pidFile, { force: true });
+                    status = "stopped";
+                }
             }
             else {
                 status = metadata.status ?? "unknown";
@@ -208,7 +221,7 @@ function getStatus(usbRoot) {
             portalUrl: adapter.portal?.url ?? null,
             processId,
             placeholder,
-            health: (0, status_1.adapterHealth)(adapter, status, placeholder),
+            health: healthOverride ?? (0, status_1.adapterHealth)(adapter, status, placeholder),
         };
     });
     services.push((0, portal_1.getPortalStatus)(root));

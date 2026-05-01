@@ -132,11 +132,23 @@ export function getStatus(usbRoot: string) {
     let status = "stopped";
     let processId: number | null = null;
     let placeholder: boolean | null = null;
+    let healthOverride: ReturnType<typeof adapterHealth> | null = null;
     if (existsSync(pidFile)) {
-      const metadata = JSON.parse(readFileSync(pidFile, "utf8")) as { status?: string; placeholder?: boolean; processId?: number };
+      const metadata = JSON.parse(readFileSync(pidFile, "utf8")) as { status?: string; placeholder?: boolean; processId?: number; runner?: string };
       if (metadata.placeholder === false && metadata.processId && !processExists(metadata.processId)) {
-        rmSync(pidFile, { force: true });
-        status = "stopped";
+        const candidateStatus = metadata.status ?? "running";
+        const candidateHealth = adapter.runtime?.kind === "wsl2" && adapter.health?.type === "http"
+          ? adapterHealth(adapter, candidateStatus, false)
+          : null;
+        if (candidateHealth?.ready) {
+          status = candidateStatus;
+          processId = null;
+          placeholder = false;
+          healthOverride = candidateHealth;
+        } else {
+          rmSync(pidFile, { force: true });
+          status = "stopped";
+        }
       } else {
         status = metadata.status ?? "unknown";
         processId = metadata.placeholder === false ? metadata.processId ?? null : null;
@@ -152,7 +164,7 @@ export function getStatus(usbRoot: string) {
       portalUrl: adapter.portal?.url ?? null,
       processId,
       placeholder,
-      health: adapterHealth(adapter, status, placeholder),
+      health: healthOverride ?? adapterHealth(adapter, status, placeholder),
     };
   });
   services.push(getPortalStatus(root));

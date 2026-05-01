@@ -62,10 +62,10 @@ function launchManagedAdapterProcess(root, adapter, serviceEnv, processPlan) {
     const commandTemplate = adapter.commands.start;
     if (!commandTemplate)
         throw new Error(`Adapter ${adapter.id} has no start command.`);
+    prepareManagedServiceEnvironment(root, adapter, serviceEnv);
     const command = (0, command_template_1.expandCommandTemplate)(commandTemplate, serviceEnv.env);
     const workingDirectory = (0, portable_1.resolveRelative)(root, adapter.appDir);
     const logFile = (0, portable_1.resolveRelative)(root, adapter.logFile);
-    ensureHermesConfigFile(serviceEnv);
     const logFd = (0, node_fs_1.openSync)(logFile, "a");
     try {
         const child = processPlan
@@ -105,6 +105,12 @@ function launchManagedAdapterProcess(root, adapter, serviceEnv, processPlan) {
         (0, node_fs_1.closeSync)(logFd);
     }
 }
+function prepareManagedServiceEnvironment(root, adapter, serviceEnv) {
+    ensureHermesConfigFile(serviceEnv);
+    if (adapter.id === "hermes-web-ui") {
+        prepareHermesWebUiEnvironment(root, serviceEnv);
+    }
+}
 function ensureHermesConfigFile(serviceEnv) {
     const hermesHome = serviceEnv.env.HERMES_HOME;
     if (!hermesHome)
@@ -130,6 +136,114 @@ function activeHermesProfileDir(hermesHome) {
         // Missing active_profile means Hermes uses the default profile.
     }
     return hermesHome;
+}
+function prepareHermesWebUiEnvironment(root, serviceEnv) {
+    const home = serviceEnv.env.HOME || (0, node_path_1.join)(root, "data", "home");
+    const profileDir = (0, node_path_1.join)(home, ".hermes");
+    (0, node_fs_1.mkdirSync)(profileDir, { recursive: true });
+    const configPath = (0, node_path_1.join)(profileDir, "config.yaml");
+    (0, node_fs_1.writeFileSync)(configPath, hermesWebUiProfileConfig(serviceEnv), "utf8");
+    const envPath = (0, node_path_1.join)(profileDir, ".env");
+    const apiKey = serviceEnv.env.API_SERVER_KEY || serviceEnv.env.AUTH_TOKEN || "clawhermes";
+    if (!(0, node_fs_1.existsSync)(envPath)) {
+        (0, node_fs_1.writeFileSync)(envPath, `API_SERVER_KEY=${apiKey}\n`, "utf8");
+    }
+    else {
+        const existing = (0, node_fs_1.readFileSync)(envPath, "utf8");
+        if (!/^API_SERVER_KEY\s*=/m.test(existing)) {
+            const separator = existing.endsWith("\n") || existing.length === 0 ? "" : "\n";
+            (0, node_fs_1.appendFileSync)(envPath, `${separator}API_SERVER_KEY=${apiKey}\n`, "utf8");
+        }
+    }
+    const shimDir = (0, node_path_1.join)(root, "data", "tmp", "bin", "hermes-web-ui");
+    writeHermesWebUiShim(shimDir);
+    const powershell = (0, node_path_1.join)(process.env.SystemRoot || "C:\\Windows", "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
+    serviceEnv.env.HERMES_BIN = powershell;
+    serviceEnv.env.CLAWHERMES_HERMES_WSL_DISTRO = serviceEnv.env.CLAWHERMES_HERMES_WSL_DISTRO || "ClawHermes-Ubuntu";
+    serviceEnv.env.PSExecutionPolicyPreference = "Bypass";
+    serviceEnv.env.PATH = [shimDir, serviceEnv.env.PATH || process.env.PATH || ""].filter(Boolean).join(";");
+}
+function hermesWebUiProfileConfig(serviceEnv) {
+    const upstream = serviceEnv.env.HERMES_AGENT_API_BASE || serviceEnv.env.UPSTREAM || "http://127.0.0.1:8642";
+    let host = "127.0.0.1";
+    let port = 8642;
+    try {
+        const parsed = new URL(upstream);
+        host = parsed.hostname || host;
+        port = Number(parsed.port) || port;
+    }
+    catch {
+        // Keep defaults when the configured upstream is not a URL.
+    }
+    return [
+        "platforms:",
+        "  api_server:",
+        "    enabled: true",
+        "    key: ''",
+        "    cors_origins: '*'",
+        "    extra:",
+        `      port: ${port}`,
+        `      host: ${host}`,
+        "",
+    ].join("\n");
+}
+function writeHermesWebUiShim(shimDir) {
+    (0, node_fs_1.mkdirSync)(shimDir, { recursive: true });
+    const commonPath = (0, node_path_1.join)(shimDir, "hermes-wsl-command.ps1");
+    (0, node_fs_1.writeFileSync)(commonPath, hermesWslCommandScript(), "utf8");
+    for (const command of ["gateway", "logs", "profile", "sessions", "setup"]) {
+        (0, node_fs_1.writeFileSync)((0, node_path_1.join)(shimDir, `${command}.ps1`), hermesSubcommandScript(command), "utf8");
+    }
+}
+function hermesSubcommandScript(command) {
+    return [
+        `$env:CLAWHERMES_HERMES_SUBCOMMAND = '${command}'`,
+        `& "$PSScriptRoot\\hermes-wsl-command.ps1" @args`,
+        "exit $LASTEXITCODE",
+        "",
+    ].join("\n");
+}
+function hermesWslCommandScript() {
+    return [
+        "$ErrorActionPreference = 'Stop'",
+        "$subcommand = $env:CLAWHERMES_HERMES_SUBCOMMAND",
+        "if (-not $subcommand) { throw 'CLAWHERMES_HERMES_SUBCOMMAND is not set.' }",
+        "$hermesArgs = @($subcommand) + @($args)",
+        "if ($subcommand -eq 'gateway' -and $args.Count -gt 0 -and @('start', 'restart', 'stop') -contains $args[0]) {",
+        "  Write-Output 'Hermes gateway is managed by ClawHermes-USB.'",
+        "  exit 0",
+        "}",
+        "$root = $env:USB_ROOT",
+        "if (-not $root) { throw 'USB_ROOT is not set.' }",
+        "$wsl = $env:CLAWHERMES_WSL_EXE",
+        "if (-not $wsl) { $wsl = 'wsl.exe' }",
+        "$distro = $env:CLAWHERMES_HERMES_WSL_DISTRO",
+        "if (-not $distro) { $distro = 'ClawHermes-Ubuntu' }",
+        "function Convert-ToWslPath([string]$PathValue) {",
+        "  if ($PathValue -match '^([A-Za-z]):[\\\\/]*(.*)$') {",
+        "    $drive = $Matches[1].ToLowerInvariant()",
+        "    $rest = $Matches[2].Replace('\\\\', '/').TrimStart('/')",
+        "    return \"/mnt/$drive/$rest\"",
+        "  }",
+        "  return $PathValue",
+        "}",
+        "function ShellQuote([string]$Value) {",
+        "  return \"'\" + $Value.Replace(\"'\", \"'`\\\"'`\\\"'\") + \"'\"",
+        "}",
+        "$appDir = Convert-ToWslPath (Join-Path $root 'apps\\hermes-agent')",
+        "$exports = @()",
+        "foreach ($name in @('USB_ROOT', 'HERMES_HOME', 'API_SERVER_KEY', 'HOME', 'USERPROFILE')) {",
+        "  $value = [Environment]::GetEnvironmentVariable($name)",
+        "  if ($value) { $exports += \"export $name=$(ShellQuote (Convert-ToWslPath $value))\" }",
+        "}",
+        "$quotedArgs = ($hermesArgs | ForEach-Object { ShellQuote $_ }) -join ' '",
+        "$scriptParts = @($exports) + @(\"./venv/bin/hermes $quotedArgs\")",
+        "$script = $scriptParts -join ' && '",
+        "$wslArgs = @('--distribution', $distro, '--cd', $appDir, '--', 'bash', '-lc', $script)",
+        "& $wsl @wslArgs",
+        "exit $LASTEXITCODE",
+        "",
+    ].join("\n");
 }
 function stopAdapter(root, adapter) {
     const pidFile = (0, portable_1.resolveRelative)(root, adapter.pidFile);

@@ -1653,7 +1653,7 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertEqual([adapter["id"] for adapter in payload["adapters"]], ["hermes-web-ui"])
         adapter = payload["adapters"][0]
         self.assertEqual(adapter["commands"]["setup"], "npm install")
-        self.assertEqual(adapter["commands"]["start"], "npm run start")
+        self.assertEqual(adapter["commands"]["start"], "node dist/server/index.js")
         self.assertEqual(adapter["dependsOn"], ["hermes-agent"])
         self.assertTrue(any("setup command" in step for step in adapter["nextSteps"]))
 
@@ -2501,7 +2501,9 @@ class WindowsCoreTests(unittest.TestCase):
                         "  argv: process.argv.slice(2),",
                         "  port: process.env.PORT,",
                         "  upstream: process.env.UPSTREAM,",
-                        "  hermesAgentApiBase: process.env.HERMES_AGENT_API_BASE",
+                        "  hermesAgentApiBase: process.env.HERMES_AGENT_API_BASE,",
+                        "  hermesBin: process.env.HERMES_BIN,",
+                        "  path: process.env.PATH",
                         "}, null, 2));",
                         "http.createServer((req, res) => { res.writeHead(200); res.end('ok'); }).listen(Number(process.env.PORT || 8648), '127.0.0.1');",
                         "",
@@ -2513,6 +2515,24 @@ class WindowsCoreTests(unittest.TestCase):
                 "HERMES_AGENT_API_BASE=http://127.0.0.1:8642\nUPSTREAM=http://127.0.0.1:8642\n",
                 encoding="utf-8",
             )
+            stale_profile_dir = temp_root / "data" / "home" / ".hermes"
+            stale_profile_dir.mkdir(parents=True)
+            (stale_profile_dir / "config.yaml").write_text(
+                "\n".join(
+                    [
+                        "platforms:",
+                        "  api_server:",
+                        "    enabled: true",
+                        "    key: ''",
+                        "    cors_origins: '*'",
+                        "    extra:",
+                        "      port: 65534",
+                        "      host: 127.0.0.1",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
 
             start = run_dispatcher_for_root(temp_root, "start", "-Json")
 
@@ -2520,6 +2540,14 @@ class WindowsCoreTests(unittest.TestCase):
             hermes_config = temp_root / "data" / "hermes" / "config.yaml"
             self.assertTrue(hermes_config.exists())
             self.assertEqual(hermes_config.read_text(encoding="utf-8"), "{}\n")
+            web_ui_profile_dir = temp_root / "data" / "home" / ".hermes"
+            web_ui_config = web_ui_profile_dir / "config.yaml"
+            web_ui_env = web_ui_profile_dir / ".env"
+            self.assertTrue(web_ui_config.exists())
+            web_ui_config_text = web_ui_config.read_text(encoding="utf-8")
+            self.assertIn("api_server:", web_ui_config_text)
+            self.assertTrue(web_ui_env.exists())
+            self.assertIn("API_SERVER_KEY=clawhermes", web_ui_env.read_text(encoding="utf-8"))
             vite_config = (app_dir / "vite.config.ts").read_text(encoding="utf-8")
             self.assertEqual(vite_config, stale_upstream_config)
             generated_config = temp_root / "data" / "tmp" / "hermes-web-ui" / "vite.config.mjs"
@@ -2530,10 +2558,17 @@ class WindowsCoreTests(unittest.TestCase):
             hermes_agent_port = next(item for item in ports["services"] if item["serviceId"] == "hermes-agent")["assignedPort"]
             hermes_web_ui_port = next(item for item in ports["services"] if item["serviceId"] == "hermes-web-ui")["assignedPort"]
             expected_upstream = f"http://127.0.0.1:{hermes_agent_port}"
+            self.assertIn(f"      port: {hermes_agent_port}", web_ui_config_text)
+            self.assertIn("      host: 127.0.0.1", web_ui_config_text)
             self.assertEqual(launched["argv"], [])
             self.assertEqual(launched["port"], str(hermes_web_ui_port))
             self.assertEqual(launched["upstream"], expected_upstream)
             self.assertEqual(launched["hermesAgentApiBase"], expected_upstream)
+            self.assertTrue(launched["hermesBin"].lower().endswith("powershell.exe"))
+            shim_dir = temp_root / "data" / "tmp" / "bin" / "hermes-web-ui"
+            self.assertTrue((shim_dir / "profile.ps1").exists())
+            self.assertTrue((shim_dir / "logs.ps1").exists())
+            self.assertIn(str(shim_dir), launched["path"])
             metadata = json.loads((temp_root / "data" / "tmp" / "pids" / "hermes-web-ui.pid").read_text(encoding="utf-8"))
             self.assertNotIn("runner", metadata)
             self.assertIn("dist/server/index.js", metadata["command"].replace("\\", "/"))
@@ -3017,6 +3052,67 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertIsNone(health["statusCode"])
             self.assertIn("unreachable", health["reason"].lower())
         finally:
+            temp_dir.cleanup()
+
+    def test_status_keeps_wsl2_http_service_running_when_wrapper_pid_exits_but_health_is_ready(self):
+        temp_dir, temp_root, port = make_temp_http_usb_root()
+        server = None
+        try:
+            adapter_path = temp_root / "adapters" / "http-service" / "adapter.json"
+            adapter = json.loads(adapter_path.read_text(encoding="utf-8"))
+            adapter["runtime"]["kind"] = "wsl2"
+            adapter_path.write_text(json.dumps(adapter, indent=2), encoding="utf-8")
+            server = subprocess.Popen(
+                [
+                    "node",
+                    "-e",
+                    (
+                        "const http=require('node:http');"
+                        f"const port={port};"
+                        "http.createServer((req,res)=>{"
+                        "if(req.url==='/health'){res.writeHead(200);res.end('ok');return;}"
+                        "res.writeHead(404);res.end('missing');"
+                        "}).listen(port,'127.0.0.1');"
+                    ),
+                ],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            wait_for_url(f"http://127.0.0.1:{port}/health")
+            pid_dir = temp_root / "data" / "tmp" / "pids"
+            pid_dir.mkdir(parents=True, exist_ok=True)
+            pid_file = pid_dir / "http-service.pid"
+            pid_file.write_text(
+                json.dumps(
+                    {
+                        "serviceId": "http-service",
+                        "displayName": "HTTP Service",
+                        "status": "running",
+                        "processId": 99999999,
+                        "placeholder": False,
+                        "runner": "wsl2",
+                        "logFile": str(temp_root / "data" / "logs" / "http-service.log"),
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            status = run_dispatcher_for_root(temp_root, "status", "-Json")
+
+            self.assertEqual(status.returncode, 0, status.stderr)
+            services = {service["id"]: service for service in json.loads(status.stdout)["services"]}
+            service = services["http-service"]
+            self.assertEqual(service["status"], "running")
+            self.assertIsNone(service["processId"])
+            self.assertTrue(service["health"]["ready"])
+            self.assertTrue(pid_file.exists())
+        finally:
+            if server:
+                server.terminate()
+                try:
+                    server.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    server.kill()
             temp_dir.cleanup()
 
     def test_start_generates_portal_from_adapter_metadata(self):

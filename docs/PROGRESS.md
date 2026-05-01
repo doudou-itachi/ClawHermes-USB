@@ -2817,6 +2817,42 @@ Next steps:
 
 - Continue real Hermes Agent and OpenClaw WSL2 payload validation when a prepared distro is available.
 
+### Hermes Web UI Runtime Bridge Hardening
+
+Status: `Done`
+
+Summary:
+
+- Investigated Hermes Web UI no-reply reports from current runtime logs and local API probes.
+- Confirmed SiliconFlow model access works through Hermes Agent and that Web UI Socket.IO chat can complete `run.started` -> `run.completed`.
+- Added a managed Hermes CLI shim for Web UI backend commands so upstream code can call `hermes profile/logs/...` without native Windows Hermes.
+- Made the Web UI profile config refresh on every managed start so stale remapped ports, such as `8643`, cannot survive after the Agent returns to `8642`.
+- Hardened WSL2 status reporting so a healthy HTTP service is not misreported as stopped when the Windows wrapper PID exits but the WSL service remains alive.
+- Preserved upstream Hermes Web UI source files; all changes stay in the ClawHermes adapter/runtime layer.
+
+Changed areas:
+
+- `core/node/src/core.ts`
+- `core/node/src/lifecycle.ts`
+- `core/node/dist/core.js`
+- `core/node/dist/lifecycle.js`
+- `tests/test_windows_core.py`
+- `docs/PROGRESS.md`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_status_keeps_wsl2_http_service_running_when_wrapper_pid_exits_but_health_is_ready tests.test_windows_core.WindowsCoreTests.test_start_uses_hermes_web_ui_production_server_without_touching_upstream -v`
+- `npm test`
+- `git diff --check`
+- Runtime status check: OpenClaw, Hermes Agent, Hermes Web UI, and Portal healthy.
+- Hermes Agent `/v1/chat/completions` smoke test with `Pro/zai-org/GLM-4.7`.
+- Hermes Web UI `/chat-run` Socket.IO smoke test with Chinese input and `Pro/zai-org/GLM-4.7`.
+
+Next steps:
+
+- Add a managed WSL stop/cleanup hook if repeated host sessions leave orphaned WSL relay state.
+
 ### Real WSL2 Payload Verification
 
 Status: `Done`
