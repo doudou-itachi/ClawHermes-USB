@@ -141,6 +141,7 @@ Summary:
 - Fixed Windows Forms click handlers that appeared unresponsive because PowerShell event callbacks could not resolve functions defined inside the GUI construction scope.
 - Moved command execution and theme update callbacks to script-level helpers and kept page rendering callbacks explicitly bound.
 - Added a click self-test path that simulates left navigation, model status button feedback, and theme switching without launching the full interactive message loop.
+- Fixed the Windows Forms layout so the content panel starts to the right of the left navigation instead of being covered by it.
 
 Changed areas:
 
@@ -152,6 +153,7 @@ Validation performed:
 
 - `python -m unittest tests.test_windows_core.WindowsCoreTests.test_gui_control_launcher_calls_powershell_gui tests.test_windows_core.WindowsCoreTests.test_gui_control_script_exposes_left_nav_theme_and_hidden_runner tests.test_windows_core.WindowsCoreTests.test_gui_control_script_wires_pages_to_dispatcher_actions tests.test_windows_core.WindowsCoreTests.test_gui_control_theme_preference_and_docs_are_user_facing tests.test_windows_core.WindowsCoreTests.test_gui_control_click_handlers_change_pages -v`
 - `powershell -NoProfile -ExecutionPolicy Bypass -File launcher\windows\ClawHermes-Control.ps1 -UsbRoot . -SelfTest`
+- Click self-test verifies `contentLeft >= navWidth`, so page controls are not hidden under the left navigation.
 
 Next steps:
 

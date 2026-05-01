@@ -256,7 +256,10 @@ function Show-ClawHermesControl {
     [void]$form.Controls.Add($nav)
 
     $content = New-Object System.Windows.Forms.Panel
-    $content.Dock = "Fill"
+    $content.Dock = "None"
+    $content.Location = New-Object System.Drawing.Point($nav.Width, 0)
+    $content.Size = New-Object System.Drawing.Size(($form.ClientSize.Width - $nav.Width), $form.ClientSize.Height)
+    $content.Anchor = "Top,Bottom,Left,Right"
     [void]$form.Controls.Add($content)
 
     $title = New-Label -Text "ClawHermes" -X 18 -Y 18 -Width 190 -Height 28 -Size 14 -Style ([System.Drawing.FontStyle]::Bold)
@@ -534,6 +537,8 @@ function Show-ClawHermesControl {
             modelPageHasApiUrl = $modelPageHasApiUrl
             modelStatusClickShowsFeedback = $modelStatusClickShowsFeedback
             afterThemeClick = $script:CurrentTheme
+            contentLeft = $content.Left
+            navWidth = $nav.Width
         }
     }
     [void][System.Windows.Forms.Application]::Run($form)

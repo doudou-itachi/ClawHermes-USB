@@ -854,6 +854,7 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertTrue(payload["modelPageHasApiUrl"])
         self.assertTrue(payload["modelStatusClickShowsFeedback"])
         self.assertEqual(payload["afterThemeClick"], "dark")
+        self.assertGreaterEqual(payload["contentLeft"], payload["navWidth"])
 
     def test_user_guide_script_exposes_safe_modes_and_noninteractive_switches(self):
         text = (ROOT / "launcher" / "windows" / "UserGuide.ps1").read_text(encoding="utf-8")
