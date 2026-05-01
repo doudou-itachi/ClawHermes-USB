@@ -37,13 +37,13 @@
     <rect x="90" y="312" width="250" height="116" rx="18" fill="#ffffff"/>
     <text x="116" y="350" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="700" fill="#182434">WSL Runtime</text>
     <text x="116" y="378" font-family="Segoe UI, Arial, sans-serif" font-size="13" fill="#6b7b8e">ClawHermes-Ubuntu</text>
-    <text x="116" y="404" font-family="Segoe UI, Arial, sans-serif" font-size="13" fill="#6b7b8e">OpenClaw + Hermes services</text>
+    <text x="116" y="404" font-family="Segoe UI, Arial, sans-serif" font-size="13" fill="#6b7b8e">OpenClaw + Hermes Agent API</text>
   </g>
   <g filter="url(#shadow)">
     <rect x="425" y="312" width="250" height="116" rx="18" fill="#ffffff"/>
     <text x="451" y="350" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="700" fill="#182434">Browser Interfaces</text>
     <text x="451" y="378" font-family="Segoe UI, Arial, sans-serif" font-size="13" fill="#6b7b8e">OpenClaw Chat</text>
-    <text x="451" y="404" font-family="Segoe UI, Arial, sans-serif" font-size="13" fill="#6b7b8e">Hermes Web UI + Portal</text>
+    <text x="451" y="404" font-family="Segoe UI, Arial, sans-serif" font-size="13" fill="#6b7b8e">Hermes Web UI -> Agent</text>
   </g>
   <g filter="url(#shadow)">
     <rect x="760" y="312" width="250" height="116" rx="18" fill="#ffffff"/>
@@ -56,6 +56,8 @@
   <path d="M732 222 C680 264 604 286 548 312" fill="none" stroke="#6b7b8e" stroke-width="3" marker-end="url(#arrow)"/>
   <path d="M748 222 C610 256 342 262 224 312" fill="none" stroke="#6b7b8e" stroke-width="3" marker-end="url(#arrow)"/>
   <path d="M800 222 C842 252 872 278 884 312" fill="none" stroke="#6b7b8e" stroke-width="3" marker-end="url(#arrow)"/>
-  <path d="M340 370 H425" stroke="#a8b5c7" stroke-width="3" stroke-dasharray="7 8" marker-end="url(#arrow)"/>
-  <path d="M675 370 H760" stroke="#a8b5c7" stroke-width="3" stroke-dasharray="7 8" marker-end="url(#arrow)"/>
+  <path d="M425 370 H340" stroke="#a8b5c7" stroke-width="3" stroke-dasharray="7 8" marker-end="url(#arrow)"/>
+  <rect x="350" y="340" width="66" height="22" rx="11" fill="#f6f9fc" stroke="#c9d6e6"/>
+  <text x="362" y="356" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="700" fill="#53657a">HTTP</text>
+  <path d="M340 404 C476 466 704 460 836 428" fill="none" stroke="#a8b5c7" stroke-width="3" stroke-dasharray="7 8" marker-end="url(#arrow)"/>
 </svg>
