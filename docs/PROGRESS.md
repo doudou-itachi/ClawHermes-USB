@@ -2335,3 +2335,35 @@ Next steps:
 
 - Consider requiring checksum sidecars once a trusted artifact source is chosen.
 - Add a lifecycle safety check that prevents `wsl-import` from overwriting an existing `data/wsl/<distribution>` install directory.
+
+### WSL2 Import Install Location Guard
+
+Status: `Done`
+
+Summary:
+
+- `wsl-import-plan --json` now reports whether the planned `data/wsl/<distribution-name>/` install location already exists.
+- `wsl-import --confirm-import` now fails before running WSL if that install location exists.
+- `setup --json` WSL artifact diagnostics include `installLocationExists` for first-run visibility.
+- Documented the install-location guard in the adapter contract and rootfs artifact policy.
+
+Changed areas:
+
+- `core/node/src/wsl-import.ts`
+- `core/node/src/diagnostics.ts`
+- `core/node/dist/`
+- `docs/ADAPTER_CONTRACT.md`
+- `docs/wsl-rootfs-artifacts.md`
+- `docs/PROGRESS.md`
+- `tests/test_windows_core.py`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_wsl_import_plan_reports_usb_storage_command_without_running_wsl tests.test_windows_core.WindowsCoreTests.test_wsl_import_rejects_existing_install_location_before_running_wsl -v`
+- `npm test`
+
+Next steps:
+
+- Consider requiring checksum sidecars once a trusted artifact source is chosen.
+- Add WSL import conflict guidance for already-registered distro names once unregister/export safeguards are defined.

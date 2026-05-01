@@ -574,6 +574,7 @@ Rules:
 - The guarded `wsl-import` command may store distro files under the USB/project path, but the imported distro is still registered on the current Windows host.
 - `wsl-import-plan` is read-only. It expects a compatible rootfs tar archive under `runtimes/wsl/` and reports the official `wsl.exe --import <name> <install-location> <archive> --version 2` command.
 - Real import execution must require `--confirm-import` and must fail before running WSL when the expected rootfs archive is missing.
+- Real import execution must fail before running WSL when the planned install location under `data/wsl/` already exists.
 - When a `.sha256` sidecar exists next to the rootfs archive, `wsl-import` must verify it before running WSL and reject mismatches.
 - WSL rootfs artifacts are operator-managed payloads. They must stay under `runtimes/wsl/`, stay out of git, avoid system temp folders as durable storage, and never be downloaded automatically by setup/startup diagnostics.
 - Missing `wsl.exe`, missing distributions, and missing WSL2 distributions must be reported as setup actions.

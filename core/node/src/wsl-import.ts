@@ -23,6 +23,7 @@ export function wslImportPlan(usbRoot: string, options: { distro?: string }) {
     distro,
     distributionName,
     installLocation,
+    installLocationExists: existsSync(installLocation),
     sourceArchive,
     sourceArchiveExists: existsSync(sourceArchive),
     checksum,
@@ -97,6 +98,9 @@ export function wslImport(usbRoot: string, options: { distro?: string; confirmIm
   }
   if (!plan.sourceArchiveExists) {
     throw new Error(`Missing WSL rootfs archive: ${plan.sourceArchive}`);
+  }
+  if (plan.installLocationExists) {
+    throw new Error(`WSL install location already exists: ${plan.installLocation}`);
   }
   if (plan.checksum.exists && !plan.checksum.verified) {
     throw new Error(`SHA256 mismatch for WSL rootfs archive: expected ${plan.checksum.expected}, got ${plan.checksum.actual}`);

@@ -725,6 +725,7 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertEqual(payload["distro"], "Ubuntu")
         self.assertEqual(payload["distributionName"], "ClawHermes-Ubuntu")
         self.assertTrue(payload["installLocation"].replace("\\", "/").endswith("data/wsl/ClawHermes-Ubuntu"))
+        self.assertFalse(payload["installLocationExists"])
         self.assertTrue(payload["sourceArchive"].replace("\\", "/").endswith("runtimes/wsl/ubuntu-rootfs.tar"))
         self.assertFalse(payload["sourceArchiveExists"])
         self.assertTrue(payload["wouldModifyHost"])
@@ -873,6 +874,33 @@ class WindowsCoreTests(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("SHA256 mismatch", result.stderr)
+            self.assertFalse(marker.exists())
+        finally:
+            temp_dir.cleanup()
+
+    def test_wsl_import_rejects_existing_install_location_before_running_wsl(self):
+        temp_dir, temp_root = make_temp_usb_root()
+        try:
+            archive = temp_root / "runtimes" / "wsl" / "ubuntu-rootfs.tar"
+            archive.parent.mkdir(parents=True, exist_ok=True)
+            archive.write_text("tiny rootfs placeholder for existing install test\n", encoding="utf-8")
+            install_location = temp_root / "data" / "wsl" / "ClawHermes-Ubuntu"
+            install_location.mkdir(parents=True)
+            marker = temp_root / "data" / "tmp" / "fake-wsl-import.txt"
+            fake_wsl = make_fake_wsl_cmd(temp_root, stay_running=False, marker_path=marker)
+
+            result = run_dispatcher_for_root(
+                temp_root,
+                "wsl-import",
+                "--distro",
+                "Ubuntu",
+                "--confirm-import",
+                "-Json",
+                env={"CLAWHERMES_WSL_EXE": str(fake_wsl)},
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("install location already exists", result.stderr)
             self.assertFalse(marker.exists())
         finally:
             temp_dir.cleanup()

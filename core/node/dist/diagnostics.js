@@ -179,6 +179,7 @@ function wslArtifactDiagnostics(root, adapters) {
             distributionName: plan.distributionName,
             archivePath: plan.sourceArchive,
             installLocation: plan.installLocation,
+            installLocationExists: plan.installLocationExists,
             sourceArchiveExists: plan.sourceArchiveExists,
             checksum: plan.checksum,
             guideCommand: `node core/node/dist/clawhermes.js wsl-rootfs-guide --distro ${plan.distro} --json`,
