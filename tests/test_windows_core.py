@@ -826,6 +826,35 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertIn("图形控制中心", readme_zh_text)
         self.assertIn("ClawHermes-Control.bat", readme_zh_text)
 
+    def test_gui_control_click_handlers_change_pages(self):
+        with tempfile.TemporaryDirectory(prefix="ClawHermes-USB-gui-click-") as temp_root:
+            result = subprocess.run(
+                [
+                    "powershell",
+                    "-NoProfile",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(ROOT / "launcher" / "windows" / "ClawHermes-Control.ps1"),
+                    "-UsbRoot",
+                    temp_root,
+                    "-ClickSelfTest",
+                ],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                encoding="utf-8",
+                errors="replace",
+            )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["initialHeader"], "总览")
+        self.assertEqual(payload["afterModelClickHeader"], "模型配置")
+        self.assertTrue(payload["modelPageHasApiUrl"])
+        self.assertTrue(payload["modelStatusClickShowsFeedback"])
+        self.assertEqual(payload["afterThemeClick"], "dark")
+
     def test_user_guide_script_exposes_safe_modes_and_noninteractive_switches(self):
         text = (ROOT / "launcher" / "windows" / "UserGuide.ps1").read_text(encoding="utf-8")
 

@@ -132,6 +132,31 @@ Next steps:
 - Run full verification before handing the branch back.
 - Consider packaging the GUI entry as the only visible shortcut in a future release bundle while keeping numbered scripts as maintenance fallbacks.
 
+### Windows GUI Click Handler Fix
+
+Status: `Done`
+
+Summary:
+
+- Fixed Windows Forms click handlers that appeared unresponsive because PowerShell event callbacks could not resolve functions defined inside the GUI construction scope.
+- Moved command execution and theme update callbacks to script-level helpers and kept page rendering callbacks explicitly bound.
+- Added a click self-test path that simulates left navigation, model status button feedback, and theme switching without launching the full interactive message loop.
+
+Changed areas:
+
+- `launcher/windows/ClawHermes-Control.ps1`
+- `tests/test_windows_core.py`
+- `docs/PROGRESS.md`
+
+Validation performed:
+
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_gui_control_launcher_calls_powershell_gui tests.test_windows_core.WindowsCoreTests.test_gui_control_script_exposes_left_nav_theme_and_hidden_runner tests.test_windows_core.WindowsCoreTests.test_gui_control_script_wires_pages_to_dispatcher_actions tests.test_windows_core.WindowsCoreTests.test_gui_control_theme_preference_and_docs_are_user_facing tests.test_windows_core.WindowsCoreTests.test_gui_control_click_handlers_change_pages -v`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File launcher\windows\ClawHermes-Control.ps1 -UsbRoot . -SelfTest`
+
+Next steps:
+
+- Ask users to reopen the GUI after pulling this fix so the updated click handlers are loaded.
+
 ## 2026-04-30
 
 ### Initial Project Foundation

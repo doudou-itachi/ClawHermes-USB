@@ -1,6 +1,7 @@
 ﻿param(
     [string]$UsbRoot,
-    [switch]$SelfTest
+    [switch]$SelfTest,
+    [switch]$ClickSelfTest
 )
 
 $ErrorActionPreference = "Stop"
@@ -190,8 +191,49 @@ function Open-Url {
     [void][System.Diagnostics.Process]::Start($Url)
 }
 
+function Set-GuiOutput {
+    param([string]$Text)
+    if ($null -ne $script:GuiOutput) {
+        $script:GuiOutput.Text = $Text
+    }
+}
+
+function Invoke-GuiRunAction {
+    param(
+        [string]$Action,
+        [string[]]$Arguments = @(),
+        [switch]$Json
+    )
+    try {
+        Set-GuiOutput -Text "正在执行：$Action`r`n请稍等，窗口不会弹出额外的命令行。"
+        $result = Invoke-ClawHermesHidden -Root $script:GuiRoot -Action $Action -Arguments $Arguments -Json:$Json
+        Set-GuiOutput -Text (Format-Output -Value $result)
+    } catch {
+        Set-GuiOutput -Text ("执行失败：`r`n" + $_.Exception.Message)
+    }
+}
+
+function Update-GuiThemeFromBox {
+    $selectedThemeId = switch ($script:GuiThemeBox.SelectedIndex) {
+        0 { "system" }
+        1 { "light" }
+        2 { "dark" }
+        default { $null }
+    }
+    if (-not [string]::IsNullOrWhiteSpace($selectedThemeId)) {
+        $script:CurrentTheme = $selectedThemeId
+        Save-GuiSettings -Root $script:GuiRoot -Theme $script:CurrentTheme
+        if ($null -ne $script:GuiApplyTheme) {
+            & $script:GuiApplyTheme -Theme $script:CurrentTheme
+        }
+    }
+}
+
 function Show-ClawHermesControl {
-    param([string]$Root)
+    param(
+        [string]$Root,
+        [switch]$ClickSelfTest
+    )
 
     [System.Windows.Forms.Application]::EnableVisualStyles()
 
@@ -242,87 +284,84 @@ function Show-ClawHermesControl {
     $output.Location = New-Object System.Drawing.Point(0, 190)
     $output.Size = New-Object System.Drawing.Size(760, 320)
     $output.Anchor = "Top,Bottom,Left,Right"
+    $script:GuiRoot = $Root
+    $script:GuiOutput = $output
 
-    function Set-Output {
+    $setOutput = {
         param([string]$Text)
         $output.Text = $Text
-    }
+    }.GetNewClosure()
 
-    function Run-Action {
-        param(
-            [string]$Action,
-            [string[]]$Arguments = @(),
-            [switch]$Json
-        )
-        try {
-            Set-Output -Text "正在执行：$Action`r`n请稍等，窗口不会弹出额外的命令行。"
-            $result = Invoke-ClawHermesHidden -Root $Root -Action $Action -Arguments $Arguments -Json:$Json
-            Set-Output -Text (Format-Output -Value $result)
-        } catch {
-            Set-Output -Text ("执行失败：`r`n" + $_.Exception.Message)
-        }
-    }
-
-    function Add-InfoText {
+    $addInfoText = {
         param([string]$Text)
         $label = New-Label -Text $Text -X 0 -Y 0 -Width 760 -Height 96 -Size 10
         $label.AutoSize = $false
         $page.Controls.Add($label)
         return $label
-    }
+    }.GetNewClosure()
 
-    function Clear-Page {
+    $clearPage = {
         $page.Controls.Clear()
         $output.Text = ""
         $page.Controls.Add($output)
-    }
+    }.GetNewClosure()
 
-    function Show-Page {
+    $showPage = {
         param([string]$Id)
-        Clear-Page
-        $item = $script:NavItems | Where-Object { $_.Id -eq $Id } | Select-Object -First 1
-        $header.Text = [string]$item.Label
+        & $clearPage
+        $header.Text = switch ($Id) {
+            "overview" { "总览" }
+            "install" { "安装向导" }
+            "start" { "启动服务" }
+            "stop" { "停止服务" }
+            "open" { "打开界面" }
+            "model" { "模型配置" }
+            "logs" { "日志" }
+            "backup" { "备份" }
+            "repair" { "修复 / 更新" }
+            default { "总览" }
+        }
 
         switch ($Id) {
             "overview" {
                 $description.Text = "查看服务状态、端口和常用入口。遇到问题时先看这里。"
-                Add-InfoText -Text "建议流程：第一次使用先进入“安装向导”，安装完成后点“启动服务”，再到“打开界面”。"
-                $statusButton = New-ActionButton -Text "刷新状态" -X 0 -Y 118 -OnClick { Run-Action -Action "status" -Json }
-                $openButton = New-ActionButton -Text "打开门户" -X 210 -Y 118 -OnClick { Open-Url -Url "http://127.0.0.1:17000/" }
+                $null = & $addInfoText -Text "建议流程：第一次使用先进入“安装向导”，安装完成后点“启动服务”，再到“打开界面”。"
+                $statusButton = New-ActionButton -Text "刷新状态" -X 0 -Y 118 -OnClick ({ Invoke-GuiRunAction -Action "status" -Json }).GetNewClosure()
+                $openButton = New-ActionButton -Text "打开门户" -X 210 -Y 118 -OnClick ({ Open-Url -Url "http://127.0.0.1:17000/" }).GetNewClosure()
                 [void]$page.Controls.Add($statusButton)
                 [void]$page.Controls.Add($openButton)
-                Set-Output -Text "欢迎使用 ClawHermes-USB 图形控制中心。`r`n`r`n这里会显示执行结果和提示，后台命令会写入 data\logs。"
+                & $setOutput -Text "欢迎使用 ClawHermes-USB 图形控制中心。`r`n`r`n这里会显示执行结果和提示，后台命令会写入 data\logs。"
             }
             "install" {
                 $description.Text = "面向新手的安装检查：先确认离线包和 WSL 计划，再执行导入。"
-                Add-InfoText -Text "按顺序点击下面按钮。导入 WSL 前会先显示计划，避免误操作。"
-                [void]$page.Controls.Add((New-ActionButton -Text "检查安装向导" -X 0 -Y 118 -OnClick { Run-Action -Action "setup-wizard" }))
-                [void]$page.Controls.Add((New-ActionButton -Text "检查 payloads" -X 205 -Y 118 -OnClick { Run-Action -Action "payloads" }))
-                [void]$page.Controls.Add((New-ActionButton -Text "查看 WSL 导入计划" -X 410 -Y 118 -Width 220 -OnClick { Run-Action -Action "wsl-import-plan" -Arguments @("--distro", "Ubuntu") }))
-                [void]$page.Controls.Add((New-ActionButton -Text "执行 WSL 导入" -X 0 -Y 156 -OnClick { Run-Action -Action "wsl-import" -Arguments @("--distro", "Ubuntu", "--confirm-import") }))
+                $null = & $addInfoText -Text "按顺序点击下面按钮。导入 WSL 前会先显示计划，避免误操作。"
+                [void]$page.Controls.Add((New-ActionButton -Text "检查安装向导" -X 0 -Y 118 -OnClick ({ Invoke-GuiRunAction -Action "setup-wizard" }).GetNewClosure()))
+                [void]$page.Controls.Add((New-ActionButton -Text "检查 payloads" -X 205 -Y 118 -OnClick ({ Invoke-GuiRunAction -Action "payloads" }).GetNewClosure()))
+                [void]$page.Controls.Add((New-ActionButton -Text "查看 WSL 导入计划" -X 410 -Y 118 -Width 220 -OnClick ({ Invoke-GuiRunAction -Action "wsl-import-plan" -Arguments @("--distro", "Ubuntu") }).GetNewClosure()))
+                [void]$page.Controls.Add((New-ActionButton -Text "执行 WSL 导入" -X 0 -Y 156 -OnClick ({ Invoke-GuiRunAction -Action "wsl-import" -Arguments @("--distro", "Ubuntu", "--confirm-import") }).GetNewClosure()))
             }
             "start" {
                 $description.Text = "启动 OpenClaw、Hermes Agent、Hermes Web UI 和本地门户。"
-                Add-InfoText -Text "点击后会在后台启动服务，不再弹出多个黑色命令行窗口。"
-                [void]$page.Controls.Add((New-ActionButton -Text "启动服务" -X 0 -Y 118 -OnClick { Run-Action -Action "start" }))
-                [void]$page.Controls.Add((New-ActionButton -Text "启动后刷新状态" -X 205 -Y 118 -OnClick { Run-Action -Action "status" -Json }))
+                $null = & $addInfoText -Text "点击后会在后台启动服务，不再弹出多个黑色命令行窗口。"
+                [void]$page.Controls.Add((New-ActionButton -Text "启动服务" -X 0 -Y 118 -OnClick ({ Invoke-GuiRunAction -Action "start" }).GetNewClosure()))
+                [void]$page.Controls.Add((New-ActionButton -Text "启动后刷新状态" -X 205 -Y 118 -OnClick ({ Invoke-GuiRunAction -Action "status" -Json }).GetNewClosure()))
             }
             "stop" {
                 $description.Text = "停止当前由 ClawHermes 管理的服务。"
-                Add-InfoText -Text "停止只影响本项目启动的服务，不会删除 USB 数据。"
-                [void]$page.Controls.Add((New-ActionButton -Text "停止服务" -X 0 -Y 118 -OnClick { Run-Action -Action "stop" }))
-                [void]$page.Controls.Add((New-ActionButton -Text "查看状态" -X 205 -Y 118 -OnClick { Run-Action -Action "status" -Json }))
+                $null = & $addInfoText -Text "停止只影响本项目启动的服务，不会删除 USB 数据。"
+                [void]$page.Controls.Add((New-ActionButton -Text "停止服务" -X 0 -Y 118 -OnClick ({ Invoke-GuiRunAction -Action "stop" }).GetNewClosure()))
+                [void]$page.Controls.Add((New-ActionButton -Text "查看状态" -X 205 -Y 118 -OnClick ({ Invoke-GuiRunAction -Action "status" -Json }).GetNewClosure()))
             }
             "open" {
                 $description.Text = "打开各个本地 Web 界面。"
-                Add-InfoText -Text "如果页面打不开，请先启动服务并刷新状态。"
-                [void]$page.Controls.Add((New-ActionButton -Text "打开 OpenClaw Chat" -X 0 -Y 118 -Width 220 -OnClick { Open-Url -Url "http://127.0.0.1:18789/" }))
-                [void]$page.Controls.Add((New-ActionButton -Text "打开 Hermes Web UI" -X 240 -Y 118 -Width 220 -OnClick { Open-Url -Url "http://127.0.0.1:8648/" }))
-                [void]$page.Controls.Add((New-ActionButton -Text "打开门户" -X 480 -Y 118 -OnClick { Open-Url -Url "http://127.0.0.1:17000/" }))
+                $null = & $addInfoText -Text "如果页面打不开，请先启动服务并刷新状态。"
+                [void]$page.Controls.Add((New-ActionButton -Text "打开 OpenClaw Chat" -X 0 -Y 118 -Width 220 -OnClick ({ Open-Url -Url "http://127.0.0.1:18789/" }).GetNewClosure()))
+                [void]$page.Controls.Add((New-ActionButton -Text "打开 Hermes Web UI" -X 240 -Y 118 -Width 220 -OnClick ({ Open-Url -Url "http://127.0.0.1:8648/" }).GetNewClosure()))
+                [void]$page.Controls.Add((New-ActionButton -Text "打开门户" -X 480 -Y 118 -OnClick ({ Open-Url -Url "http://127.0.0.1:17000/" }).GetNewClosure()))
             }
             "model" {
                 $description.Text = "给 OpenClaw、Hermes 或两者同时配置模型。"
-                Add-InfoText -Text "填写 API URL / Base URL、模型名称和 API Key。保存时会隐藏密钥显示，只写入本项目 data 目录。"
+                $null = & $addInfoText -Text "填写 API URL / Base URL、模型名称和 API Key。保存时会隐藏密钥显示，只写入本项目 data 目录。"
 
                 $apiUrlLabel = New-Label -Text "API URL / Base URL" -X 0 -Y 92 -Width 160 -Height 22
                 $apiUrl = New-Object System.Windows.Forms.TextBox
@@ -351,18 +390,16 @@ function Show-ClawHermesControl {
                 [void]$apply.Items.Add("hermes")
                 $apply.SelectedIndex = 0
 
-                $saveButton = New-ActionButton -Text "保存模型配置" -X 540 -Y 122 -Width 180 -OnClick {
-                    Run-Action -Action "model-config" -Arguments @(
+                $saveButton = New-ActionButton -Text "保存模型配置" -X 540 -Y 122 -Width 180 -OnClick ({
+                    Invoke-GuiRunAction -Action "model-config" -Arguments @(
                         "--provider-type", "openai-compatible",
                         "--api-url", $apiUrl.Text,
                         "--model", $model.Text,
                         "--api-key", $apiKey.Text,
                         "--apply", $apply.SelectedItem
                     ) -Json
-                }
-                $statusButton = New-ActionButton -Text "查看已保存配置" -X 540 -Y 160 -Width 180 -OnClick {
-                    Run-Action -Action "model-config-status" -Json
-                }
+                }).GetNewClosure()
+                $statusButton = New-ActionButton -Text "查看已保存配置" -X 540 -Y 160 -Width 180 -OnClick ({ Invoke-GuiRunAction -Action "model-config-status" -Json }).GetNewClosure()
 
                 foreach ($control in @($apiUrlLabel, $apiUrl, $modelLabel, $model, $apiKeyLabel, $apiKey, $applyLabel, $apply, $saveButton, $statusButton)) {
                     [void]$page.Controls.Add($control)
@@ -370,25 +407,25 @@ function Show-ClawHermesControl {
             }
             "logs" {
                 $description.Text = "查看日志目录和核心日志列表。"
-                Add-InfoText -Text "日志统一写在 data\logs，方便拷贝给技术支持排查。"
-                [void]$page.Controls.Add((New-ActionButton -Text "列出日志" -X 0 -Y 118 -OnClick { Run-Action -Action "logs" }))
+                $null = & $addInfoText -Text "日志统一写在 data\logs，方便拷贝给技术支持排查。"
+                [void]$page.Controls.Add((New-ActionButton -Text "列出日志" -X 0 -Y 118 -OnClick ({ Invoke-GuiRunAction -Action "logs" }).GetNewClosure()))
             }
             "backup" {
                 $description.Text = "备份本项目的数据目录。"
-                Add-InfoText -Text "备份会保存用户数据和配置，不会修改系统环境。"
-                [void]$page.Controls.Add((New-ActionButton -Text "创建备份" -X 0 -Y 118 -OnClick { Run-Action -Action "backup" }))
+                $null = & $addInfoText -Text "备份会保存用户数据和配置，不会修改系统环境。"
+                [void]$page.Controls.Add((New-ActionButton -Text "创建备份" -X 0 -Y 118 -OnClick ({ Invoke-GuiRunAction -Action "backup" }).GetNewClosure()))
             }
             "repair" {
                 $description.Text = "检查运行环境、离线包、上游源码和适配器状态。"
-                Add-InfoText -Text "修复 / 更新用于排查问题。普通用户通常只需要把这里的输出发给维护人员。"
-                [void]$page.Controls.Add((New-ActionButton -Text "检查基础环境" -X 0 -Y 118 -OnClick { Run-Action -Action "setup" }))
-                [void]$page.Controls.Add((New-ActionButton -Text "检查 runtimes" -X 205 -Y 118 -OnClick { Run-Action -Action "runtimes" }))
-                [void]$page.Controls.Add((New-ActionButton -Text "检查 sources" -X 410 -Y 118 -OnClick { Run-Action -Action "sources" }))
+                $null = & $addInfoText -Text "修复 / 更新用于排查问题。普通用户通常只需要把这里的输出发给维护人员。"
+                [void]$page.Controls.Add((New-ActionButton -Text "检查基础环境" -X 0 -Y 118 -OnClick ({ Invoke-GuiRunAction -Action "setup" }).GetNewClosure()))
+                [void]$page.Controls.Add((New-ActionButton -Text "检查 runtimes" -X 205 -Y 118 -OnClick ({ Invoke-GuiRunAction -Action "runtimes" }).GetNewClosure()))
+                [void]$page.Controls.Add((New-ActionButton -Text "检查 sources" -X 410 -Y 118 -OnClick ({ Invoke-GuiRunAction -Action "sources" }).GetNewClosure()))
             }
         }
-    }
+    }.GetNewClosure()
 
-    function Apply-Theme {
+    $applyTheme = {
         param([string]$Theme)
         $effectiveTheme = $Theme
         if ($effectiveTheme -eq "system") {
@@ -420,21 +457,22 @@ function Show-ClawHermesControl {
                 $control.ForeColor = [System.Drawing.Color]::White
             }
         }
-    }
+    }.GetNewClosure()
+    $script:GuiApplyTheme = $applyTheme
 
     $buttonTop = 86
     foreach ($item in $script:NavItems) {
         $button = New-Object System.Windows.Forms.Button
-        $button.Text = "$($item.Icon)  $($item.Label)"
-        $button.Tag = $item.Id
+        $button.Text = "$($item["Icon"])  $($item["Label"])"
+        $button.Tag = $item["Id"]
         $button.Location = New-Object System.Drawing.Point(14, $buttonTop)
         $button.Size = New-Object System.Drawing.Size(200, 38)
         $button.FlatStyle = "Flat"
         $button.UseVisualStyleBackColor = $false
-        $button.Add_Click({
-            Show-Page -Id ([string]$this.Tag)
-            Apply-Theme -Theme $script:CurrentTheme
-        })
+        $button.Add_Click(({
+            & $showPage -Id ([string]$this.Tag)
+            & $applyTheme -Theme $script:CurrentTheme
+        }).GetNewClosure())
         [void]$nav.Controls.Add($button)
         $buttonTop += 44
     }
@@ -447,32 +485,57 @@ function Show-ClawHermesControl {
     $themeBox.DropDownStyle = "DropDownList"
     $themeBox.Location = New-Object System.Drawing.Point(18, 584)
     $themeBox.Size = New-Object System.Drawing.Size(180, 24)
+    $script:GuiThemeBox = $themeBox
     foreach ($choice in $script:ThemeChoices) {
         [void]$themeBox.Items.Add($choice.Label)
     }
-    $selectedTheme = $script:ThemeChoices | Where-Object { $_.Id -eq $script:CurrentTheme } | Select-Object -First 1
+    $selectedTheme = $null
+    foreach ($choice in $script:ThemeChoices) {
+        if ($choice["Id"] -eq $script:CurrentTheme) {
+            $selectedTheme = $choice
+            break
+        }
+    }
     if ($null -eq $selectedTheme) {
         $themeBox.SelectedIndex = 0
     } else {
-        $themeBox.SelectedItem = $selectedTheme.Label
+        $themeBox.SelectedItem = $selectedTheme["Label"]
     }
-    $themeBox.Add_SelectedIndexChanged({
-        $selectedLabel = [string]$themeBox.SelectedItem
-        $selected = $script:ThemeChoices | Where-Object { $_.Label -eq $selectedLabel } | Select-Object -First 1
-        if ($null -ne $selected) {
-            $script:CurrentTheme = [string]$selected.Id
-            Save-GuiSettings -Root $Root -Theme $script:CurrentTheme
-            Apply-Theme -Theme $script:CurrentTheme
-        }
-    })
+    $themeChanged = { Update-GuiThemeFromBox }
+    $themeBox.Add_SelectedIndexChanged($themeChanged)
     [void]$nav.Controls.Add($themeBox)
 
     $rootLabel = New-Label -Text $Root -X 18 -Y 620 -Width 190 -Height 38 -Size 7
     $rootLabel.ForeColor = [System.Drawing.Color]::FromArgb(156, 163, 175)
     [void]$nav.Controls.Add($rootLabel)
 
-    Show-Page -Id "overview"
-    Apply-Theme -Theme $script:CurrentTheme
+    & $showPage -Id "overview"
+    & $applyTheme -Theme $script:CurrentTheme
+    if ($ClickSelfTest) {
+        $form.Show()
+        [System.Windows.Forms.Application]::DoEvents()
+        $initialHeader = $header.Text
+        $modelButton = $nav.Controls | Where-Object { $_ -is [System.Windows.Forms.Button] -and $_.Tag -eq "model" } | Select-Object -First 1
+        $modelButton.PerformClick()
+        [System.Windows.Forms.Application]::DoEvents()
+        $afterModelClickHeader = $header.Text
+        $modelPageHasApiUrl = ($page.Controls | Where-Object { $_.Text -eq "API URL / Base URL" }).Count -gt 0
+        $modelStatusButton = $page.Controls | Where-Object { $_ -is [System.Windows.Forms.Button] -and $_.Text -eq "查看已保存配置" } | Select-Object -First 1
+        $modelStatusButton.PerformClick()
+        [System.Windows.Forms.Application]::DoEvents()
+        $modelStatusClickShowsFeedback = -not [string]::IsNullOrWhiteSpace($output.Text)
+        $themeBox.SelectedIndex = 2
+        & $themeChanged
+        [System.Windows.Forms.Application]::DoEvents()
+        $form.Close()
+        return [pscustomobject]@{
+            initialHeader = $initialHeader
+            afterModelClickHeader = $afterModelClickHeader
+            modelPageHasApiUrl = $modelPageHasApiUrl
+            modelStatusClickShowsFeedback = $modelStatusClickShowsFeedback
+            afterThemeClick = $script:CurrentTheme
+        }
+    }
     [void][System.Windows.Forms.Application]::Run($form)
 }
 
@@ -486,6 +549,11 @@ if ($SelfTest) {
         settingsPath = Get-GuiSettingsPath -Root $root
         actions = @("setup-wizard", "payloads", "wsl-import-plan", "wsl-import", "model-config", "model-config-status", "start", "stop", "status", "backup", "logs")
     } | ConvertTo-Json -Compress
+    exit 0
+}
+
+if ($ClickSelfTest) {
+    Show-ClawHermesControl -Root $root -ClickSelfTest | ConvertTo-Json -Compress
     exit 0
 }
 
