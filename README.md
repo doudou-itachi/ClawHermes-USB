@@ -16,7 +16,8 @@ Implemented:
 - Adapter descriptor loading and dependency ordering.
 - Placeholder service start/status/stop with logs and PID metadata.
 - Managed process launch for production-ready adapters.
-- Local portal at `http://127.0.0.1:17000/` with live status, setup actions, adapter verification, logs, backup status, and guarded operation commands.
+- Local portal at `http://127.0.0.1:17000/` by default with live status, setup actions, adapter verification, logs, backup status, and guarded operation commands.
+- Runtime port remapping when default service or portal ports are already occupied; assignments are written to `data/tmp/ports.json`.
 - Portable backup command that writes timestamped zip archives under `data/backups/`.
 - Read-only restore planning and guarded no-overwrite restore execution for backup archives.
 - Verified WSL2 adapter path for Hermes Agent using the project-managed `ClawHermes-Ubuntu` distro and `http://127.0.0.1:8642/health`.
@@ -48,7 +49,7 @@ launcher/windows/Stop.bat
 launcher/windows/Backup.bat
 ```
 
-`Start.bat` opens the local portal after a successful start. All Windows Batch launchers forward the core command exit code.
+`Start.bat` opens the local portal after a successful start. If port `17000` is occupied, the core selects a free local port and `Start.bat` opens the assigned URL from `data/tmp/ports.json`. All Windows Batch launchers forward the core command exit code.
 
 Run the Node CLI directly:
 

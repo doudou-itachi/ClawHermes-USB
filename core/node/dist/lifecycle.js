@@ -10,10 +10,11 @@ const environment_1 = require("./environment");
 const portable_1 = require("./portable");
 const wsl_adapter_1 = require("./wsl-adapter");
 const wsl_1 = require("./wsl");
+const command_template_1 = require("./command-template");
 function startAdapter(root, adapter, options = {}) {
     const pidFile = (0, portable_1.resolveRelative)(root, adapter.pidFile);
     const logFile = (0, portable_1.resolveRelative)(root, adapter.logFile);
-    const serviceEnv = (0, environment_1.resolveServiceEnvironment)(root, adapter.id);
+    const serviceEnv = options.serviceEnv ?? (0, environment_1.resolveServiceEnvironment)(root, adapter.id);
     (0, node_fs_1.mkdirSync)((0, node_path_1.dirname)(pidFile), { recursive: true });
     (0, node_fs_1.mkdirSync)((0, node_path_1.dirname)(logFile), { recursive: true });
     const metadata = shouldLaunchManagedProcess(root, adapter, options.forceManaged === true)
@@ -58,9 +59,10 @@ function environmentMetadata(serviceEnv) {
     };
 }
 function launchManagedAdapterProcess(root, adapter, serviceEnv, processPlan) {
-    const command = adapter.commands.start;
-    if (!command)
+    const commandTemplate = adapter.commands.start;
+    if (!commandTemplate)
         throw new Error(`Adapter ${adapter.id} has no start command.`);
+    const command = (0, command_template_1.expandCommandTemplate)(commandTemplate, serviceEnv.env);
     const workingDirectory = (0, portable_1.resolveRelative)(root, adapter.appDir);
     const logFile = (0, portable_1.resolveRelative)(root, adapter.logFile);
     const logFd = (0, node_fs_1.openSync)(logFile, "a");

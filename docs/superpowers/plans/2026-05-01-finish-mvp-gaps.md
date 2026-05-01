@@ -59,12 +59,12 @@
 - Test: `tests/test_windows_core.py`
 - Docs: `docs/PRD.md`, `docs/PROGRESS.md`
 
-- [ ] Add failing tests where default service ports are occupied and `start --json` assigns free replacement ports.
-- [ ] Add failing tests proving health URLs and portal URLs use runtime-assigned ports.
-- [ ] Implement runtime port assignment stored in `data/tmp/ports.json`.
-- [ ] Expand adapter start commands from resolved service env so `${OPENCLAW_GATEWAY_PORT}` and similar placeholders work in WSL and Windows commands.
-- [ ] Support portal port reassignment and return the actual portal URL from `start --json`.
-- [ ] Build, run focused tests, then commit.
+- [x] Add failing tests where default service ports are occupied and `start --json` assigns free replacement ports.
+- [x] Add failing tests proving health URLs and portal URLs use runtime-assigned ports.
+- [x] Implement runtime port assignment stored in `data/tmp/ports.json`.
+- [x] Expand adapter start commands from resolved service env so `${OPENCLAW_GATEWAY_PORT}` and similar placeholders work in WSL and Windows commands.
+- [x] Support portal port reassignment and return the actual portal URL from `start --json`.
+- [x] Build, run focused tests, then commit.
 
 ### Task 5: Setup Wizard
 

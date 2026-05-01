@@ -12,12 +12,14 @@ const node_path_1 = require("node:path");
 const node_http_1 = require("node:http");
 const lifecycle_1 = require("./lifecycle");
 const portable_1 = require("./portable");
+const ports_runtime_1 = require("./ports-runtime");
 exports.PORTAL_URL = "http://127.0.0.1:17000/";
 function escapeHtml(value) {
     return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 }
 function generatePortal(usbRoot, services) {
     const root = (0, portable_1.getRoot)(usbRoot);
+    const url = (0, ports_runtime_1.runtimePortalUrl)(root);
     const portalPath = (0, node_path_1.join)(root, "portal", "index.html");
     (0, node_fs_1.mkdirSync)((0, node_path_1.dirname)(portalPath), { recursive: true });
     const rows = services.map((service) => {
@@ -297,7 +299,7 @@ function generatePortal(usbRoot, services) {
 `;
     (0, node_fs_1.writeFileSync)(portalPath, html, "utf8");
     (0, portable_1.writeLog)(root, "portal", "INFO", "Generated portal/index.html.");
-    return { path: portalPath, url: exports.PORTAL_URL };
+    return { path: portalPath, url };
 }
 function portalPidFile(usbRoot) {
     return (0, node_path_1.join)((0, portable_1.getRoot)(usbRoot), "data", "tmp", "pids", "portal.pid");
@@ -340,11 +342,11 @@ async function tcpPortAvailable(port) {
         server.listen(port, "127.0.0.1", () => server.close(() => resolveAvailable(true)));
     });
 }
-async function portalReady(timeoutMs = 5000) {
+async function portalReady(url, timeoutMs = 5000) {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
         const ready = await new Promise((resolveReady) => {
-            const request = (0, node_http_1.get)(exports.PORTAL_URL, (response) => {
+            const request = (0, node_http_1.get)(url, (response) => {
                 response.resume();
                 resolveReady(response.statusCode === 200);
             });
@@ -360,56 +362,59 @@ async function portalReady(timeoutMs = 5000) {
     }
     return false;
 }
-function portalMetadata(root, processId) {
+function portalMetadata(root, processId, url = (0, ports_runtime_1.runtimePortalUrl)(root)) {
     return {
         serviceId: "portal",
         displayName: "Portal",
         status: "running",
         processId,
         startedAt: new Date().toISOString(),
-        url: exports.PORTAL_URL,
+        url,
         logFile: (0, node_path_1.join)(root, "data", "logs", "portal.log"),
     };
 }
-async function startPortalServer(usbRoot) {
+async function startPortalServer(usbRoot, port = 17000) {
     const root = (0, portable_1.getRoot)(usbRoot);
+    const url = `http://127.0.0.1:${port}/`;
     const pidFile = portalPidFile(root);
     (0, node_fs_1.mkdirSync)((0, node_path_1.dirname)(pidFile), { recursive: true });
     if ((0, node_fs_1.existsSync)(pidFile)) {
         const existing = JSON.parse((0, node_fs_1.readFileSync)(pidFile, "utf8"));
-        if (existing.processId && portalProcessById(root, existing.processId))
-            return existing;
+        if (existing.processId && portalProcessById(root, existing.processId)) {
+            return { ...portalMetadata(root, existing.processId, url), ...existing, url };
+        }
         (0, node_fs_1.rmSync)(pidFile, { force: true });
     }
     const existingProcess = portalProcesses(root)[0];
     if (existingProcess) {
-        const metadata = portalMetadata(root, existingProcess.ProcessId);
+        const metadata = portalMetadata(root, existingProcess.ProcessId, url);
         (0, node_fs_1.writeFileSync)(pidFile, JSON.stringify(metadata, null, 2), "utf8");
-        (0, portable_1.writeLog)(root, "portal", "INFO", "Reused existing portal server on http://127.0.0.1:17000/.");
+        (0, portable_1.writeLog)(root, "portal", "INFO", `Reused existing portal server on ${url}.`);
         return metadata;
     }
-    if (!(await tcpPortAvailable(17000))) {
-        throw new Error("Port 17000 is already in use. Stop the conflicting process or change config/defaults/ports.json.");
+    if (!(await tcpPortAvailable(port))) {
+        throw new Error(`Port ${port} is already in use. Stop the conflicting process or change config/defaults/ports.json.`);
     }
-    const child = (0, node_child_process_1.spawn)(process.execPath, [portalServerPath(root), "--usb-root", root, "--port", "17000"], {
+    const child = (0, node_child_process_1.spawn)(process.execPath, [portalServerPath(root), "--usb-root", root, "--port", String(port)], {
         detached: true,
         stdio: ["ignore", "ignore", "ignore"],
         windowsHide: true,
     });
     child.unref();
-    if (!(await portalReady())) {
+    if (!(await portalReady(url))) {
         if (child.pid && portalProcessById(root, child.pid))
             process.kill(child.pid);
-        throw new Error("Portal server did not become reachable at http://127.0.0.1:17000/.");
+        throw new Error(`Portal server did not become reachable at ${url}.`);
     }
-    const metadata = portalMetadata(root, child.pid ?? 0);
+    const metadata = portalMetadata(root, child.pid ?? 0, url);
     (0, node_fs_1.writeFileSync)(pidFile, JSON.stringify(metadata, null, 2), "utf8");
-    (0, portable_1.writeLog)(root, "portal", "INFO", "Started portal server on http://127.0.0.1:17000/.");
+    (0, portable_1.writeLog)(root, "portal", "INFO", `Started portal server on ${url}.`);
     return metadata;
 }
 function getPortalStatus(usbRoot) {
     const root = (0, portable_1.getRoot)(usbRoot);
     const pidFile = portalPidFile(root);
+    const url = (0, ports_runtime_1.runtimePortalUrl)(root);
     let status = "stopped";
     let processId = null;
     if ((0, node_fs_1.existsSync)(pidFile)) {
@@ -437,7 +442,7 @@ function getPortalStatus(usbRoot) {
         status,
         pidFile,
         logFile: (0, node_path_1.join)(root, "data", "logs", "portal.log"),
-        portalUrl: exports.PORTAL_URL,
+        portalUrl: url,
         processId,
         placeholder: false,
         health: {

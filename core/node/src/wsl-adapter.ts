@@ -1,6 +1,7 @@
 import type { AdapterDescriptor, ServiceEnvironment } from "./types";
 import { resolveRelative } from "./portable";
 import { wslDiagnostics } from "./wsl";
+import { expandCommandTemplate } from "./command-template";
 
 export function wslAdapterSetupPlan(root: string, adapter: AdapterDescriptor, serviceEnv: ServiceEnvironment) {
   return wslAdapterCommandPlan(root, adapter, serviceEnv, "setup");
@@ -10,8 +11,9 @@ export function wslAdapterCommandPlan(root: string, adapter: AdapterDescriptor, 
   const distro = adapter.runtime?.distro;
   const diagnostics = wslDiagnostics(root, distro);
   const workingDirectory = windowsPathToWslPath(resolveRelative(root, adapter.appDir));
-  const command = adapter.commands[phase];
-  if (!command) throw new Error(`Adapter ${adapter.id} does not declare a ${phase} command.`);
+  const commandTemplate = adapter.commands[phase];
+  if (!commandTemplate) throw new Error(`Adapter ${adapter.id} does not declare a ${phase} command.`);
+  const command = expandCommandTemplate(commandTemplate, serviceEnv.env);
   const script = [
     ...environmentExports(root, serviceEnv.env),
     command,

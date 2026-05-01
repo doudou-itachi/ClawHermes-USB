@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.wslWorkflowPlan = exports.wslUnregisterPlan = exports.wslUnregister = exports.wslRootfsGuide = exports.wslImportPlan = exports.wslImport = exports.wslExport = exports.wslDiagnostics = exports.prepareWsl = exports.writeStatusSnapshot = exports.payloadInventory = exports.payloadExport = exports.runtimePreparationPlan = exports.runtimeDiagnostics = exports.loadRuntimeManifest = exports.installRuntimeFromArchive = exports.stopPortalServer = exports.startPortalServer = exports.getPortalStatus = exports.generatePortal = exports.PORTAL_URL = exports.writeSetupSnapshot = exports.setupDiagnostics = exports.readLogTail = exports.portDiagnostics = exports.pathDiagnostics = exports.serviceEnvironmentDiagnostic = exports.resolveServiceEnvironment = exports.initializeEnvFiles = exports.envFileDiagnostics = exports.restorePlan = exports.restoreBackup = exports.createBackup = exports.verifyAdapter = exports.runAdapterSetup = exports.markAdapterReady = exports.probeAppSources = exports.checkoutAppSource = exports.appSourcePlan = exports.adapterSetupPlan = exports.validateAdapter = exports.serviceOrder = exports.loadAdapters = exports.integrationReadiness = exports.portableEnv = exports.getRoot = exports.dataWritable = void 0;
+exports.wslWorkflowPlan = exports.wslUnregisterPlan = exports.wslUnregister = exports.wslRootfsGuide = exports.wslImportPlan = exports.wslImport = exports.wslExport = exports.wslDiagnostics = exports.prepareWsl = exports.writeStatusSnapshot = exports.readRuntimePortState = exports.assignRuntimePorts = exports.payloadInventory = exports.payloadExport = exports.runtimePreparationPlan = exports.runtimeDiagnostics = exports.loadRuntimeManifest = exports.installRuntimeFromArchive = exports.stopPortalServer = exports.startPortalServer = exports.getPortalStatus = exports.generatePortal = exports.PORTAL_URL = exports.writeSetupSnapshot = exports.setupDiagnostics = exports.readLogTail = exports.portDiagnostics = exports.pathDiagnostics = exports.serviceEnvironmentDiagnostic = exports.resolveServiceEnvironment = exports.initializeEnvFiles = exports.envFileDiagnostics = exports.restorePlan = exports.restoreBackup = exports.createBackup = exports.verifyAdapter = exports.runAdapterSetup = exports.markAdapterReady = exports.probeAppSources = exports.checkoutAppSource = exports.appSourcePlan = exports.adapterSetupPlan = exports.validateAdapter = exports.serviceOrder = exports.loadAdapters = exports.integrationReadiness = exports.portableEnv = exports.getRoot = exports.dataWritable = void 0;
 exports.startSkeleton = startSkeleton;
 exports.startSingleAdapter = startSingleAdapter;
 exports.getStatus = getStatus;
@@ -15,6 +15,7 @@ const portal_1 = require("./portal");
 const status_1 = require("./status");
 const wsl_adapter_1 = require("./wsl-adapter");
 const wsl_1 = require("./wsl");
+const ports_runtime_1 = require("./ports-runtime");
 var portable_2 = require("./portable");
 Object.defineProperty(exports, "dataWritable", { enumerable: true, get: function () { return portable_2.dataWritable; } });
 Object.defineProperty(exports, "getRoot", { enumerable: true, get: function () { return portable_2.getRoot; } });
@@ -65,6 +66,9 @@ var payload_export_1 = require("./payload-export");
 Object.defineProperty(exports, "payloadExport", { enumerable: true, get: function () { return payload_export_1.payloadExport; } });
 var payloads_1 = require("./payloads");
 Object.defineProperty(exports, "payloadInventory", { enumerable: true, get: function () { return payloads_1.payloadInventory; } });
+var ports_runtime_2 = require("./ports-runtime");
+Object.defineProperty(exports, "assignRuntimePorts", { enumerable: true, get: function () { return ports_runtime_2.assignRuntimePorts; } });
+Object.defineProperty(exports, "readRuntimePortState", { enumerable: true, get: function () { return ports_runtime_2.readRuntimePortState; } });
 var status_2 = require("./status");
 Object.defineProperty(exports, "writeStatusSnapshot", { enumerable: true, get: function () { return status_2.writeStatusSnapshot; } });
 var wsl_2 = require("./wsl");
@@ -84,17 +88,21 @@ async function startSkeleton(usbRoot) {
     const setup = (0, diagnostics_1.setupDiagnostics)(root);
     (0, diagnostics_1.writeSetupSnapshot)(root, setup);
     const started = [];
-    for (const adapter of (0, adapters_1.serviceOrder)(root, "start").filter((item) => item.enabled)) {
+    const adapters = (0, adapters_1.serviceOrder)(root, "start").filter((item) => item.enabled);
+    const portState = await (0, ports_runtime_1.assignRuntimePorts)(root, adapters);
+    for (const sourceAdapter of adapters) {
+        const adapter = (0, ports_runtime_1.applyRuntimePortsToAdapter)(sourceAdapter, portState);
+        const serviceEnv = (0, ports_runtime_1.applyRuntimePortsToEnvironment)((0, environment_1.resolveServiceEnvironment)(root, adapter.id), portState);
         const shouldPrepareWslPlan = adapter.runtime?.kind === "wsl2" && adapter.integration?.productionReady === true && Boolean(adapter.commands.start);
-        const wslPlan = shouldPrepareWslPlan ? (0, wsl_adapter_1.wslAdapterCommandPlan)(root, adapter, (0, environment_1.resolveServiceEnvironment)(root, adapter.id), "start") : null;
+        const wslPlan = shouldPrepareWslPlan ? (0, wsl_adapter_1.wslAdapterCommandPlan)(root, adapter, serviceEnv, "start") : null;
         if (wslPlan && adapter.integration?.productionReady === true) {
             (0, wsl_adapter_1.assertWslReadyForAdapterDistro)(root, adapter.id, adapter.runtime?.distro);
         }
-        (0, lifecycle_1.startAdapter)(root, adapter, wslPlan ? { processPlan: wslManagedProcessPlan(root, wslPlan) } : {});
+        (0, lifecycle_1.startAdapter)(root, adapter, wslPlan ? { processPlan: wslManagedProcessPlan(root, wslPlan), serviceEnv } : { serviceEnv });
         started.push(adapter.id);
     }
     (0, portal_1.generatePortal)(root, getStatus(root).services);
-    const portal = await (0, portal_1.startPortalServer)(root);
+    const portal = await (0, portal_1.startPortalServer)(root, portState.portal.assignedPort);
     (0, status_1.writeStatusSnapshot)(root, getStatus(root));
     return { root, started, portal, setupMessages: setup.messages };
 }
@@ -107,18 +115,21 @@ function startSingleAdapter(usbRoot, serviceId, options) {
         throw new Error(`Unknown adapter: ${serviceId}`);
     if (!adapter.commands.start)
         throw new Error(`Adapter ${serviceId} does not declare a start command.`);
-    const wslPlan = adapter.runtime?.kind === "wsl2" ? (0, wsl_adapter_1.wslAdapterCommandPlan)(root, adapter, (0, environment_1.resolveServiceEnvironment)(root, serviceId), "start") : null;
+    const portState = (0, ports_runtime_1.readRuntimePortState)(root);
+    const runtimeAdapter = (0, ports_runtime_1.applyRuntimePortsToAdapter)(adapter, portState);
+    const serviceEnv = (0, ports_runtime_1.applyRuntimePortsToEnvironment)((0, environment_1.resolveServiceEnvironment)(root, serviceId), portState);
+    const wslPlan = runtimeAdapter.runtime?.kind === "wsl2" ? (0, wsl_adapter_1.wslAdapterCommandPlan)(root, runtimeAdapter, serviceEnv, "start") : null;
     const result = {
         root,
         serviceId,
-        displayName: adapter.displayName,
+        displayName: runtimeAdapter.displayName,
         runner: wslPlan ? "wsl2" : "windows",
         dryRun: options.dryRun,
         confirmed: options.confirm,
         wouldModify: !options.dryRun,
         started: false,
-        command: adapter.commands.start,
-        appDir: (0, portable_1.resolveRelative)(root, adapter.appDir),
+        command: runtimeAdapter.commands.start,
+        appDir: (0, portable_1.resolveRelative)(root, runtimeAdapter.appDir),
         wsl: wslPlan
             ? {
                 executablePath: wslPlan.executablePath,
@@ -136,14 +147,15 @@ function startSingleAdapter(usbRoot, serviceId, options) {
     if (options.dryRun)
         return result;
     if (wslPlan) {
-        (0, wsl_adapter_1.assertWslReadyForAdapterDistro)(root, serviceId, adapter.runtime?.distro);
-        const metadata = (0, lifecycle_1.startAdapter)(root, adapter, {
+        (0, wsl_adapter_1.assertWslReadyForAdapterDistro)(root, serviceId, runtimeAdapter.runtime?.distro);
+        const metadata = (0, lifecycle_1.startAdapter)(root, runtimeAdapter, {
             forceManaged: true,
             processPlan: wslManagedProcessPlan(root, wslPlan),
+            serviceEnv,
         });
         return { ...result, started: true, metadata };
     }
-    const metadata = (0, lifecycle_1.startAdapter)(root, adapter, { forceManaged: true });
+    const metadata = (0, lifecycle_1.startAdapter)(root, runtimeAdapter, { forceManaged: true, serviceEnv });
     return { ...result, started: true, metadata };
 }
 function wslManagedProcessPlan(root, wslPlan) {
@@ -166,7 +178,9 @@ function wslManagedProcessPlan(root, wslPlan) {
 }
 function getStatus(usbRoot) {
     const root = (0, portable_1.getRoot)(usbRoot);
-    const services = (0, adapters_1.serviceOrder)(root, "start").map((adapter) => {
+    const portState = (0, ports_runtime_1.readRuntimePortState)(root);
+    const services = (0, adapters_1.serviceOrder)(root, "start").map((sourceAdapter) => {
+        const adapter = (0, ports_runtime_1.applyRuntimePortsToAdapter)(sourceAdapter, portState);
         const pidFile = (0, portable_1.resolveRelative)(root, adapter.pidFile);
         let status = "stopped";
         let processId = null;

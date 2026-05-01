@@ -9,6 +9,7 @@ import { generatePortal, getPortalStatus, startPortalServer, stopPortalServer } 
 import { adapterHealth, processExists, writeStatusSnapshot } from "./status";
 import { assertWslReadyForAdapterDistro, wslAdapterCommandPlan } from "./wsl-adapter";
 import { wslExecutableInvocation } from "./wsl";
+import { applyRuntimePortsToAdapter, applyRuntimePortsToEnvironment, assignRuntimePorts, readRuntimePortState } from "./ports-runtime";
 
 export { dataWritable, getRoot, portableEnv } from "./portable";
 export { integrationReadiness, loadAdapters, serviceOrder, validateAdapter } from "./adapters";
@@ -23,6 +24,7 @@ export { PORTAL_URL, generatePortal, getPortalStatus, startPortalServer, stopPor
 export { installRuntimeFromArchive, loadRuntimeManifest, runtimeDiagnostics, runtimePreparationPlan } from "./runtimes";
 export { payloadExport } from "./payload-export";
 export { payloadInventory } from "./payloads";
+export { assignRuntimePorts, readRuntimePortState } from "./ports-runtime";
 export { writeStatusSnapshot } from "./status";
 export { prepareWsl, wslDiagnostics } from "./wsl";
 export { wslExport, wslImport, wslImportPlan, wslRootfsGuide, wslUnregister, wslUnregisterPlan } from "./wsl-import";
@@ -33,17 +35,21 @@ export async function startSkeleton(usbRoot: string) {
   const setup = setupDiagnostics(root);
   writeSetupSnapshot(root, setup);
   const started: string[] = [];
-  for (const adapter of serviceOrder(root, "start").filter((item) => item.enabled)) {
+  const adapters = serviceOrder(root, "start").filter((item) => item.enabled);
+  const portState = await assignRuntimePorts(root, adapters);
+  for (const sourceAdapter of adapters) {
+    const adapter = applyRuntimePortsToAdapter(sourceAdapter, portState);
+    const serviceEnv = applyRuntimePortsToEnvironment(resolveServiceEnvironment(root, adapter.id), portState);
     const shouldPrepareWslPlan = adapter.runtime?.kind === "wsl2" && adapter.integration?.productionReady === true && Boolean(adapter.commands.start);
-    const wslPlan = shouldPrepareWslPlan ? wslAdapterCommandPlan(root, adapter, resolveServiceEnvironment(root, adapter.id), "start") : null;
+    const wslPlan = shouldPrepareWslPlan ? wslAdapterCommandPlan(root, adapter, serviceEnv, "start") : null;
     if (wslPlan && adapter.integration?.productionReady === true) {
       assertWslReadyForAdapterDistro(root, adapter.id, adapter.runtime?.distro);
     }
-    startAdapter(root, adapter, wslPlan ? { processPlan: wslManagedProcessPlan(root, wslPlan) } : {});
+    startAdapter(root, adapter, wslPlan ? { processPlan: wslManagedProcessPlan(root, wslPlan), serviceEnv } : { serviceEnv });
     started.push(adapter.id);
   }
   generatePortal(root, getStatus(root).services);
-  const portal = await startPortalServer(root);
+  const portal = await startPortalServer(root, portState.portal.assignedPort);
   writeStatusSnapshot(root, getStatus(root));
   return { root, started, portal, setupMessages: setup.messages };
 }
@@ -54,18 +60,21 @@ export function startSingleAdapter(usbRoot: string, serviceId: string | undefine
   const adapter = loadAdapters(root).find((item) => item.id === serviceId);
   if (!adapter) throw new Error(`Unknown adapter: ${serviceId}`);
   if (!adapter.commands.start) throw new Error(`Adapter ${serviceId} does not declare a start command.`);
-  const wslPlan = adapter.runtime?.kind === "wsl2" ? wslAdapterCommandPlan(root, adapter, resolveServiceEnvironment(root, serviceId), "start") : null;
+  const portState = readRuntimePortState(root);
+  const runtimeAdapter = applyRuntimePortsToAdapter(adapter, portState);
+  const serviceEnv = applyRuntimePortsToEnvironment(resolveServiceEnvironment(root, serviceId), portState);
+  const wslPlan = runtimeAdapter.runtime?.kind === "wsl2" ? wslAdapterCommandPlan(root, runtimeAdapter, serviceEnv, "start") : null;
   const result = {
     root,
     serviceId,
-    displayName: adapter.displayName,
+    displayName: runtimeAdapter.displayName,
     runner: wslPlan ? "wsl2" : "windows",
     dryRun: options.dryRun,
     confirmed: options.confirm,
     wouldModify: !options.dryRun,
     started: false,
-    command: adapter.commands.start,
-    appDir: resolveRelative(root, adapter.appDir),
+    command: runtimeAdapter.commands.start,
+    appDir: resolveRelative(root, runtimeAdapter.appDir),
     wsl: wslPlan
       ? {
         executablePath: wslPlan.executablePath,
@@ -82,14 +91,15 @@ export function startSingleAdapter(usbRoot: string, serviceId: string | undefine
   }
   if (options.dryRun) return result;
   if (wslPlan) {
-    assertWslReadyForAdapterDistro(root, serviceId, adapter.runtime?.distro);
-    const metadata = startAdapter(root, adapter, {
+    assertWslReadyForAdapterDistro(root, serviceId, runtimeAdapter.runtime?.distro);
+    const metadata = startAdapter(root, runtimeAdapter, {
       forceManaged: true,
       processPlan: wslManagedProcessPlan(root, wslPlan),
+      serviceEnv,
     });
     return { ...result, started: true, metadata };
   }
-  const metadata = startAdapter(root, adapter, { forceManaged: true });
+  const metadata = startAdapter(root, runtimeAdapter, { forceManaged: true, serviceEnv });
   return { ...result, started: true, metadata };
 }
 
@@ -114,7 +124,9 @@ function wslManagedProcessPlan(root: string, wslPlan: ReturnType<typeof wslAdapt
 
 export function getStatus(usbRoot: string) {
   const root = getRoot(usbRoot);
-  const services: ServiceStatus[] = serviceOrder(root, "start").map((adapter) => {
+  const portState = readRuntimePortState(root);
+  const services: ServiceStatus[] = serviceOrder(root, "start").map((sourceAdapter) => {
+    const adapter = applyRuntimePortsToAdapter(sourceAdapter, portState);
     const pidFile = resolveRelative(root, adapter.pidFile);
     let status = "stopped";
     let processId: number | null = null;

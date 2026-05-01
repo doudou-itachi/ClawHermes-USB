@@ -461,9 +461,9 @@ async function main(): Promise<void> {
       if (json) {
         printJson(result);
       } else {
-        console.log("ClawHermes-USB placeholder services started:");
+        console.log("ClawHermes-USB services started:");
         for (const id of result.started) console.log(`- ${id}`);
-        console.log("Portal target: http://127.0.0.1:17000/");
+        console.log(`Portal target: ${result.portal.url}`);
       }
       return;
     }

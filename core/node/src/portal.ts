@@ -6,8 +6,19 @@ import { get } from "node:http";
 import type { ServiceStatus } from "./types";
 import { killProcessTree } from "./lifecycle";
 import { getRoot, writeLog } from "./portable";
+import { runtimePortalUrl } from "./ports-runtime";
 
 export const PORTAL_URL = "http://127.0.0.1:17000/";
+
+type PortalMetadata = {
+  serviceId: "portal";
+  displayName: "Portal";
+  status: "running";
+  processId: number;
+  startedAt: string;
+  url: string;
+  logFile: string;
+};
 
 function escapeHtml(value: string): string {
   return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
@@ -15,6 +26,7 @@ function escapeHtml(value: string): string {
 
 export function generatePortal(usbRoot: string, services: ServiceStatus[]): { path: string; url: string } {
   const root = getRoot(usbRoot);
+  const url = runtimePortalUrl(root);
   const portalPath = join(root, "portal", "index.html");
   mkdirSync(dirname(portalPath), { recursive: true });
   const rows = services.map((service) => {
@@ -294,7 +306,7 @@ export function generatePortal(usbRoot: string, services: ServiceStatus[]): { pa
 `;
   writeFileSync(portalPath, html, "utf8");
   writeLog(root, "portal", "INFO", "Generated portal/index.html.");
-  return { path: portalPath, url: PORTAL_URL };
+  return { path: portalPath, url };
 }
 
 function portalPidFile(usbRoot: string): string {
@@ -343,11 +355,11 @@ async function tcpPortAvailable(port: number): Promise<boolean> {
   });
 }
 
-async function portalReady(timeoutMs = 5000): Promise<boolean> {
+async function portalReady(url: string, timeoutMs = 5000): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const ready = await new Promise<boolean>((resolveReady) => {
-      const request = get(PORTAL_URL, (response) => {
+      const request = get(url, (response) => {
         response.resume();
         resolveReady(response.statusCode === 200);
       });
@@ -363,56 +375,60 @@ async function portalReady(timeoutMs = 5000): Promise<boolean> {
   return false;
 }
 
-function portalMetadata(root: string, processId: number) {
+function portalMetadata(root: string, processId: number, url = runtimePortalUrl(root)): PortalMetadata {
   return {
     serviceId: "portal",
     displayName: "Portal",
     status: "running",
     processId,
     startedAt: new Date().toISOString(),
-    url: PORTAL_URL,
+    url,
     logFile: join(root, "data", "logs", "portal.log"),
   };
 }
 
-export async function startPortalServer(usbRoot: string) {
+export async function startPortalServer(usbRoot: string, port = 17000) {
   const root = getRoot(usbRoot);
+  const url = `http://127.0.0.1:${port}/`;
   const pidFile = portalPidFile(root);
   mkdirSync(dirname(pidFile), { recursive: true });
   if (existsSync(pidFile)) {
-    const existing = JSON.parse(readFileSync(pidFile, "utf8")) as { processId?: number };
-    if (existing.processId && portalProcessById(root, existing.processId)) return existing;
+    const existing = JSON.parse(readFileSync(pidFile, "utf8")) as Partial<PortalMetadata>;
+    if (existing.processId && portalProcessById(root, existing.processId)) {
+      return { ...portalMetadata(root, existing.processId, url), ...existing, url };
+    }
     rmSync(pidFile, { force: true });
   }
   const existingProcess = portalProcesses(root)[0];
   if (existingProcess) {
-    const metadata = portalMetadata(root, existingProcess.ProcessId);
+    const metadata = portalMetadata(root, existingProcess.ProcessId, url);
     writeFileSync(pidFile, JSON.stringify(metadata, null, 2), "utf8");
-    writeLog(root, "portal", "INFO", "Reused existing portal server on http://127.0.0.1:17000/.");
+    writeLog(root, "portal", "INFO", `Reused existing portal server on ${url}.`);
     return metadata;
   }
-  if (!(await tcpPortAvailable(17000))) {
-    throw new Error("Port 17000 is already in use. Stop the conflicting process or change config/defaults/ports.json.");
+  if (!(await tcpPortAvailable(port))) {
+    throw new Error(`Port ${port} is already in use. Stop the conflicting process or change config/defaults/ports.json.`);
   }
-  const child = spawn(process.execPath, [portalServerPath(root), "--usb-root", root, "--port", "17000"], {
+  const child = spawn(process.execPath, [portalServerPath(root), "--usb-root", root, "--port", String(port)], {
     detached: true,
     stdio: ["ignore", "ignore", "ignore"],
     windowsHide: true,
   });
   child.unref();
-  if (!(await portalReady())) {
+  if (!(await portalReady(url))) {
     if (child.pid && portalProcessById(root, child.pid)) process.kill(child.pid);
-    throw new Error("Portal server did not become reachable at http://127.0.0.1:17000/.");
+    throw new Error(`Portal server did not become reachable at ${url}.`);
   }
-  const metadata = portalMetadata(root, child.pid ?? 0);
+  const metadata = portalMetadata(root, child.pid ?? 0, url);
   writeFileSync(pidFile, JSON.stringify(metadata, null, 2), "utf8");
-  writeLog(root, "portal", "INFO", "Started portal server on http://127.0.0.1:17000/.");
+  writeLog(root, "portal", "INFO", `Started portal server on ${url}.`);
   return metadata;
 }
 
 export function getPortalStatus(usbRoot: string): ServiceStatus {
   const root = getRoot(usbRoot);
   const pidFile = portalPidFile(root);
+  const url = runtimePortalUrl(root);
   let status = "stopped";
   let processId: number | null = null;
   if (existsSync(pidFile)) {
@@ -437,7 +453,7 @@ export function getPortalStatus(usbRoot: string): ServiceStatus {
     status,
     pidFile,
     logFile: join(root, "data", "logs", "portal.log"),
-    portalUrl: PORTAL_URL,
+    portalUrl: url,
     processId,
     placeholder: false,
     health: {

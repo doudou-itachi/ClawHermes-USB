@@ -3005,6 +3005,46 @@ Next steps:
 - Keep `.gitkeep` placeholders tracked only by the parent repository.
 - Keep nested payload git status clean before running export or release packaging.
 
+### Runtime Port Remapping
+
+Status: `Done`
+
+Summary:
+
+- Added runtime port assignment under `data/tmp/ports.json`.
+- `start --json` now assigns free replacement localhost ports when default portal or adapter health ports are occupied.
+- Service environment values, health URLs, portal URLs, and templated command variables are rewritten to runtime-assigned ports before managed processes launch.
+- The portal server starts on the assigned portal port and reports the actual URL in metadata/status.
+- `Start.bat` reads `data/tmp/ports.json` after startup and opens the assigned portal URL instead of assuming `17000`.
+- OpenClaw startup now uses `${OPENCLAW_GATEWAY_PORT}` so the WSL2 adapter can receive remapped gateway ports.
+
+Changed areas:
+
+- `core/node/src/ports-runtime.ts`
+- `core/node/src/command-template.ts`
+- `core/node/src/core.ts`
+- `core/node/src/lifecycle.ts`
+- `core/node/src/wsl-adapter.ts`
+- `core/node/src/portal.ts`
+- `core/node/src/clawhermes.ts`
+- `core/node/dist/`
+- `launcher/windows/Start.bat`
+- `adapters/openclaw/adapter.json`
+- `README.md`
+- `docs/PRD.md`
+- `docs/PROGRESS.md`
+- `tests/test_windows_core.py`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_windows_batch_launchers_forward_exit_codes_and_start_opens_portal tests.test_windows_core.WindowsCoreTests.test_start_remaps_portal_when_default_port_is_occupied_by_another_process tests.test_windows_core.WindowsCoreTests.test_start_remaps_http_adapter_port_when_default_port_is_occupied tests.test_windows_core.WindowsCoreTests.test_start_serves_portal_over_localhost_and_stop_shuts_it_down tests.test_windows_core.WindowsCoreTests.test_status_reports_http_adapter_ready_when_endpoint_responds -v`
+
+Next steps:
+
+- Keep remapping limited to localhost ports for MVP.
+- Use `status --json` or `data/tmp/ports.json` as the source of truth for actual runtime URLs.
+
 ### Real WSL2 Payload Host Preparation
 
 Status: `Done`

@@ -6,6 +6,7 @@ exports.assertWslReadyForAdapter = assertWslReadyForAdapter;
 exports.assertWslReadyForAdapterDistro = assertWslReadyForAdapterDistro;
 const portable_1 = require("./portable");
 const wsl_1 = require("./wsl");
+const command_template_1 = require("./command-template");
 function wslAdapterSetupPlan(root, adapter, serviceEnv) {
     return wslAdapterCommandPlan(root, adapter, serviceEnv, "setup");
 }
@@ -13,9 +14,10 @@ function wslAdapterCommandPlan(root, adapter, serviceEnv, phase) {
     const distro = adapter.runtime?.distro;
     const diagnostics = (0, wsl_1.wslDiagnostics)(root, distro);
     const workingDirectory = windowsPathToWslPath((0, portable_1.resolveRelative)(root, adapter.appDir));
-    const command = adapter.commands[phase];
-    if (!command)
+    const commandTemplate = adapter.commands[phase];
+    if (!commandTemplate)
         throw new Error(`Adapter ${adapter.id} does not declare a ${phase} command.`);
+    const command = (0, command_template_1.expandCommandTemplate)(commandTemplate, serviceEnv.env);
     const script = [
         ...environmentExports(root, serviceEnv.env),
         command,

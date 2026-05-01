@@ -6,6 +6,7 @@ import { resolveServiceEnvironment } from "./environment";
 import { resolveRelative, writeLog } from "./portable";
 import { wslAdapterCommandPlan } from "./wsl-adapter";
 import { wslExecutableInvocation } from "./wsl";
+import { expandCommandTemplate } from "./command-template";
 
 export type ManagedProcessPlan = {
   runner?: string;
@@ -17,10 +18,10 @@ export type ManagedProcessPlan = {
   metadata?: Record<string, unknown>;
 };
 
-export function startAdapter(root: string, adapter: AdapterDescriptor, options: { forceManaged?: boolean; processPlan?: ManagedProcessPlan } = {}) {
+export function startAdapter(root: string, adapter: AdapterDescriptor, options: { forceManaged?: boolean; processPlan?: ManagedProcessPlan; serviceEnv?: ServiceEnvironment } = {}) {
   const pidFile = resolveRelative(root, adapter.pidFile);
   const logFile = resolveRelative(root, adapter.logFile);
-  const serviceEnv = resolveServiceEnvironment(root, adapter.id);
+  const serviceEnv = options.serviceEnv ?? resolveServiceEnvironment(root, adapter.id);
   mkdirSync(dirname(pidFile), { recursive: true });
   mkdirSync(dirname(logFile), { recursive: true });
   const metadata = shouldLaunchManagedProcess(root, adapter, options.forceManaged === true)
@@ -67,8 +68,9 @@ function environmentMetadata(serviceEnv: ServiceEnvironment) {
 }
 
 function launchManagedAdapterProcess(root: string, adapter: AdapterDescriptor, serviceEnv: ServiceEnvironment, processPlan?: ManagedProcessPlan) {
-  const command = adapter.commands.start;
-  if (!command) throw new Error(`Adapter ${adapter.id} has no start command.`);
+  const commandTemplate = adapter.commands.start;
+  if (!commandTemplate) throw new Error(`Adapter ${adapter.id} has no start command.`);
+  const command = expandCommandTemplate(commandTemplate, serviceEnv.env);
   const workingDirectory = resolveRelative(root, adapter.appDir);
   const logFile = resolveRelative(root, adapter.logFile);
   const logFd = openSync(logFile, "a");

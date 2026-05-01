@@ -601,7 +601,8 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertIn("endlocal & exit /b %CLAWHERMES_EXIT%", text)
 
         start_text = (ROOT / "launcher" / "windows" / "Start.bat").read_text(encoding="utf-8")
-        self.assertIn('if "%CLAWHERMES_EXIT%"=="0" start "" "http://127.0.0.1:17000/"', start_text)
+        self.assertIn("data\\tmp\\ports.json", start_text)
+        self.assertIn('if "%CLAWHERMES_EXIT%"=="0" start "" "%CLAWHERMES_PORTAL_URL%"', start_text)
 
     def test_setup_json_reports_runtime_diagnostics_and_valid_adapters(self):
         result = run_dispatcher("setup", "-Json")
@@ -1558,7 +1559,7 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertTrue(adapters["openclaw"]["integration"]["productionReady"])
         self.assertTrue(adapters["hermes-web-ui"]["integration"]["productionReady"])
         self.assertIn("config/env/openclaw.env", [item["path"] for item in adapters["openclaw"]["envFiles"]])
-        self.assertEqual(adapters["openclaw"]["commands"]["start"], "node openclaw.mjs gateway --port 18789 --verbose --allow-unconfigured")
+        self.assertEqual(adapters["openclaw"]["commands"]["start"], "node openclaw.mjs gateway --port ${OPENCLAW_GATEWAY_PORT} --verbose --allow-unconfigured")
 
     def test_adapters_json_can_filter_one_adapter(self):
         result = run_dispatcher("adapters", "hermes-web-ui", "-Json")
@@ -3063,17 +3064,56 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertEqual(statuses["portal"], "stopped")
         self.assertFalse(portal_pid.exists())
 
-    def test_start_fails_when_portal_port_is_occupied_by_another_process(self):
+    def test_start_remaps_portal_when_default_port_is_occupied_by_another_process(self):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
             listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             listener.bind(("127.0.0.1", 17000))
             listener.listen(1)
 
-            start = run_dispatcher("start", "-Json")
+            temp_dir, temp_root = make_temp_skeleton_usb_root()
+            try:
+                start = run_dispatcher_for_root(temp_root, "start", "-Json")
 
-        self.assertNotEqual(start.returncode, 0)
-        self.assertIn("Port 17000 is already in use", start.stderr)
-        self.assertFalse((ROOT / "data" / "tmp" / "pids" / "portal.pid").exists())
+                self.assertEqual(start.returncode, 0, start.stderr)
+                payload = json.loads(start.stdout)
+                self.assertNotEqual(payload["portal"]["url"], PORTAL_URL)
+                self.assertRegex(payload["portal"]["url"], r"^http://127\.0\.0\.1:\d+/$")
+
+                ports = json.loads((temp_root / "data" / "tmp" / "ports.json").read_text(encoding="utf-8"))
+                self.assertEqual(ports["portal"]["defaultPort"], 17000)
+                self.assertNotEqual(ports["portal"]["assignedPort"], 17000)
+            finally:
+                run_dispatcher_for_root(temp_root, "stop", "-Json")
+                temp_dir.cleanup()
+
+    def test_start_remaps_http_adapter_port_when_default_port_is_occupied(self):
+        temp_dir, temp_root, port = make_temp_http_usb_root()
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
+            listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            listener.bind(("127.0.0.1", port))
+            listener.listen(1)
+            try:
+                start = run_dispatcher_for_root(temp_root, "start", "-Json")
+
+                self.assertEqual(start.returncode, 0, start.stderr)
+                ports = json.loads((temp_root / "data" / "tmp" / "ports.json").read_text(encoding="utf-8"))
+                service_port = next(item for item in ports["services"] if item["serviceId"] == "http-service")
+                self.assertEqual(service_port["defaultPort"], port)
+                self.assertNotEqual(service_port["assignedPort"], port)
+
+                remapped_health = f"http://127.0.0.1:{service_port['assignedPort']}/health"
+                wait_for_url(remapped_health)
+
+                status = run_dispatcher_for_root(temp_root, "status", "-Json")
+                self.assertEqual(status.returncode, 0, status.stderr)
+                status_payload = json.loads(status.stdout)
+                service = next(item for item in status_payload["services"] if item["id"] == "http-service")
+                self.assertEqual(service["health"]["url"], remapped_health)
+                self.assertTrue(service["health"]["ready"])
+                self.assertEqual(service["portalUrl"], f"http://127.0.0.1:{service_port['assignedPort']}")
+            finally:
+                run_dispatcher_for_root(temp_root, "stop", "-Json")
+                temp_dir.cleanup()
 
 
 if __name__ == "__main__":
