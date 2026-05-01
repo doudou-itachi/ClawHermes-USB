@@ -1,6 +1,7 @@
 import { loadAdapters } from "./adapters";
 import { getRoot } from "./portable";
 import { wslDiagnostics } from "./wsl";
+import { wslImportPlan } from "./wsl-import";
 
 type WorkflowPhase = {
   id: string;
@@ -11,6 +12,7 @@ type WorkflowPhase = {
   modifiesHost: boolean;
   modifiesProject: boolean;
   detail: string;
+  sourceArchiveExists?: boolean;
 };
 
 export function wslWorkflowPlan(usbRoot: string, serviceId: string | undefined) {
@@ -23,6 +25,7 @@ export function wslWorkflowPlan(usbRoot: string, serviceId: string | undefined) 
   const distro = adapter.runtime.distro?.trim() || "Ubuntu";
   const diagnostics = wslDiagnostics(root, distro);
   const wslReady = diagnostics.hasDesiredDistro && diagnostics.desiredDistroVersion === 2;
+  const importPlan = wslImportPlan(root, { distro });
   const commandPrefix = "node core/node/dist/clawhermes.js";
   const phases: WorkflowPhase[] = [
     {
@@ -44,6 +47,17 @@ export function wslWorkflowPlan(usbRoot: string, serviceId: string | undefined) 
       modifiesHost: true,
       modifiesProject: false,
       detail: "Host-level WSL2 preparation requires explicit confirmation.",
+    },
+    {
+      id: "import-distro",
+      title: "Optionally import project-local WSL2 distro",
+      status: wslReady ? "ready" : "manual",
+      command: `${commandPrefix} wsl-import-plan --distro ${distro} --json`,
+      confirmCommand: `${commandPrefix} wsl-import --distro ${distro} --confirm-import --json`,
+      modifiesHost: true,
+      modifiesProject: true,
+      detail: "Optional import path uses a rootfs archive under runtimes/wsl/ and still registers the distro on this Windows host.",
+      sourceArchiveExists: importPlan.sourceArchiveExists,
     },
     {
       id: "checkout-source",
@@ -104,6 +118,7 @@ export function wslWorkflowPlan(usbRoot: string, serviceId: string | undefined) 
     runner: "wsl2",
     distro,
     wslReady,
+    stopHookDeclared: Boolean(adapter.commands.stop),
     diagnostics,
     phases,
     messages: wslReady

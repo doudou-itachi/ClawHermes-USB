@@ -673,10 +673,11 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertEqual(payload["runner"], "wsl2")
         self.assertEqual(payload["distro"], "Ubuntu")
         self.assertFalse(payload["wslReady"])
+        self.assertFalse(payload["stopHookDeclared"])
         phase_ids = [phase["id"] for phase in payload["phases"]]
         self.assertEqual(
             phase_ids,
-            ["diagnose", "prepare-host", "checkout-source", "setup-adapter", "start-adapter", "verify-adapter", "mark-ready"],
+            ["diagnose", "prepare-host", "import-distro", "checkout-source", "setup-adapter", "start-adapter", "verify-adapter", "mark-ready"],
         )
         phases = {phase["id"]: phase for phase in payload["phases"]}
         self.assertFalse(phases["diagnose"]["modifiesHost"])
@@ -685,6 +686,11 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertIn("prepare-wsl --distro Ubuntu --dry-run --json", phases["prepare-host"]["command"])
         self.assertIn("--confirm-install", phases["prepare-host"]["confirmCommand"])
         self.assertTrue(phases["prepare-host"]["modifiesHost"])
+        self.assertIn("wsl-import-plan --distro Ubuntu --json", phases["import-distro"]["command"])
+        self.assertIn("wsl-import --distro Ubuntu --confirm-import --json", phases["import-distro"]["confirmCommand"])
+        self.assertTrue(phases["import-distro"]["modifiesHost"])
+        self.assertTrue(phases["import-distro"]["modifiesProject"])
+        self.assertFalse(phases["import-distro"]["sourceArchiveExists"])
         self.assertIn("--dry-run", phases["checkout-source"]["command"])
         self.assertIn("--confirm-checkout", phases["checkout-source"]["confirmCommand"])
         self.assertIn("--confirm-setup", phases["setup-adapter"]["confirmCommand"])

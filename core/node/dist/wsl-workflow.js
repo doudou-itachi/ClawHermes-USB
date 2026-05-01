@@ -4,6 +4,7 @@ exports.wslWorkflowPlan = wslWorkflowPlan;
 const adapters_1 = require("./adapters");
 const portable_1 = require("./portable");
 const wsl_1 = require("./wsl");
+const wsl_import_1 = require("./wsl-import");
 function wslWorkflowPlan(usbRoot, serviceId) {
     const root = (0, portable_1.getRoot)(usbRoot);
     if (!serviceId)
@@ -16,6 +17,7 @@ function wslWorkflowPlan(usbRoot, serviceId) {
     const distro = adapter.runtime.distro?.trim() || "Ubuntu";
     const diagnostics = (0, wsl_1.wslDiagnostics)(root, distro);
     const wslReady = diagnostics.hasDesiredDistro && diagnostics.desiredDistroVersion === 2;
+    const importPlan = (0, wsl_import_1.wslImportPlan)(root, { distro });
     const commandPrefix = "node core/node/dist/clawhermes.js";
     const phases = [
         {
@@ -37,6 +39,17 @@ function wslWorkflowPlan(usbRoot, serviceId) {
             modifiesHost: true,
             modifiesProject: false,
             detail: "Host-level WSL2 preparation requires explicit confirmation.",
+        },
+        {
+            id: "import-distro",
+            title: "Optionally import project-local WSL2 distro",
+            status: wslReady ? "ready" : "manual",
+            command: `${commandPrefix} wsl-import-plan --distro ${distro} --json`,
+            confirmCommand: `${commandPrefix} wsl-import --distro ${distro} --confirm-import --json`,
+            modifiesHost: true,
+            modifiesProject: true,
+            detail: "Optional import path uses a rootfs archive under runtimes/wsl/ and still registers the distro on this Windows host.",
+            sourceArchiveExists: importPlan.sourceArchiveExists,
         },
         {
             id: "checkout-source",
@@ -96,6 +109,7 @@ function wslWorkflowPlan(usbRoot, serviceId) {
         runner: "wsl2",
         distro,
         wslReady,
+        stopHookDeclared: Boolean(adapter.commands.stop),
         diagnostics,
         phases,
         messages: wslReady

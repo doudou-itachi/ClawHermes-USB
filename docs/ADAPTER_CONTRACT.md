@@ -564,6 +564,7 @@ Rules:
 - The diagnostic is read-only.
 - Users must explicitly approve WSL2 preparation before WSL2 adapters can run; ClawHermes-USB must not silently enable Windows features or install Linux distributions.
 - `wsl-workflow <service-id>` is read-only and should show the full operator sequence from diagnostics through production-readiness metadata.
+- `wsl-workflow <service-id>` should include the optional project-local import step and a `stopHookDeclared` field so operators can see whether graceful in-distro shutdown is configured.
 - Inspect the host-level preparation plan with `node core/node/dist/clawhermes.js prepare-wsl --distro Ubuntu --dry-run --json`.
 - Inspect a USB/project-local import command with `node core/node/dist/clawhermes.js wsl-import-plan --distro Ubuntu --json`.
 - A typical explicit installation command is `wsl.exe --install -d Ubuntu`, followed by the standard WSL first-run initialization.

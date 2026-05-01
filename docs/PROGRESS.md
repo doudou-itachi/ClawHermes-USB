@@ -2026,6 +2026,7 @@ Validation performed:
 
 - `npm run build`
 - `python -m unittest tests.test_windows_core.WindowsCoreTests.test_wsl_workflow_reports_explicit_confirm_commands_for_hermes_agent -v`
+- `npm test`
 
 Next steps:
 
@@ -2175,3 +2176,32 @@ Next steps:
 
 - Add `wsl-import` as an optional phase in the WSL2 operator workflow.
 - Add a workflow field that surfaces whether a WSL2 adapter declares a graceful stop hook.
+
+### WSL2 Workflow Import Phase
+
+Status: `Done`
+
+Summary:
+
+- Added an `import-distro` phase to `wsl-workflow <service-id> --json`.
+- The phase exposes the read-only `wsl-import-plan` command, the explicit `wsl-import --confirm-import` command, host/project mutation flags, and whether the expected rootfs archive currently exists.
+- Added top-level `stopHookDeclared` workflow metadata so operators can see whether a WSL2 adapter declares an in-distro stop command.
+- Kept `wsl-workflow` read-only; it only reports the sequence and never runs WSL import itself.
+
+Changed areas:
+
+- `core/node/src/wsl-workflow.ts`
+- `core/node/dist/wsl-workflow.js`
+- `docs/ADAPTER_CONTRACT.md`
+- `docs/PROGRESS.md`
+- `tests/test_windows_core.py`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_wsl_workflow_reports_explicit_confirm_commands_for_hermes_agent -v`
+
+Next steps:
+
+- Add checksum verification support for WSL rootfs archives before any import command runs.
+- Add user-facing guidance for obtaining a trusted Ubuntu rootfs artifact without automatic downloads.
