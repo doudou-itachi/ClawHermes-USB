@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.wslImportPlan = wslImportPlan;
 exports.wslRootfsGuide = wslRootfsGuide;
 exports.wslImport = wslImport;
+exports.wslUnregisterPlan = wslUnregisterPlan;
 const node_child_process_1 = require("node:child_process");
 const node_crypto_1 = require("node:crypto");
 const node_fs_1 = require("node:fs");
@@ -126,6 +127,39 @@ function wslImport(usbRoot, options) {
             ...plan.messages,
             `Executed WSL import for ${plan.distributionName}.`,
         ],
+    };
+}
+function wslUnregisterPlan(usbRoot, options) {
+    const plan = wslImportPlan(usbRoot, options);
+    const diagnostics = (0, wsl_1.wslDiagnostics)(plan.root);
+    const registered = diagnostics.distros.some((item) => item.name.toLowerCase() === plan.distributionName.toLowerCase());
+    const backupArchive = (0, node_path_1.join)(plan.root, "data", "backups", "wsl", `${plan.distributionName}-backup.tar`);
+    const args = ["--unregister", plan.distributionName];
+    return {
+        root: plan.root,
+        distro: plan.distro,
+        distributionName: plan.distributionName,
+        registered,
+        diagnostics,
+        backupArchive,
+        backupCommand: `wsl.exe --export ${plan.distributionName} ${quoteCommandArg(backupArchive)}`,
+        dryRun: true,
+        executed: false,
+        wouldModifyHost: true,
+        destructive: true,
+        executablePath: "wsl.exe",
+        args,
+        command: ["wsl.exe", ...args.map(quoteCommandArg)].join(" "),
+        confirmCommand: `node core/node/dist/clawhermes.js wsl-unregister --distro ${plan.distro} --confirm-unregister --json`,
+        docs: WSL_COMMAND_DOCS,
+        warnings: [
+            `Unregistering ${plan.distributionName} permanently deletes that WSL distribution and its Linux filesystem from this Windows host.`,
+            `Export a backup first with: wsl.exe --export ${plan.distributionName} ${quoteCommandArg(backupArchive)}`,
+            "This command is read-only and does not run wsl.exe.",
+        ],
+        messages: registered
+            ? [`Distribution is registered on this host: ${plan.distributionName}.`]
+            : [`Distribution is not registered on this host: ${plan.distributionName}.`],
     };
 }
 function checksumStatus(sourceArchive, checksumFile) {

@@ -62,3 +62,11 @@ node core/node/dist/clawhermes.js wsl-import --distro Ubuntu --confirm-import --
 ```
 
 This command fails before running WSL if `--confirm-import` is missing, if the rootfs archive is absent, if the planned `data/wsl/<distribution-name>/` install location already exists, if the planned distribution name is already registered on the host, or if an available `.sha256` sidecar does not match the archive.
+
+Inspect the read-only unregister plan before removing an imported distribution:
+
+```powershell
+node core/node/dist/clawhermes.js wsl-unregister-plan --distro Ubuntu --json
+```
+
+The plan reports whether `ClawHermes-Ubuntu` is registered, the destructive `wsl.exe --unregister` command, and a recommended `wsl.exe --export` backup command. It does not run WSL.

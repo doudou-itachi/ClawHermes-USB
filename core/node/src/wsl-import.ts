@@ -128,6 +128,40 @@ export function wslImport(usbRoot: string, options: { distro?: string; confirmIm
   };
 }
 
+export function wslUnregisterPlan(usbRoot: string, options: { distro?: string }) {
+  const plan = wslImportPlan(usbRoot, options);
+  const diagnostics = wslDiagnostics(plan.root);
+  const registered = diagnostics.distros.some((item) => item.name.toLowerCase() === plan.distributionName.toLowerCase());
+  const backupArchive = join(plan.root, "data", "backups", "wsl", `${plan.distributionName}-backup.tar`);
+  const args = ["--unregister", plan.distributionName];
+  return {
+    root: plan.root,
+    distro: plan.distro,
+    distributionName: plan.distributionName,
+    registered,
+    diagnostics,
+    backupArchive,
+    backupCommand: `wsl.exe --export ${plan.distributionName} ${quoteCommandArg(backupArchive)}`,
+    dryRun: true,
+    executed: false,
+    wouldModifyHost: true,
+    destructive: true,
+    executablePath: "wsl.exe",
+    args,
+    command: ["wsl.exe", ...args.map(quoteCommandArg)].join(" "),
+    confirmCommand: `node core/node/dist/clawhermes.js wsl-unregister --distro ${plan.distro} --confirm-unregister --json`,
+    docs: WSL_COMMAND_DOCS,
+    warnings: [
+      `Unregistering ${plan.distributionName} permanently deletes that WSL distribution and its Linux filesystem from this Windows host.`,
+      `Export a backup first with: wsl.exe --export ${plan.distributionName} ${quoteCommandArg(backupArchive)}`,
+      "This command is read-only and does not run wsl.exe.",
+    ],
+    messages: registered
+      ? [`Distribution is registered on this host: ${plan.distributionName}.`]
+      : [`Distribution is not registered on this host: ${plan.distributionName}.`],
+  };
+}
+
 function checksumStatus(sourceArchive: string, checksumFile: string) {
   if (!existsSync(checksumFile)) {
     return {

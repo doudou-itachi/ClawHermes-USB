@@ -23,7 +23,7 @@ export { PORTAL_URL, generatePortal, getPortalStatus, startPortalServer, stopPor
 export { installRuntimeFromArchive, loadRuntimeManifest, runtimeDiagnostics, runtimePreparationPlan } from "./runtimes";
 export { writeStatusSnapshot } from "./status";
 export { prepareWsl, wslDiagnostics } from "./wsl";
-export { wslImport, wslImportPlan, wslRootfsGuide } from "./wsl-import";
+export { wslImport, wslImportPlan, wslRootfsGuide, wslUnregisterPlan } from "./wsl-import";
 export { wslWorkflowPlan } from "./wsl-workflow";
 
 export async function startSkeleton(usbRoot: string) {

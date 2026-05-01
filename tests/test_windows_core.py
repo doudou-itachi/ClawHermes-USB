@@ -935,6 +935,45 @@ class WindowsCoreTests(unittest.TestCase):
         finally:
             temp_dir.cleanup()
 
+    def test_wsl_unregister_plan_reports_destructive_risk_without_running_wsl(self):
+        temp_dir, temp_root = make_temp_usb_root()
+        try:
+            marker = temp_root / "data" / "tmp" / "fake-wsl-unregister.txt"
+            args_file = temp_root / "data" / "tmp" / "fake-wsl-unregister-args.txt"
+            fake_wsl = make_fake_wsl_cmd(
+                temp_root,
+                stay_running=False,
+                marker_path=marker,
+                args_path=args_file,
+                list_distribution="ClawHermes-Ubuntu",
+            )
+
+            result = run_dispatcher_for_root(
+                temp_root,
+                "wsl-unregister-plan",
+                "--distro",
+                "Ubuntu",
+                "-Json",
+                env={"CLAWHERMES_WSL_EXE": str(fake_wsl)},
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertTrue(payload["dryRun"])
+            self.assertFalse(payload["executed"])
+            self.assertTrue(payload["wouldModifyHost"])
+            self.assertTrue(payload["destructive"])
+            self.assertEqual(payload["distributionName"], "ClawHermes-Ubuntu")
+            self.assertTrue(payload["registered"])
+            self.assertIn("--unregister", payload["args"])
+            self.assertIn("wsl.exe --export ClawHermes-Ubuntu", payload["backupCommand"])
+            self.assertTrue(payload["backupArchive"].replace("\\", "/").endswith("data/backups/wsl/ClawHermes-Ubuntu-backup.tar"))
+            self.assertIn("--confirm-unregister", payload["confirmCommand"])
+            self.assertIn("permanently deletes", "\n".join(payload["warnings"]))
+            self.assertFalse(marker.exists())
+        finally:
+            temp_dir.cleanup()
+
     def test_setup_json_reports_wsl2_action_when_hermes_agent_needs_wsl2(self):
         missing_wsl = str(ROOT / "data" / "tmp" / "missing-wsl.exe")
 

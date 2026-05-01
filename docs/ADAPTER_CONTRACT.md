@@ -557,6 +557,7 @@ node core/node/dist/clawhermes.js wsl --distro Ubuntu --json
 node core/node/dist/clawhermes.js wsl-rootfs-guide --distro Ubuntu --json
 node core/node/dist/clawhermes.js wsl-import-plan --distro Ubuntu --json
 node core/node/dist/clawhermes.js wsl-import --distro Ubuntu --confirm-import --json
+node core/node/dist/clawhermes.js wsl-unregister-plan --distro Ubuntu --json
 node core/node/dist/clawhermes.js wsl-workflow hermes-agent --json
 ```
 
@@ -577,6 +578,8 @@ Rules:
 - Real import execution must fail before running WSL when the planned install location under `data/wsl/` already exists.
 - Real import execution must fail before running WSL when the planned distribution name is already registered on the current Windows host.
 - When a `.sha256` sidecar exists next to the rootfs archive, `wsl-import` must verify it before running WSL and reject mismatches.
+- `wsl-unregister-plan --distro <name>` is read-only and must warn that `wsl.exe --unregister` permanently deletes the registered Linux distribution data.
+- Any future unregister execution must require explicit confirmation and should recommend a `wsl.exe --export` backup first.
 - WSL rootfs artifacts are operator-managed payloads. They must stay under `runtimes/wsl/`, stay out of git, avoid system temp folders as durable storage, and never be downloaded automatically by setup/startup diagnostics.
 - Missing `wsl.exe`, missing distributions, and missing WSL2 distributions must be reported as setup actions.
 - Missing WSL rootfs archives for WSL2 adapters must be reported in `setup --json` under `wslArtifacts` and should add a `wsl-artifact:<service-id>` action pointing to `wsl-rootfs-guide`.

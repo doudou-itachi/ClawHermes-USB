@@ -225,6 +225,19 @@ async function main() {
             }
             return;
         }
+        case "wsl-unregister-plan": {
+            const result = (0, core_1.wslUnregisterPlan)(root, { distro });
+            if (json) {
+                printJson(result);
+            }
+            else {
+                console.log("ClawHermes-USB WSL2 unregister plan");
+                for (const warning of result.warnings)
+                    console.log(`- ${warning}`);
+                console.log(`Command: ${result.command}`);
+            }
+            return;
+        }
         case "init-env": {
             const result = (0, core_1.initializeEnvFiles)(root, dryRun);
             if (json) {

@@ -2399,3 +2399,39 @@ Next steps:
 
 - Consider requiring checksum sidecars once a trusted artifact source is chosen.
 - Add explicit unregister/export safety guidance before supporting any cleanup command.
+
+### WSL2 Unregister Planning
+
+Status: `Done`
+
+Summary:
+
+- Added a read-only `wsl-unregister-plan --distro Ubuntu --json` command.
+- The plan reports the managed distribution name, registration status, destructive `wsl.exe --unregister` args, and a recommended `wsl.exe --export` backup command under `data/backups/wsl/`.
+- The command does not run WSL and exists only to show the risk and next-step confirmation boundary.
+- Added the action to the PowerShell wrapper whitelist.
+- Documented the unregister plan in README, adapter contract, and rootfs artifact policy.
+
+Changed areas:
+
+- `core/node/src/wsl-import.ts`
+- `core/node/src/core.ts`
+- `core/node/src/clawhermes.ts`
+- `core/node/dist/`
+- `core/windows/clawhermes.ps1`
+- `README.md`
+- `docs/ADAPTER_CONTRACT.md`
+- `docs/wsl-rootfs-artifacts.md`
+- `docs/PROGRESS.md`
+- `tests/test_windows_core.py`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_wsl_unregister_plan_reports_destructive_risk_without_running_wsl -v`
+- `npm test`
+
+Next steps:
+
+- Add a guarded `wsl-unregister --confirm-unregister` path only after backup/export safeguards are defined.
+- Consider requiring checksum sidecars once a trusted artifact source is chosen.
