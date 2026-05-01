@@ -36,7 +36,8 @@
       "OPENCLAW_DATA_DIR": "${USB_ROOT}/data/openclaw",
       "OPENCLAW_STATE_DIR": "${USB_ROOT}/data/openclaw",
       "OPENCLAW_CONFIG_PATH": "${USB_ROOT}/data/openclaw/openclaw.json",
-      "OPENCLAW_GATEWAY_PORT": "18789"
+      "OPENCLAW_GATEWAY_PORT": "18789",
+      "OPENCLAW_GATEWAY_TOKEN": "clawhermes"
     }
   },
   "dataDir": "data/openclaw",

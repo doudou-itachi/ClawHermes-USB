@@ -31,6 +31,9 @@
     "variables": {
       "HERMES_HOME": "${USB_ROOT}/data/hermes",
       "HERMES_WEB_UI_DATA_DIR": "${USB_ROOT}/data/hermes-web-ui",
+      "HERMES_AGENT_API_BASE": "http://127.0.0.1:8642",
+      "UPSTREAM": "http://127.0.0.1:8642",
+      "AUTH_TOKEN": "clawhermes",
       "HOME": "${USB_ROOT}/data/home",
       "USERPROFILE": "${USB_ROOT}/data/home"
     }

@@ -1554,6 +1554,49 @@ class WindowsCoreTests(unittest.TestCase):
         finally:
             temp_dir.cleanup()
 
+    def test_default_gateway_tokens_are_unified_without_service_env_value_leakage(self):
+        temp_dir, temp_root = make_temp_skeleton_usb_root()
+        try:
+            init = run_dispatcher_for_root(temp_root, "init-env", "-Json")
+            self.assertEqual(init.returncode, 0, init.stderr)
+
+            for service_id in ("openclaw", "hermes-agent", "hermes-web-ui"):
+                diagnostic = run_dispatcher_for_root(temp_root, "service-env", service_id, "-Json")
+                self.assertEqual(diagnostic.returncode, 0, diagnostic.stderr)
+                self.assertNotIn("clawhermes", diagnostic.stdout)
+
+            script = (
+                "const { resolveServiceEnvironment } = require('./core/node/dist/core.js');"
+                "const root = process.argv[1];"
+                "const serviceIds = ['openclaw', 'hermes-agent', 'hermes-web-ui'];"
+                "const result = Object.fromEntries(serviceIds.map((id) => [id, resolveServiceEnvironment(root, id).env]));"
+                "process.stdout.write(JSON.stringify({"
+                "openclaw: result.openclaw.OPENCLAW_GATEWAY_TOKEN ?? null,"
+                "'hermes-agent': result['hermes-agent'].API_SERVER_KEY ?? null,"
+                "'hermes-web-ui-auth': result['hermes-web-ui'].AUTH_TOKEN ?? null,"
+                "'hermes-web-ui-upstream': result['hermes-web-ui'].UPSTREAM ?? null,"
+                "'hermes-web-ui-agent-base': result['hermes-web-ui'].HERMES_AGENT_API_BASE ?? null"
+                "}));"
+            )
+            resolved = subprocess.run(
+                ["node", "-e", script, str(temp_root)],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+                env={**os.environ, "PYTHONUTF8": "1"},
+            )
+
+            self.assertEqual(resolved.returncode, 0, resolved.stderr)
+            payload = json.loads(resolved.stdout)
+            self.assertEqual(payload["openclaw"], "clawhermes")
+            self.assertEqual(payload["hermes-agent"], "clawhermes")
+            self.assertEqual(payload["hermes-web-ui-auth"], "clawhermes")
+            self.assertEqual(payload["hermes-web-ui-upstream"], "http://127.0.0.1:8642")
+            self.assertEqual(payload["hermes-web-ui-agent-base"], "http://127.0.0.1:8642")
+        finally:
+            temp_dir.cleanup()
+
     def test_service_env_unknown_service_fails_with_actionable_message(self):
         temp_dir, temp_root = make_temp_usb_root()
         try:

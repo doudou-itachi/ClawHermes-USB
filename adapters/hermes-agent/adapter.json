@@ -31,6 +31,7 @@
     ],
     "variables": {
       "HERMES_HOME": "${USB_ROOT}/data/hermes",
+      "API_SERVER_KEY": "clawhermes",
       "HOME": "${USB_ROOT}/data/home",
       "USERPROFILE": "${USB_ROOT}/data/home"
     }

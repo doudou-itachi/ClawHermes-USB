@@ -3104,6 +3104,38 @@ Next steps:
 
 - Use the checklist before publishing release archives or handing the USB root to another host.
 
+### Unified Local Gateway Token
+
+Status: `Done`
+
+Summary:
+
+- Standardized the local default gateway/auth token to `clawhermes`.
+- Set `OPENCLAW_GATEWAY_TOKEN=clawhermes` for OpenClaw.
+- Set `API_SERVER_KEY=clawhermes` for Hermes Agent.
+- Set `AUTH_TOKEN=clawhermes` and `UPSTREAM=http://127.0.0.1:8642` for Hermes Web UI.
+- Added adapter default variables so the same token is resolved even when an env file is absent.
+- Kept `service-env` diagnostics value-free so the fixed token is not printed in diagnostic JSON.
+
+Changed areas:
+
+- `adapters/openclaw/adapter.json`
+- `adapters/hermes-agent/adapter.json`
+- `adapters/hermes-web-ui/adapter.json`
+- `config/env/*.env.example`
+- local ignored `config/env/*.env`
+- `README.md`
+- `docs/PROGRESS.md`
+- `tests/test_windows_core.py`
+
+Validation performed:
+
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_default_gateway_tokens_are_unified_without_service_env_value_leakage -v`
+
+Next steps:
+
+- Change `config/env/*.env` before exposing services beyond trusted localhost use.
+
 ### Real WSL2 Payload Host Preparation
 
 Status: `Done`

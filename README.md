@@ -19,6 +19,7 @@ Implemented:
 - Managed process launch for production-ready adapters.
 - Local portal at `http://127.0.0.1:17000/` by default with live status, setup actions, adapter verification, logs, backup status, and guarded operation commands.
 - Runtime port remapping when default service or portal ports are already occupied; assignments are written to `data/tmp/ports.json`.
+- Unified local gateway/auth token defaults set to `clawhermes` for OpenClaw, Hermes Agent, and Hermes Web UI.
 - Portable backup command that writes timestamped zip archives under `data/backups/`.
 - Read-only restore planning and guarded no-overwrite restore execution for backup archives.
 - Verified WSL2 adapter path for Hermes Agent using the project-managed `ClawHermes-Ubuntu` distro and `http://127.0.0.1:8642/health`.
@@ -94,6 +95,8 @@ npm test
 ```
 
 WSL2 note: `prepare-wsl` is guarded because enabling WSL2 and registering a Linux distribution modify the current Windows host. The command only prints a plan by default; real host preparation requires `--confirm-install`. WSL2 adapters run in `ClawHermes-Ubuntu`; rootfs/import/export planning uses `Ubuntu` as the source distro. Rootfs archives for `wsl-import-plan` are operator-managed payloads under `runtimes/wsl/`; see [WSL2 Rootfs Artifact Policy](docs/wsl-rootfs-artifacts.md).
+
+Local auth note: the default portable env templates set OpenClaw gateway token, Hermes Agent API server key, and Hermes Web UI auth token to `clawhermes`. Change `config/env/*.env` before sharing a running instance beyond trusted localhost use.
 
 ## Core Documents
 
