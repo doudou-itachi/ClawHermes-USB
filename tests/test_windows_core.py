@@ -630,6 +630,17 @@ class WindowsCoreTests(unittest.TestCase):
                 ],
             )
 
+    def test_user_guide_script_exposes_safe_modes_and_noninteractive_switches(self):
+        text = (ROOT / "launcher" / "windows" / "UserGuide.ps1").read_text(encoding="utf-8")
+
+        self.assertIn('[ValidateSet("Install", "Start", "Stop", "Status", "Backup", "Uninstall", "Repair")]', text)
+        self.assertIn("[switch]$NoPause", text)
+        self.assertIn("[switch]$AssumeYes", text)
+        self.assertIn("[switch]$PlanOnly", text)
+        self.assertIn("core\\windows\\clawhermes.ps1", text)
+        self.assertIn("data\\logs", text)
+        self.assertNotIn("setx ", text.lower())
+
     def test_setup_json_reports_runtime_diagnostics_and_valid_adapters(self):
         result = run_dispatcher("setup", "-Json")
 
