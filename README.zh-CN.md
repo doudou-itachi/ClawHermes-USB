@@ -16,8 +16,9 @@ ClawHermes-USB 是一个 Windows 优先的 U 盘便携式运行套件，用于�
 - 加载服务 adapter 描述文件并按依赖排序。
 - 占位服务的启动、状态、停止、日志和 PID 元数据。
 - 对标记为 production-ready 的 adapter 启动真实受管进程。
-- 本地门户 `http://127.0.0.1:17000/`，支持实时状态和备份状态展示。
+- 本地门户 `http://127.0.0.1:17000/`，支持实时状态、setup actions、adapter verification、日志、备份状态和受保护操作命令展示。
 - 便携备份命令，在 `data/backups/` 下生成带时间戳的 zip 归档。
+- 备份归档的只读还原预案，以及受保护的无覆盖还原执行。
 
 尚未实现：
 
@@ -60,6 +61,8 @@ node core/node/dist/clawhermes.js start --json
 node core/node/dist/clawhermes.js status --json
 node core/node/dist/clawhermes.js logs openclaw --lines 50 --json
 node core/node/dist/clawhermes.js backup --dry-run --json
+node core/node/dist/clawhermes.js restore-plan --archive data/backups/example.zip --json
+node core/node/dist/clawhermes.js restore --archive data/backups/example.zip --confirm-restore --json
 ```
 
 运行验证：
