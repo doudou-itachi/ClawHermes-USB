@@ -674,6 +674,71 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertIn("openclaw:", result.stdout)
         self.assertIn("Portal:", result.stdout)
 
+    def test_user_guide_start_opens_runtime_portal_url_text(self):
+        temp_dir, temp_root = make_temp_skeleton_usb_root()
+        try:
+            guide_path = temp_root / "launcher" / "windows" / "UserGuide.ps1"
+            guide_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(ROOT / "launcher" / "windows" / "UserGuide.ps1", guide_path)
+
+            dispatcher_path = temp_root / "core" / "windows" / "clawhermes.ps1"
+            dispatcher_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(ROOT / "core" / "windows" / "clawhermes.ps1", dispatcher_path)
+
+            stdout_path = temp_root / "data" / "tmp" / "user-guide-start.stdout"
+            stderr_path = temp_root / "data" / "tmp" / "user-guide-start.stderr"
+            with stdout_path.open("w", encoding="utf-8") as stdout_handle, stderr_path.open("w", encoding="utf-8") as stderr_handle:
+                result = subprocess.run(
+                    [
+                        "powershell",
+                        "-NoProfile",
+                        "-ExecutionPolicy",
+                        "Bypass",
+                        "-File",
+                        str(guide_path),
+                        "-Mode",
+                        "Start",
+                        "-UsbRoot",
+                        str(temp_root),
+                        "-NoPause",
+                    ],
+                    cwd=temp_root,
+                    text=True,
+                    stdout=stdout_handle,
+                    stderr=stderr_handle,
+                    check=False,
+                    env=os.environ.copy(),
+                )
+
+            stdout_text = stdout_path.read_text(encoding="utf-8")
+            stderr_text = stderr_path.read_text(encoding="utf-8")
+            self.assertEqual(result.returncode, 0, stderr_text)
+            self.assertIn("Start", stdout_text)
+            self.assertIn("Portal: http://127.0.0.1:", stdout_text)
+        finally:
+            run_dispatcher_for_root(temp_root, "stop", "-Json")
+            temp_dir.cleanup()
+
+    def test_user_guide_backup_creates_data_backup_without_uninstall_words(self):
+        temp_dir, temp_root = make_temp_skeleton_usb_root()
+        try:
+            guide_path = temp_root / "launcher" / "windows" / "UserGuide.ps1"
+            guide_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(ROOT / "launcher" / "windows" / "UserGuide.ps1", guide_path)
+
+            dispatcher_path = temp_root / "core" / "windows" / "clawhermes.ps1"
+            dispatcher_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(ROOT / "core" / "windows" / "clawhermes.ps1", dispatcher_path)
+
+            result = run_user_guide("Backup", root=temp_root)
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("Backup", result.stdout)
+            self.assertNotIn("unregister", result.stdout.lower())
+            self.assertNotIn("ClawHermes-Ubuntu", result.stdout)
+        finally:
+            temp_dir.cleanup()
+
     def test_user_guide_install_plan_only_does_not_import_wsl_or_start_services(self):
         result = run_user_guide("Install", "-PlanOnly")
 

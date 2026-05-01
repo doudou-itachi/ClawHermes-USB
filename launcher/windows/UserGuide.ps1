@@ -100,6 +100,14 @@ function Show-LogHint {
     Write-Host "Logs: $logRoot"
 }
 
+function Open-GuideUrl {
+    param([string]$Url)
+    if ($NoPause) {
+        return
+    }
+    Start-Process $Url
+}
+
 function Complete-Guide {
     param([string]$Root)
     if (-not $NoPause) {
@@ -136,14 +144,14 @@ try {
             Invoke-ClawHermes -Root $root -Action "start" -Arguments @()
             $portalUrl = Get-PortalUrl -Root $root
             Write-Host "Portal: $portalUrl"
-            Start-Process $portalUrl
+            Open-GuideUrl -Url $portalUrl
         }
         "Start" {
             Write-Section "Start"
             Invoke-ClawHermes -Root $root -Action "start" -Arguments @()
             $portalUrl = Get-PortalUrl -Root $root
             Write-Host "Portal: $portalUrl"
-            Start-Process $portalUrl
+            Open-GuideUrl -Url $portalUrl
         }
         "Stop" {
             Write-Section "Stop"
