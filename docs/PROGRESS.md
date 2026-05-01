@@ -2435,3 +2435,40 @@ Next steps:
 
 - Add a guarded `wsl-unregister --confirm-unregister` path only after backup/export safeguards are defined.
 - Consider requiring checksum sidecars once a trusted artifact source is chosen.
+
+### WSL2 Export Backup Command
+
+Status: `Done`
+
+Summary:
+
+- Added `wsl-export --distro Ubuntu --confirm-export --json`.
+- The command exports the managed `ClawHermes-Ubuntu` distribution to `data/backups/wsl/` by default.
+- Export requires explicit confirmation, checks that the distribution is registered, and executes through the same WSL wrapper used by diagnostics and import.
+- Archive overrides under system temp are rejected unless the path is still inside the project root, allowing disposable test roots to remain self-contained.
+- Added PowerShell wrapper coverage and documented the command in README, adapter contract, and rootfs artifact policy.
+
+Changed areas:
+
+- `core/node/src/wsl-import.ts`
+- `core/node/src/core.ts`
+- `core/node/src/clawhermes.ts`
+- `core/node/dist/`
+- `core/windows/clawhermes.ps1`
+- `README.md`
+- `docs/ADAPTER_CONTRACT.md`
+- `docs/wsl-rootfs-artifacts.md`
+- `docs/PROGRESS.md`
+- `tests/test_windows_core.py`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_wsl_export_requires_explicit_confirm_export tests.test_windows_core.WindowsCoreTests.test_wsl_export_confirm_runs_fake_wsl_export_to_project_backup tests.test_windows_core.WindowsCoreTests.test_wsl_export_rejects_system_temp_archive_before_running_wsl -v`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_powershell_wrapper_allows_wsl_import_actions -v`
+- `npm test`
+
+Next steps:
+
+- Update `wsl-unregister-plan` to surface latest backup state before enabling destructive unregister execution.
+- Consider requiring checksum sidecars once a trusted artifact source is chosen.

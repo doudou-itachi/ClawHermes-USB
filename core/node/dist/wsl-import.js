@@ -4,9 +4,11 @@ exports.wslImportPlan = wslImportPlan;
 exports.wslRootfsGuide = wslRootfsGuide;
 exports.wslImport = wslImport;
 exports.wslUnregisterPlan = wslUnregisterPlan;
+exports.wslExport = wslExport;
 const node_child_process_1 = require("node:child_process");
 const node_crypto_1 = require("node:crypto");
 const node_fs_1 = require("node:fs");
+const node_os_1 = require("node:os");
 const node_path_1 = require("node:path");
 const portable_1 = require("./portable");
 const wsl_1 = require("./wsl");
@@ -162,6 +164,52 @@ function wslUnregisterPlan(usbRoot, options) {
             : [`Distribution is not registered on this host: ${plan.distributionName}.`],
     };
 }
+function wslExport(usbRoot, options) {
+    const plan = wslImportPlan(usbRoot, options);
+    const backupArchive = options.archive?.trim() ? (0, node_path_1.resolve)(options.archive) : defaultBackupArchive(plan.root, plan.distributionName);
+    const args = ["--export", plan.distributionName, backupArchive];
+    const result = {
+        root: plan.root,
+        distro: plan.distro,
+        distributionName: plan.distributionName,
+        backupArchive,
+        dryRun: false,
+        confirmedExport: options.confirmExport,
+        executed: false,
+        wouldModifyProject: true,
+        executablePath: "wsl.exe",
+        args,
+        command: ["wsl.exe", ...args.map(quoteCommandArg)].join(" "),
+        stdout: "",
+        stderr: "",
+        messages: [`Prepared WSL export for ${plan.distributionName}.`],
+    };
+    if (!options.confirmExport) {
+        throw new Error("wsl-export writes a backup archive. Re-run with --confirm-export to proceed.");
+    }
+    if (isUnderSystemTempOutsideRoot(backupArchive, plan.root)) {
+        throw new Error(`Refusing to write WSL export archive under system temp: ${backupArchive}`);
+    }
+    const executablePath = (0, wsl_1.resolveWslExecutable)();
+    if (!executablePath) {
+        throw new Error("wsl.exe not found. Install or enable WSL2 before exporting a distribution.");
+    }
+    const diagnostics = (0, wsl_1.wslDiagnostics)(plan.root);
+    const registered = diagnostics.distros.some((item) => item.name.toLowerCase() === plan.distributionName.toLowerCase());
+    if (diagnostics.listSucceeded && !registered) {
+        throw new Error(`WSL distribution is not registered: ${plan.distributionName}`);
+    }
+    (0, node_fs_1.mkdirSync)((0, node_path_1.dirname)(backupArchive), { recursive: true });
+    const invocation = (0, wsl_1.wslExecutableInvocation)(executablePath, args);
+    const stdout = (0, node_child_process_1.execFileSync)(invocation.executablePath, invocation.args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+    return {
+        ...result,
+        executablePath,
+        executed: true,
+        stdout: stdout.trim(),
+        messages: [`Exported WSL distribution ${plan.distributionName} to ${backupArchive}.`],
+    };
+}
 function checksumStatus(sourceArchive, checksumFile) {
     if (!(0, node_fs_1.existsSync)(checksumFile)) {
         return {
@@ -201,4 +249,18 @@ function quoteCommandArg(value) {
 }
 function quotePowerShellArg(value) {
     return `'${value.replaceAll("'", "''")}'`;
+}
+function defaultBackupArchive(root, distributionName) {
+    return (0, node_path_1.join)(root, "data", "backups", "wsl", `${distributionName}-${timestampForFile()}.tar`);
+}
+function timestampForFile() {
+    return new Date().toISOString().replace(/[:.]/g, "-");
+}
+function isUnderSystemTempOutsideRoot(path, root) {
+    const temp = (0, node_path_1.resolve)((0, node_os_1.tmpdir)()).toLowerCase();
+    const target = (0, node_path_1.resolve)(path).toLowerCase();
+    const projectRoot = (0, node_path_1.resolve)(root).toLowerCase();
+    const underRoot = target === projectRoot || target.startsWith(`${projectRoot}\\`) || target.startsWith(`${projectRoot}/`);
+    const underTemp = target === temp || target.startsWith(`${temp}\\`) || target.startsWith(`${temp}/`);
+    return underTemp && !underRoot;
 }

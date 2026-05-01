@@ -766,6 +766,10 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertEqual(guide.returncode, 0, guide.stderr)
         self.assertEqual(json.loads(guide.stdout)["distro"], "Ubuntu")
 
+        export = run_powershell_dispatcher("wsl-export", "-Json", "--distro", "Ubuntu")
+        self.assertNotEqual(export.returncode, 0)
+        self.assertIn("--confirm-export", export.stderr)
+
         result = run_powershell_dispatcher("wsl-import-plan", "-Json", "--distro", "Ubuntu")
 
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -970,6 +974,80 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertTrue(payload["backupArchive"].replace("\\", "/").endswith("data/backups/wsl/ClawHermes-Ubuntu-backup.tar"))
             self.assertIn("--confirm-unregister", payload["confirmCommand"])
             self.assertIn("permanently deletes", "\n".join(payload["warnings"]))
+            self.assertFalse(marker.exists())
+        finally:
+            temp_dir.cleanup()
+
+    def test_wsl_export_requires_explicit_confirm_export(self):
+        result = run_dispatcher("wsl-export", "--distro", "Ubuntu", "-Json")
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--confirm-export", result.stderr)
+
+    def test_wsl_export_confirm_runs_fake_wsl_export_to_project_backup(self):
+        temp_dir, temp_root = make_temp_usb_root()
+        try:
+            marker = temp_root / "data" / "tmp" / "fake-wsl-export.txt"
+            args_file = temp_root / "data" / "tmp" / "fake-wsl-export-args.txt"
+            fake_wsl = make_fake_wsl_cmd(
+                temp_root,
+                stay_running=False,
+                marker_path=marker,
+                args_path=args_file,
+                list_distribution="ClawHermes-Ubuntu",
+            )
+
+            result = run_dispatcher_for_root(
+                temp_root,
+                "wsl-export",
+                "--distro",
+                "Ubuntu",
+                "--confirm-export",
+                "-Json",
+                env={"CLAWHERMES_WSL_EXE": str(fake_wsl)},
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertTrue(payload["executed"])
+            self.assertTrue(payload["confirmedExport"])
+            self.assertEqual(payload["distributionName"], "ClawHermes-Ubuntu")
+            self.assertTrue(payload["backupArchive"].replace("\\", "/").startswith(str(temp_root).replace("\\", "/") + "/data/backups/wsl/ClawHermes-Ubuntu-"))
+            self.assertIn("--export", payload["args"])
+            self.assertTrue(marker.exists())
+            args_text = args_file.read_text(encoding="utf-8")
+            self.assertIn("--export", args_text)
+            self.assertIn("ClawHermes-Ubuntu", args_text)
+            self.assertIn(payload["backupArchive"], args_text)
+        finally:
+            temp_dir.cleanup()
+
+    def test_wsl_export_rejects_system_temp_archive_before_running_wsl(self):
+        temp_dir, temp_root = make_temp_usb_root()
+        try:
+            temp_archive = Path(tempfile.gettempdir()) / "ClawHermes-USB-wsl-export-test.tar"
+            marker = temp_root / "data" / "tmp" / "fake-wsl-export.txt"
+            fake_wsl = make_fake_wsl_cmd(
+                temp_root,
+                stay_running=False,
+                marker_path=marker,
+                list_distribution="ClawHermes-Ubuntu",
+            )
+
+            result = run_dispatcher_for_root(
+                temp_root,
+                "wsl-export",
+                "--distro",
+                "Ubuntu",
+                "--archive",
+                str(temp_archive),
+                "--confirm-export",
+                "-Json",
+                env={"CLAWHERMES_WSL_EXE": str(fake_wsl)},
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("system temp", result.stderr)
             self.assertFalse(marker.exists())
         finally:
             temp_dir.cleanup()

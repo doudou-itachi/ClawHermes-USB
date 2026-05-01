@@ -70,3 +70,11 @@ node core/node/dist/clawhermes.js wsl-unregister-plan --distro Ubuntu --json
 ```
 
 The plan reports whether `ClawHermes-Ubuntu` is registered, the destructive `wsl.exe --unregister` command, and a recommended `wsl.exe --export` backup command. It does not run WSL.
+
+Create an explicit backup before unregistering:
+
+```powershell
+node core/node/dist/clawhermes.js wsl-export --distro Ubuntu --confirm-export --json
+```
+
+By default, the archive is written under `data/backups/wsl/`. Archive overrides under the system temp directory are rejected unless the current project root itself is a disposable test root under temp.
