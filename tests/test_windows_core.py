@@ -41,6 +41,26 @@ def run_dispatcher_for_root(usb_root, *args, env=None):
     )
 
 
+def run_powershell_dispatcher(*args, env=None):
+    command = [
+        "powershell",
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        str(DISPATCHER),
+        *args,
+    ]
+    return subprocess.run(
+        command,
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+        env={**os.environ, **(env or {})},
+    )
+
+
 def fetch_portal(timeout=0.5):
     with urllib.request.urlopen(PORTAL_URL, timeout=timeout) as response:
         return response.read().decode("utf-8")
@@ -700,11 +720,59 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertTrue(policy["mustNotUseSystemTemp"])
         self.assertIn("No automatic rootfs download", "\n".join(payload["messages"]))
 
+    def test_powershell_wrapper_allows_wsl_import_actions(self):
+        result = run_powershell_dispatcher("wsl-import-plan", "-Json", "--distro", "Ubuntu")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["distributionName"], "ClawHermes-Ubuntu")
+
     def test_gitignore_excludes_wsl_rootfs_payloads(self):
         gitignore = (ROOT / ".gitignore").read_text(encoding="utf-8")
 
         self.assertIn("runtimes/wsl/*.tar", gitignore)
         self.assertIn("!runtimes/wsl/.gitkeep", gitignore)
+
+    def test_wsl_import_requires_explicit_confirm_import(self):
+        result = run_dispatcher("wsl-import", "--distro", "Ubuntu", "-Json")
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--confirm-import", result.stderr)
+
+    def test_wsl_import_confirm_runs_fake_wsl_import_with_project_local_archive(self):
+        temp_dir, temp_root = make_temp_usb_root()
+        try:
+            archive = temp_root / "runtimes" / "wsl" / "ubuntu-rootfs.tar"
+            archive.parent.mkdir(parents=True, exist_ok=True)
+            archive.write_text("tiny rootfs placeholder for command test\n", encoding="utf-8")
+            marker = temp_root / "data" / "tmp" / "fake-wsl-import.txt"
+            args_file = temp_root / "data" / "tmp" / "fake-wsl-import-args.txt"
+            fake_wsl = make_fake_wsl_cmd(temp_root, stay_running=False, marker_path=marker, args_path=args_file)
+
+            result = run_dispatcher_for_root(
+                temp_root,
+                "wsl-import",
+                "--distro",
+                "Ubuntu",
+                "--confirm-import",
+                "-Json",
+                env={"CLAWHERMES_WSL_EXE": str(fake_wsl)},
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertTrue(payload["executed"])
+            self.assertTrue(payload["confirmedImport"])
+            self.assertTrue(payload["sourceArchiveExists"])
+            self.assertEqual(payload["executablePath"], str(fake_wsl))
+            self.assertTrue(marker.exists())
+            args_text = args_file.read_text(encoding="utf-8")
+            self.assertIn("--import", args_text)
+            self.assertIn("ClawHermes-Ubuntu", args_text)
+            self.assertIn(str(archive), args_text)
+            self.assertIn("--version 2", args_text)
+        finally:
+            temp_dir.cleanup()
 
     def test_setup_json_reports_wsl2_action_when_hermes_agent_needs_wsl2(self):
         missing_wsl = str(ROOT / "data" / "tmp" / "missing-wsl.exe")

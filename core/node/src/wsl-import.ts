@@ -1,6 +1,8 @@
+import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { getRoot } from "./portable";
+import { resolveWslExecutable, wslExecutableInvocation } from "./wsl";
 
 const WSL_COMMAND_DOCS = "https://learn.microsoft.com/en-us/windows/wsl/basic-commands";
 
@@ -46,6 +48,40 @@ export function wslImportPlan(usbRoot: string, options: { distro?: string }) {
       `Place the matching SHA256 file at ${checksumFile} when one is available from the artifact source.`,
       "No automatic rootfs download is performed; keep large rootfs artifacts out of git and outside system temp folders.",
       "This command is read-only and does not run wsl.exe.",
+    ],
+  };
+}
+
+export function wslImport(usbRoot: string, options: { distro?: string; confirmImport: boolean }) {
+  const plan = wslImportPlan(usbRoot, options);
+  const result = {
+    ...plan,
+    dryRun: false,
+    confirmedImport: options.confirmImport,
+    executed: false,
+    stdout: "",
+    stderr: "",
+  };
+  if (!options.confirmImport) {
+    throw new Error("wsl-import modifies the current Windows host. Re-run with --confirm-import to proceed.");
+  }
+  if (!plan.sourceArchiveExists) {
+    throw new Error(`Missing WSL rootfs archive: ${plan.sourceArchive}`);
+  }
+  const executablePath = resolveWslExecutable();
+  if (!executablePath) {
+    throw new Error("wsl.exe not found. Install or enable WSL2 before importing a distribution.");
+  }
+  const invocation = wslExecutableInvocation(executablePath, plan.args);
+  const stdout = execFileSync(invocation.executablePath, invocation.args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+  return {
+    ...result,
+    executablePath,
+    executed: true,
+    stdout: stdout.trim(),
+    messages: [
+      ...plan.messages,
+      `Executed WSL import for ${plan.distributionName}.`,
     ],
   };
 }

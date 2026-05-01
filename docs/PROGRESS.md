@@ -2135,3 +2135,43 @@ Next steps:
 
 - Add a guarded WSL import execution command that requires explicit user confirmation and remains testable through the fake WSL shim.
 - Add a workflow field that surfaces whether a WSL2 adapter declares a graceful stop hook.
+
+### Guarded WSL2 Import Execution
+
+Status: `Done`
+
+Summary:
+
+- Added `wsl-import --distro Ubuntu --confirm-import --json` for explicit WSL2 distribution import execution.
+- The command refuses to run unless `--confirm-import` is provided.
+- The command fails before invoking WSL when the expected rootfs archive is missing.
+- Confirmed execution uses the same WSL executable wrapper as diagnostics, so tests can run through a fake `.cmd` WSL shim without requiring real WSL2.
+- Updated the PowerShell dispatcher action whitelist so WSL2 preparation, import, and workflow commands are available through the thin outer script.
+
+Changed areas:
+
+- `core/node/src/wsl.ts`
+- `core/node/src/wsl-import.ts`
+- `core/node/src/core.ts`
+- `core/node/src/clawhermes.ts`
+- `core/node/dist/`
+- `core/windows/clawhermes.ps1`
+- `README.md`
+- `docs/ADAPTER_CONTRACT.md`
+- `docs/wsl-rootfs-artifacts.md`
+- `docs/PROGRESS.md`
+- `tests/test_windows_core.py`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_wsl_import_requires_explicit_confirm_import tests.test_windows_core.WindowsCoreTests.test_wsl_import_confirm_runs_fake_wsl_import_with_project_local_archive tests.test_windows_core.WindowsCoreTests.test_powershell_wrapper_allows_wsl_import_actions -v`
+- `npm test`
+- `git diff --check`
+- UTF-8 smoke check
+- C temp cleanup check
+
+Next steps:
+
+- Add `wsl-import` as an optional phase in the WSL2 operator workflow.
+- Add a workflow field that surfaces whether a WSL2 adapter declares a graceful stop hook.

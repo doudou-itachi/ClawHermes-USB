@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.wslDiagnostics = wslDiagnostics;
 exports.prepareWsl = prepareWsl;
 exports.wslExecutableInvocation = wslExecutableInvocation;
+exports.resolveWslExecutable = resolveWslExecutable;
 const node_child_process_1 = require("node:child_process");
 const node_fs_1 = require("node:fs");
 const node_path_1 = require("node:path");

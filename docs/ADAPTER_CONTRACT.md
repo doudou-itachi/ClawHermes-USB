@@ -555,6 +555,7 @@ Before attempting WSL2 setup or startup, run:
 ```powershell
 node core/node/dist/clawhermes.js wsl --distro Ubuntu --json
 node core/node/dist/clawhermes.js wsl-import-plan --distro Ubuntu --json
+node core/node/dist/clawhermes.js wsl-import --distro Ubuntu --confirm-import --json
 node core/node/dist/clawhermes.js wsl-workflow hermes-agent --json
 ```
 
@@ -567,8 +568,9 @@ Rules:
 - Inspect a USB/project-local import command with `node core/node/dist/clawhermes.js wsl-import-plan --distro Ubuntu --json`.
 - A typical explicit installation command is `wsl.exe --install -d Ubuntu`, followed by the standard WSL first-run initialization.
 - Real host preparation must require `--confirm-install`.
-- A future `wsl --import` workflow may store distro files under the USB/project path, but the imported distro is still registered on the current Windows host.
+- The guarded `wsl-import` command may store distro files under the USB/project path, but the imported distro is still registered on the current Windows host.
 - `wsl-import-plan` is read-only. It expects a compatible rootfs tar archive under `runtimes/wsl/` and reports the official `wsl.exe --import <name> <install-location> <archive> --version 2` command.
+- Real import execution must require `--confirm-import` and must fail before running WSL when the expected rootfs archive is missing.
 - WSL rootfs artifacts are operator-managed payloads. They must stay under `runtimes/wsl/`, stay out of git, avoid system temp folders as durable storage, and never be downloaded automatically by setup/startup diagnostics.
 - Missing `wsl.exe`, missing distributions, and missing WSL2 distributions must be reported as setup actions.
 - When `runtime.distro` is set, WSL commands must include `--distribution <name>` and diagnostics must verify that target distribution.

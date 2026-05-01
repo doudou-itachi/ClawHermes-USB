@@ -38,3 +38,11 @@ node core/node/dist/clawhermes.js wsl-import-plan --distro Ubuntu --json
 ```
 
 This command reports the expected archive path, checksum path, install location, and official `wsl.exe --import ... --version 2` argument list. It does not run `wsl.exe`.
+
+After placing the rootfs archive under `runtimes/wsl/`, explicitly confirm import execution:
+
+```powershell
+node core/node/dist/clawhermes.js wsl-import --distro Ubuntu --confirm-import --json
+```
+
+This command fails before running WSL if `--confirm-import` is missing or if the rootfs archive is absent.

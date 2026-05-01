@@ -1,17 +1,25 @@
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("env-json", "setup", "runtimes", "wsl", "install-runtime", "init-env", "service-env", "adapters", "sources", "probe-sources", "checkout-source", "setup-adapter", "verify-adapter", "mark-adapter-ready", "logs", "backup", "start", "start-adapter", "status", "stop")]
+    [ValidateSet("env-json", "setup", "runtimes", "wsl", "prepare-wsl", "wsl-import-plan", "wsl-import", "wsl-workflow", "install-runtime", "init-env", "service-env", "adapters", "sources", "probe-sources", "checkout-source", "setup-adapter", "verify-adapter", "mark-adapter-ready", "logs", "backup", "start", "start-adapter", "status", "stop")]
     [string]$Action = "setup",
 
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]]$RemainingArgs,
 
-    [string]$UsbRoot = (Resolve-Path -LiteralPath (Join-Path -Path $PSScriptRoot -ChildPath "..\..")).Path,
+    [string]$UsbRoot,
 
     [switch]$Json
 )
 
 $ErrorActionPreference = "Stop"
+
+if ([string]::IsNullOrWhiteSpace($UsbRoot)) {
+    $scriptRoot = $PSScriptRoot
+    if ([string]::IsNullOrWhiteSpace($scriptRoot)) {
+        $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+    }
+    $UsbRoot = (Resolve-Path -LiteralPath (Join-Path -Path $scriptRoot -ChildPath "..\..")).Path
+}
 
 $root = (Resolve-Path -LiteralPath $UsbRoot).Path
 $node = Join-Path -Path $root -ChildPath "runtimes\windows\node\node.exe"

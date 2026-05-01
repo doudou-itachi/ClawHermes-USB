@@ -179,7 +179,7 @@ function normalizeDesiredDistro(value: string | undefined): string | null {
   return trimmed ? trimmed : null;
 }
 
-function resolveWslExecutable(): string | null {
+export function resolveWslExecutable(): string | null {
   const override = process.env.CLAWHERMES_WSL_EXE;
   if (override) return existsSync(override) ? override : null;
   try {
