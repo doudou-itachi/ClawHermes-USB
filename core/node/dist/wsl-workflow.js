@@ -18,6 +18,7 @@ function wslWorkflowPlan(usbRoot, serviceId) {
     const diagnostics = (0, wsl_1.wslDiagnostics)(root, distro);
     const wslReady = diagnostics.hasDesiredDistro && diagnostics.desiredDistroVersion === 2;
     const importPlan = (0, wsl_import_1.wslImportPlan)(root, { distro });
+    const unregisterPlan = (0, wsl_import_1.wslUnregisterPlan)(root, { distro });
     const commandPrefix = "node core/node/dist/clawhermes.js";
     const phases = [
         {
@@ -111,6 +112,28 @@ function wslWorkflowPlan(usbRoot, serviceId) {
             modifiesHost: false,
             modifiesProject: true,
             detail: "Metadata update is guarded by --confirm-ready and requires verification evidence.",
+        },
+        {
+            id: "export-backup",
+            title: "Export managed WSL2 distro backup",
+            status: unregisterPlan.registered ? "manual" : "blocked",
+            command: `${commandPrefix} wsl-unregister-plan --distro ${distro} --json`,
+            confirmCommand: `${commandPrefix} wsl-export --distro ${distro} --confirm-export --json`,
+            modifiesHost: false,
+            modifiesProject: true,
+            detail: "Backup export writes a project-local archive under data/backups/wsl/ before any destructive cleanup.",
+            latestBackupExists: unregisterPlan.latestBackup.exists,
+        },
+        {
+            id: "unregister-distro",
+            title: "Optionally unregister managed WSL2 distro",
+            status: unregisterPlan.latestBackup.exists && unregisterPlan.registered ? "manual" : "blocked",
+            command: `${commandPrefix} wsl-unregister-plan --distro ${distro} --json`,
+            confirmCommand: `${commandPrefix} wsl-unregister --distro ${distro} --confirm-unregister --json`,
+            modifiesHost: true,
+            modifiesProject: false,
+            detail: "Destructive host cleanup is blocked until a project-local backup exists and still requires explicit confirmation.",
+            latestBackupExists: unregisterPlan.latestBackup.exists,
         },
     ];
     return {

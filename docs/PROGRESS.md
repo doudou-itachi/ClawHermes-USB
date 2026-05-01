@@ -2542,3 +2542,36 @@ Next steps:
 
 - Fold export/unregister steps into `wsl-workflow` so the operator sees the cleanup path in one place.
 - Consider requiring checksum sidecars once a trusted artifact source is chosen.
+
+### WSL2 Workflow Cleanup Phases
+
+Status: `Done`
+
+Summary:
+
+- Added `export-backup` and `unregister-distro` phases to `wsl-workflow <service-id> --json`.
+- The workflow now surfaces the guarded `wsl-export --confirm-export` command before any destructive unregister step.
+- The unregister phase reports whether a latest project-local backup exists and stays blocked until backup and registration gates are satisfied.
+- Updated the adapter contract so WSL2 workflows cover optional cleanup after production-readiness metadata.
+
+Changed areas:
+
+- `core/node/src/wsl-workflow.ts`
+- `core/node/dist/wsl-workflow.js`
+- `docs/ADAPTER_CONTRACT.md`
+- `docs/PROGRESS.md`
+- `tests/test_windows_core.py`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_wsl_workflow_reports_explicit_confirm_commands_for_hermes_agent -v`
+- `npm test`
+- `git diff --check`
+- UTF-8 smoke check
+- C temp cleanup check
+
+Next steps:
+
+- Consider requiring checksum sidecars once a trusted artifact source is chosen.
+- Review PRD/progress for the next highest-value gap after the WSL2 operator workflow is complete.

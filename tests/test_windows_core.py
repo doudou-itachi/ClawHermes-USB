@@ -690,7 +690,19 @@ class WindowsCoreTests(unittest.TestCase):
         phase_ids = [phase["id"] for phase in payload["phases"]]
         self.assertEqual(
             phase_ids,
-            ["diagnose", "prepare-host", "prepare-rootfs", "import-distro", "checkout-source", "setup-adapter", "start-adapter", "verify-adapter", "mark-ready"],
+            [
+                "diagnose",
+                "prepare-host",
+                "prepare-rootfs",
+                "import-distro",
+                "checkout-source",
+                "setup-adapter",
+                "start-adapter",
+                "verify-adapter",
+                "mark-ready",
+                "export-backup",
+                "unregister-distro",
+            ],
         )
         phases = {phase["id"]: phase for phase in payload["phases"]}
         self.assertFalse(phases["diagnose"]["modifiesHost"])
@@ -714,6 +726,14 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertIn("--confirm-start", phases["start-adapter"]["confirmCommand"])
         self.assertIn("verify-adapter hermes-agent --json", phases["verify-adapter"]["command"])
         self.assertIn("--confirm-ready", phases["mark-ready"]["confirmCommand"])
+        self.assertIn("wsl-export --distro Ubuntu --confirm-export --json", phases["export-backup"]["confirmCommand"])
+        self.assertFalse(phases["export-backup"]["modifiesHost"])
+        self.assertTrue(phases["export-backup"]["modifiesProject"])
+        self.assertIn("wsl-unregister-plan --distro Ubuntu --json", phases["unregister-distro"]["command"])
+        self.assertIn("wsl-unregister --distro Ubuntu --confirm-unregister --json", phases["unregister-distro"]["confirmCommand"])
+        self.assertTrue(phases["unregister-distro"]["modifiesHost"])
+        self.assertFalse(phases["unregister-distro"]["modifiesProject"])
+        self.assertFalse(phases["unregister-distro"]["latestBackupExists"])
 
     def test_wsl_import_plan_reports_usb_storage_command_without_running_wsl(self):
         result = run_dispatcher("wsl-import-plan", "--distro", "Ubuntu", "-Json")
