@@ -49,6 +49,17 @@ export function wslWorkflowPlan(usbRoot: string, serviceId: string | undefined) 
       detail: "Host-level WSL2 preparation requires explicit confirmation.",
     },
     {
+      id: "prepare-rootfs",
+      title: "Prepare project-local rootfs artifact",
+      status: importPlan.sourceArchiveExists ? "ready" : "manual",
+      command: `${commandPrefix} wsl-rootfs-guide --distro ${distro} --json`,
+      confirmCommand: null,
+      modifiesHost: false,
+      modifiesProject: false,
+      detail: "Read-only guide for manually exporting a rootfs archive and SHA256 sidecar under runtimes/wsl/.",
+      sourceArchiveExists: importPlan.sourceArchiveExists,
+    },
+    {
       id: "import-distro",
       title: "Optionally import project-local WSL2 distro",
       status: wslReady ? "ready" : "manual",

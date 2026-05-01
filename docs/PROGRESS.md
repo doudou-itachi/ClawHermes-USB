@@ -2027,6 +2027,7 @@ Validation performed:
 - `npm run build`
 - `python -m unittest tests.test_windows_core.WindowsCoreTests.test_wsl_workflow_reports_explicit_confirm_commands_for_hermes_agent -v`
 - `npm test`
+- `npm test`
 
 Next steps:
 
@@ -2272,4 +2273,33 @@ Validation performed:
 Next steps:
 
 - Add an optional rootfs guide phase to `wsl-workflow` if the workflow output becomes too dense for operators.
+- Consider requiring checksum sidecars once a trusted artifact source is chosen.
+
+### WSL2 Workflow Rootfs Guide Phase
+
+Status: `Done`
+
+Summary:
+
+- Added a `prepare-rootfs` phase to `wsl-workflow <service-id> --json`.
+- The new phase points to `wsl-rootfs-guide --distro <name> --json` before the guarded import phase.
+- The phase is read-only, reports whether the expected rootfs archive exists, and does not claim host or project mutation.
+- Updated the adapter contract to keep the workflow sequence aligned with the rootfs artifact guidance.
+
+Changed areas:
+
+- `core/node/src/wsl-workflow.ts`
+- `core/node/dist/wsl-workflow.js`
+- `docs/ADAPTER_CONTRACT.md`
+- `docs/PROGRESS.md`
+- `tests/test_windows_core.py`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_wsl_workflow_reports_explicit_confirm_commands_for_hermes_agent -v`
+
+Next steps:
+
+- Add rootfs/archive status summaries to setup diagnostics so first-run users can see WSL2 artifact readiness from `setup --json`.
 - Consider requiring checksum sidecars once a trusted artifact source is chosen.
