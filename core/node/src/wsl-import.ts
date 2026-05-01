@@ -218,6 +218,45 @@ export function wslExport(usbRoot: string, options: { distro?: string; archive?:
   };
 }
 
+export function wslUnregister(usbRoot: string, options: { distro?: string; confirmUnregister: boolean }) {
+  const plan = wslUnregisterPlan(usbRoot, options);
+  const result = {
+    ...plan,
+    dryRun: false,
+    confirmedUnregister: options.confirmUnregister,
+    executed: false,
+    stdout: "",
+    stderr: "",
+  };
+  if (!options.confirmUnregister) {
+    throw new Error("wsl-unregister permanently deletes a WSL distribution. Re-run with --confirm-unregister to proceed.");
+  }
+  if (!plan.distributionName.startsWith("ClawHermes-")) {
+    throw new Error(`Refusing to unregister non-ClawHermes distribution: ${plan.distributionName}`);
+  }
+  if (!plan.latestBackup.exists) {
+    throw new Error(`Refusing to unregister ${plan.distributionName} before a project-local WSL backup exists. Run wsl-export --confirm-export first.`);
+  }
+  const executablePath = resolveWslExecutable();
+  if (!executablePath) {
+    throw new Error("wsl.exe not found. Install or enable WSL2 before unregistering a distribution.");
+  }
+  const diagnostics = wslDiagnostics(plan.root);
+  const registered = diagnostics.distros.some((item) => item.name.toLowerCase() === plan.distributionName.toLowerCase());
+  if (diagnostics.listSucceeded && !registered) {
+    throw new Error(`WSL distribution is not registered: ${plan.distributionName}`);
+  }
+  const invocation = wslExecutableInvocation(executablePath, plan.args);
+  const stdout = execFileSync(invocation.executablePath, invocation.args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+  return {
+    ...result,
+    executablePath,
+    executed: true,
+    stdout: stdout.trim(),
+    messages: [`Unregistered WSL distribution ${plan.distributionName}.`],
+  };
+}
+
 function checksumStatus(sourceArchive: string, checksumFile: string) {
   if (!existsSync(checksumFile)) {
     return {

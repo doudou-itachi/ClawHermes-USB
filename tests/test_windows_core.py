@@ -770,6 +770,10 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertNotEqual(export.returncode, 0)
         self.assertIn("--confirm-export", export.stderr)
 
+        unregister = run_powershell_dispatcher("wsl-unregister", "-Json", "--distro", "Ubuntu")
+        self.assertNotEqual(unregister.returncode, 0)
+        self.assertIn("--confirm-unregister", unregister.stderr)
+
         result = run_powershell_dispatcher("wsl-import-plan", "-Json", "--distro", "Ubuntu")
 
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -1010,6 +1014,79 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertEqual(Path(payload["latestBackup"]["path"]).resolve(), latest_backup.resolve())
             self.assertGreater(payload["latestBackup"]["sizeBytes"], 0)
             self.assertIn("Latest backup", "\n".join(payload["messages"]))
+        finally:
+            temp_dir.cleanup()
+
+    def test_wsl_unregister_requires_explicit_confirm_unregister(self):
+        result = run_dispatcher("wsl-unregister", "--distro", "Ubuntu", "-Json")
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--confirm-unregister", result.stderr)
+
+    def test_wsl_unregister_requires_project_backup_before_running_wsl(self):
+        temp_dir, temp_root = make_temp_usb_root()
+        try:
+            marker = temp_root / "data" / "tmp" / "fake-wsl-unregister.txt"
+            fake_wsl = make_fake_wsl_cmd(
+                temp_root,
+                stay_running=False,
+                marker_path=marker,
+                list_distribution="ClawHermes-Ubuntu",
+            )
+
+            result = run_dispatcher_for_root(
+                temp_root,
+                "wsl-unregister",
+                "--distro",
+                "Ubuntu",
+                "--confirm-unregister",
+                "-Json",
+                env={"CLAWHERMES_WSL_EXE": str(fake_wsl)},
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("backup", result.stderr.lower())
+            self.assertFalse(marker.exists())
+        finally:
+            temp_dir.cleanup()
+
+    def test_wsl_unregister_confirm_runs_fake_wsl_after_backup_gate(self):
+        temp_dir, temp_root = make_temp_usb_root()
+        try:
+            backup_dir = temp_root / "data" / "backups" / "wsl"
+            backup_dir.mkdir(parents=True)
+            (backup_dir / "ClawHermes-Ubuntu-2026-02-01T00-00-00-000Z.tar").write_text("backup\n", encoding="utf-8")
+            marker = temp_root / "data" / "tmp" / "fake-wsl-unregister.txt"
+            args_file = temp_root / "data" / "tmp" / "fake-wsl-unregister-args.txt"
+            fake_wsl = make_fake_wsl_cmd(
+                temp_root,
+                stay_running=False,
+                marker_path=marker,
+                args_path=args_file,
+                list_distribution="ClawHermes-Ubuntu",
+            )
+
+            result = run_dispatcher_for_root(
+                temp_root,
+                "wsl-unregister",
+                "--distro",
+                "Ubuntu",
+                "--confirm-unregister",
+                "-Json",
+                env={"CLAWHERMES_WSL_EXE": str(fake_wsl)},
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertTrue(payload["executed"])
+            self.assertTrue(payload["confirmedUnregister"])
+            self.assertTrue(payload["latestBackup"]["exists"])
+            self.assertEqual(payload["distributionName"], "ClawHermes-Ubuntu")
+            self.assertIn("--unregister", payload["args"])
+            self.assertTrue(marker.exists())
+            args_text = args_file.read_text(encoding="utf-8")
+            self.assertIn("--unregister", args_text)
+            self.assertIn("ClawHermes-Ubuntu", args_text)
         finally:
             temp_dir.cleanup()
 

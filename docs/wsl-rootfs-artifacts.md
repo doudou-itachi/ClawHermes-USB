@@ -78,3 +78,11 @@ node core/node/dist/clawhermes.js wsl-export --distro Ubuntu --confirm-export --
 ```
 
 By default, the archive is written under `data/backups/wsl/`. Archive overrides under the system temp directory are rejected unless the current project root itself is a disposable test root under temp.
+
+After a project-local backup exists, unregistering still requires explicit confirmation:
+
+```powershell
+node core/node/dist/clawhermes.js wsl-unregister --distro Ubuntu --confirm-unregister --json
+```
+
+This command only targets the managed `ClawHermes-*` distribution name and refuses to run before a matching backup exists under `data/backups/wsl/`.

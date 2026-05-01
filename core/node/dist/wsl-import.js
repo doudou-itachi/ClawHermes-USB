@@ -5,6 +5,7 @@ exports.wslRootfsGuide = wslRootfsGuide;
 exports.wslImport = wslImport;
 exports.wslUnregisterPlan = wslUnregisterPlan;
 exports.wslExport = wslExport;
+exports.wslUnregister = wslUnregister;
 const node_child_process_1 = require("node:child_process");
 const node_crypto_1 = require("node:crypto");
 const node_fs_1 = require("node:fs");
@@ -216,6 +217,44 @@ function wslExport(usbRoot, options) {
         executed: true,
         stdout: stdout.trim(),
         messages: [`Exported WSL distribution ${plan.distributionName} to ${backupArchive}.`],
+    };
+}
+function wslUnregister(usbRoot, options) {
+    const plan = wslUnregisterPlan(usbRoot, options);
+    const result = {
+        ...plan,
+        dryRun: false,
+        confirmedUnregister: options.confirmUnregister,
+        executed: false,
+        stdout: "",
+        stderr: "",
+    };
+    if (!options.confirmUnregister) {
+        throw new Error("wsl-unregister permanently deletes a WSL distribution. Re-run with --confirm-unregister to proceed.");
+    }
+    if (!plan.distributionName.startsWith("ClawHermes-")) {
+        throw new Error(`Refusing to unregister non-ClawHermes distribution: ${plan.distributionName}`);
+    }
+    if (!plan.latestBackup.exists) {
+        throw new Error(`Refusing to unregister ${plan.distributionName} before a project-local WSL backup exists. Run wsl-export --confirm-export first.`);
+    }
+    const executablePath = (0, wsl_1.resolveWslExecutable)();
+    if (!executablePath) {
+        throw new Error("wsl.exe not found. Install or enable WSL2 before unregistering a distribution.");
+    }
+    const diagnostics = (0, wsl_1.wslDiagnostics)(plan.root);
+    const registered = diagnostics.distros.some((item) => item.name.toLowerCase() === plan.distributionName.toLowerCase());
+    if (diagnostics.listSucceeded && !registered) {
+        throw new Error(`WSL distribution is not registered: ${plan.distributionName}`);
+    }
+    const invocation = (0, wsl_1.wslExecutableInvocation)(executablePath, plan.args);
+    const stdout = (0, node_child_process_1.execFileSync)(invocation.executablePath, invocation.args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+    return {
+        ...result,
+        executablePath,
+        executed: true,
+        stdout: stdout.trim(),
+        messages: [`Unregistered WSL distribution ${plan.distributionName}.`],
     };
 }
 function checksumStatus(sourceArchive, checksumFile) {

@@ -2503,3 +2503,42 @@ Next steps:
 
 - Add guarded `wsl-unregister --confirm-unregister` execution with backup presence checks.
 - Consider requiring checksum sidecars once a trusted artifact source is chosen.
+
+### WSL2 Guarded Unregister Execution
+
+Status: `Done`
+
+Summary:
+
+- Added `wsl-unregister --distro Ubuntu --confirm-unregister --json`.
+- The command requires explicit confirmation, refuses non-`ClawHermes-*` names, requires a project-local backup, checks registration state, and executes through the WSL wrapper.
+- Fake WSL coverage verifies no WSL command runs before confirmation or before the backup gate passes.
+- Added the action to the PowerShell wrapper whitelist and documented it in README, adapter contract, and rootfs artifact policy.
+
+Changed areas:
+
+- `core/node/src/wsl-import.ts`
+- `core/node/src/core.ts`
+- `core/node/src/clawhermes.ts`
+- `core/node/dist/`
+- `core/windows/clawhermes.ps1`
+- `README.md`
+- `docs/ADAPTER_CONTRACT.md`
+- `docs/wsl-rootfs-artifacts.md`
+- `docs/PROGRESS.md`
+- `tests/test_windows_core.py`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_wsl_unregister_requires_explicit_confirm_unregister tests.test_windows_core.WindowsCoreTests.test_wsl_unregister_requires_project_backup_before_running_wsl tests.test_windows_core.WindowsCoreTests.test_wsl_unregister_confirm_runs_fake_wsl_after_backup_gate -v`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_powershell_wrapper_allows_wsl_import_actions -v`
+- `npm test`
+- `git diff --check`
+- UTF-8 smoke check
+- C temp cleanup check
+
+Next steps:
+
+- Fold export/unregister steps into `wsl-workflow` so the operator sees the cleanup path in one place.
+- Consider requiring checksum sidecars once a trusted artifact source is chosen.

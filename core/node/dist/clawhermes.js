@@ -19,6 +19,7 @@ function parseArgs(argv) {
     let confirmStart = false;
     let confirmImport = false;
     let confirmExport = false;
+    let confirmUnregister = false;
     let distro;
     let summary;
     let lines = 50;
@@ -70,6 +71,9 @@ function parseArgs(argv) {
         else if (arg === "--confirm-export") {
             confirmExport = true;
         }
+        else if (arg === "--confirm-unregister") {
+            confirmUnregister = true;
+        }
         else if (arg === "--distro" && args[index + 1]) {
             distro = args[index + 1];
             index += 1;
@@ -86,7 +90,7 @@ function parseArgs(argv) {
             positional.push(arg);
         }
     }
-    return { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, confirmCheckout, confirmSetup, confirmInstall, confirmReady, confirmStart, confirmImport, confirmExport, distro, summary, lines };
+    return { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, confirmCheckout, confirmSetup, confirmInstall, confirmReady, confirmStart, confirmImport, confirmExport, confirmUnregister, distro, summary, lines };
 }
 function parseBackupProfile(value) {
     if (value === "data-only" || value === "full")
@@ -97,7 +101,7 @@ function printJson(value) {
     process.stdout.write(`${JSON.stringify(value, null, 2)}\n`);
 }
 async function main() {
-    const { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, confirmCheckout, confirmSetup, confirmInstall, confirmReady, confirmStart, confirmImport, confirmExport, distro, summary, lines } = parseArgs(process.argv.slice(2));
+    const { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, confirmCheckout, confirmSetup, confirmInstall, confirmReady, confirmStart, confirmImport, confirmExport, confirmUnregister, distro, summary, lines } = parseArgs(process.argv.slice(2));
     const root = (0, core_1.getRoot)(usbRoot);
     switch (action) {
         case "env-json":
@@ -249,6 +253,19 @@ async function main() {
             }
             else {
                 console.log("ClawHermes-USB WSL2 export");
+                for (const message of result.messages)
+                    console.log(`- ${message}`);
+                console.log(`Command: ${result.command}`);
+            }
+            return;
+        }
+        case "wsl-unregister": {
+            const result = (0, core_1.wslUnregister)(root, { distro, confirmUnregister });
+            if (json) {
+                printJson(result);
+            }
+            else {
+                console.log("ClawHermes-USB WSL2 unregister");
                 for (const message of result.messages)
                     console.log(`- ${message}`);
                 console.log(`Command: ${result.command}`);

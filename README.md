@@ -54,6 +54,7 @@ node core/node/dist/clawhermes.js wsl-import-plan --distro Ubuntu --json
 node core/node/dist/clawhermes.js wsl-import --distro Ubuntu --confirm-import --json
 node core/node/dist/clawhermes.js wsl-export --distro Ubuntu --confirm-export --json
 node core/node/dist/clawhermes.js wsl-unregister-plan --distro Ubuntu --json
+node core/node/dist/clawhermes.js wsl-unregister --distro Ubuntu --confirm-unregister --json
 node core/node/dist/clawhermes.js wsl-workflow hermes-agent --json
 node core/node/dist/clawhermes.js adapters --json
 node core/node/dist/clawhermes.js adapters hermes-web-ui --json

@@ -559,6 +559,7 @@ node core/node/dist/clawhermes.js wsl-import-plan --distro Ubuntu --json
 node core/node/dist/clawhermes.js wsl-import --distro Ubuntu --confirm-import --json
 node core/node/dist/clawhermes.js wsl-export --distro Ubuntu --confirm-export --json
 node core/node/dist/clawhermes.js wsl-unregister-plan --distro Ubuntu --json
+node core/node/dist/clawhermes.js wsl-unregister --distro Ubuntu --confirm-unregister --json
 node core/node/dist/clawhermes.js wsl-workflow hermes-agent --json
 ```
 
@@ -583,7 +584,7 @@ Rules:
 - `wsl-unregister-plan` must report the latest project-local WSL backup under `data/backups/wsl/` when one exists, and should recommend `wsl-export --confirm-export` when no backup is present.
 - `wsl-export --distro <name> --confirm-export` must be explicit and should write backups under `data/backups/wsl/` by default.
 - WSL export must reject archive overrides under the system temp directory unless that path is still inside the current project root used by tests or disposable USB roots.
-- Any future unregister execution must require explicit confirmation and should recommend a WSL export backup first.
+- `wsl-unregister --distro <name> --confirm-unregister` must require explicit confirmation, only target `ClawHermes-*` distribution names, require a project-local backup first, and execute through the WSL wrapper.
 - WSL rootfs artifacts are operator-managed payloads. They must stay under `runtimes/wsl/`, stay out of git, avoid system temp folders as durable storage, and never be downloaded automatically by setup/startup diagnostics.
 - Missing `wsl.exe`, missing distributions, and missing WSL2 distributions must be reported as setup actions.
 - Missing WSL rootfs archives for WSL2 adapters must be reported in `setup --json` under `wslArtifacts` and should add a `wsl-artifact:<service-id>` action pointing to `wsl-rootfs-guide`.
