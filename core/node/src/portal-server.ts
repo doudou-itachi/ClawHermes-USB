@@ -1,6 +1,9 @@
 import { createServer } from "node:http";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
+import { loadAdapters } from "./adapters";
+import { verifyAdapter } from "./adapter-verification";
+import type { WslDiagnostic } from "./types";
 
 function parseArgs(argv: string[]): { usbRoot: string; port: number } {
   let usbRoot = process.cwd();
@@ -66,6 +69,14 @@ const server = createServer((request, response) => {
       response.end(JSON.stringify(backupSnapshot(), null, 2));
       return;
     }
+    if (request.url === "/adapter-verification.json") {
+      response.writeHead(200, {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+      });
+      response.end(JSON.stringify(adapterVerificationSnapshot(), null, 2));
+      return;
+    }
     if (request.url !== "/" && request.url !== "/index.html") {
       response.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
       response.end("Not found");
@@ -107,6 +118,30 @@ function backupSnapshot() {
     count: backups.length,
     latest: backups[0] ?? null,
     backups,
+  };
+}
+
+function adapterVerificationSnapshot() {
+  const wslDiagnosticsByDistro = new Map<string, WslDiagnostic>();
+  return {
+    root: usbRoot,
+    generatedAt: new Date().toISOString(),
+    adapters: loadAdapters(usbRoot).map((adapter) => {
+      const verification = verifyAdapter(usbRoot, adapter.id, {
+        wslDiagnosticsByDistro,
+        wslCommandTimeoutMs: 1500,
+        probeHealth: false,
+      });
+      return {
+        serviceId: verification.serviceId,
+        displayName: verification.displayName,
+        productionReadyCandidate: verification.productionReadyCandidate,
+        checks: verification.checks,
+        nextSteps: verification.nextSteps,
+        wsl: verification.wsl,
+        health: verification.health,
+      };
+    }),
   };
 }
 

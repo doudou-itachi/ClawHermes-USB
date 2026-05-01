@@ -3,6 +3,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const node_http_1 = require("node:http");
 const node_fs_1 = require("node:fs");
 const node_path_1 = require("node:path");
+const adapters_1 = require("./adapters");
+const adapter_verification_1 = require("./adapter-verification");
 function parseArgs(argv) {
     let usbRoot = process.cwd();
     let port = 17000;
@@ -65,6 +67,14 @@ const server = (0, node_http_1.createServer)((request, response) => {
             response.end(JSON.stringify(backupSnapshot(), null, 2));
             return;
         }
+        if (request.url === "/adapter-verification.json") {
+            response.writeHead(200, {
+                "content-type": "application/json; charset=utf-8",
+                "cache-control": "no-store",
+            });
+            response.end(JSON.stringify(adapterVerificationSnapshot(), null, 2));
+            return;
+        }
         if (request.url !== "/" && request.url !== "/index.html") {
             response.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
             response.end("Not found");
@@ -106,6 +116,29 @@ function backupSnapshot() {
         count: backups.length,
         latest: backups[0] ?? null,
         backups,
+    };
+}
+function adapterVerificationSnapshot() {
+    const wslDiagnosticsByDistro = new Map();
+    return {
+        root: usbRoot,
+        generatedAt: new Date().toISOString(),
+        adapters: (0, adapters_1.loadAdapters)(usbRoot).map((adapter) => {
+            const verification = (0, adapter_verification_1.verifyAdapter)(usbRoot, adapter.id, {
+                wslDiagnosticsByDistro,
+                wslCommandTimeoutMs: 1500,
+                probeHealth: false,
+            });
+            return {
+                serviceId: verification.serviceId,
+                displayName: verification.displayName,
+                productionReadyCandidate: verification.productionReadyCandidate,
+                checks: verification.checks,
+                nextSteps: verification.nextSteps,
+                wsl: verification.wsl,
+                health: verification.health,
+            };
+        }),
     };
 }
 server.listen(port, "127.0.0.1", () => {

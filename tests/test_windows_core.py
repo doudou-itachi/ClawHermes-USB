@@ -81,6 +81,11 @@ def fetch_portal_backups(timeout=0.5):
         return json.loads(response.read().decode("utf-8"))
 
 
+def fetch_portal_adapter_verification(timeout=0.5):
+    with urllib.request.urlopen(f"{PORTAL_URL}adapter-verification.json", timeout=timeout) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
 def wait_for_portal():
     deadline = time.time() + 5
     last_error = None
@@ -121,6 +126,12 @@ def make_temp_usb_root():
         (env_root / example_file.name).write_text(example_file.read_text(encoding="utf-8"), encoding="utf-8")
 
     return temp_dir, temp_root
+
+
+def copy_portal_dist(temp_root):
+    target = temp_root / "core" / "node" / "dist"
+    target.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(ROOT / "core" / "node" / "dist", target, dirs_exist_ok=True)
 
 
 def make_hermes_agent_app_ready(temp_root):
@@ -318,10 +329,7 @@ def make_temp_process_usb_root():
         encoding="utf-8",
     )
     (temp_root / "config" / "env" / "fake.env").write_text("FAKE_SECRET=from-env-file\n", encoding="utf-8")
-    (temp_root / "core" / "node" / "dist" / "portal-server.js").write_text(
-        (ROOT / "core" / "node" / "dist" / "portal-server.js").read_text(encoding="utf-8"),
-        encoding="utf-8",
-    )
+    copy_portal_dist(temp_root)
     (temp_root / "apps" / "fake-service" / "service.js").write_text(
         "\n".join(
             [
@@ -426,10 +434,7 @@ def make_temp_http_usb_root(health_port=None):
         json.dumps({"platform": "windows", "runtimes": []}, indent=2),
         encoding="utf-8",
     )
-    (temp_root / "core" / "node" / "dist" / "portal-server.js").write_text(
-        (ROOT / "core" / "node" / "dist" / "portal-server.js").read_text(encoding="utf-8"),
-        encoding="utf-8",
-    )
+    copy_portal_dist(temp_root)
     (temp_root / "apps" / "http-service" / "service.js").write_text(
         "\n".join(
             [
@@ -2190,9 +2195,7 @@ class WindowsCoreTests(unittest.TestCase):
             app_dir = temp_root / "apps" / "hermes-web-ui"
             app_dir.mkdir(parents=True)
             (app_dir / ".gitkeep").write_text("\n", encoding="utf-8")
-            portal_server = temp_root / "core" / "node" / "dist" / "portal-server.js"
-            portal_server.parent.mkdir(parents=True)
-            portal_server.write_text((ROOT / "core" / "node" / "dist" / "portal-server.js").read_text(encoding="utf-8"), encoding="utf-8")
+            copy_portal_dist(temp_root)
             mark_adapter_production_ready(temp_root, "hermes-web-ui")
 
             result = run_dispatcher_for_root(temp_root, "start", "-Json")
@@ -2386,9 +2389,7 @@ class WindowsCoreTests(unittest.TestCase):
             services["startOrder"] = ["hermes-agent"]
             services["stopOrder"] = ["hermes-agent"]
             (defaults / "services.json").write_text(json.dumps(services, indent=2), encoding="utf-8")
-            portal_server = temp_root / "core" / "node" / "dist" / "portal-server.js"
-            portal_server.parent.mkdir(parents=True)
-            portal_server.write_text((ROOT / "core" / "node" / "dist" / "portal-server.js").read_text(encoding="utf-8"), encoding="utf-8")
+            copy_portal_dist(temp_root)
             make_hermes_agent_app_ready(temp_root)
             mark_adapter_production_ready(temp_root, "hermes-agent")
             marker = temp_root / "data" / "tmp" / "fake-wsl-started.txt"
@@ -2592,6 +2593,9 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertIn("data-wsl2-readiness", html)
             self.assertIn("wsl-workflow", html)
             self.assertIn("verify-adapter", html)
+            self.assertIn("Adapter verification", html)
+            self.assertIn("data-adapter-verification", html)
+            self.assertIn("fetch('/adapter-verification.json'", html)
         finally:
             run_dispatcher("stop", "-Json")
 
@@ -2642,6 +2646,26 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertIn("runtime:node", action_ids)
             self.assertIn("env-file:hermes-agent", action_ids)
             self.assertTrue(any(item["serviceId"] == "openclaw" for item in setup_payload["wslArtifacts"]))
+        finally:
+            run_dispatcher("stop", "-Json")
+
+    def test_portal_serves_adapter_verification_snapshot(self):
+        try:
+            start = run_dispatcher("start", "-Json")
+            self.assertEqual(start.returncode, 0, start.stderr)
+            wait_for_portal()
+
+            payload = fetch_portal_adapter_verification(timeout=5)
+            adapters = {item["serviceId"]: item for item in payload["adapters"]}
+            openclaw_checks = {item["id"] for item in adapters["openclaw"]["checks"]}
+
+            self.assertEqual(Path(payload["root"]).resolve(), ROOT)
+            self.assertIn("generatedAt", payload)
+            self.assertIn("openclaw", adapters)
+            self.assertFalse(adapters["openclaw"]["productionReadyCandidate"])
+            self.assertIn("wsl-executable", openclaw_checks)
+            self.assertIn("wsl-target-distro", openclaw_checks)
+            self.assertGreaterEqual(len(adapters["openclaw"]["nextSteps"]), 1)
         finally:
             run_dispatcher("stop", "-Json")
 

@@ -5,6 +5,7 @@ import { envFileDiagnostics } from "./environment";
 import { getRoot, resolveRelative } from "./portable";
 import { adapterHealth } from "./status";
 import { wslDiagnostics } from "./wsl";
+import type { WslDiagnostic } from "./types";
 
 type VerificationStatus = "pass" | "fail" | "warn";
 
@@ -15,7 +16,11 @@ type VerificationCheck = {
   message: string;
 };
 
-export function verifyAdapter(usbRoot: string, serviceId: string | undefined) {
+export function verifyAdapter(
+  usbRoot: string,
+  serviceId: string | undefined,
+  options: { wslDiagnosticsByDistro?: Map<string, WslDiagnostic>; wslCommandTimeoutMs?: number; probeHealth?: boolean } = {},
+) {
   const root = getRoot(usbRoot);
   if (!serviceId) throw new Error("Service id is required. Example: verify-adapter hermes-web-ui");
   const adapter = loadAdapters(root).find((item) => item.id === serviceId);
@@ -43,7 +48,9 @@ export function verifyAdapter(usbRoot: string, serviceId: string | undefined) {
   const healthDeclared = Boolean(adapter.health?.type);
   checks.push(check("health-declared", "Health declaration", healthDeclared, healthDeclared ? `Health check type is ${adapter.health?.type}.` : "Health check is missing."));
 
-  const wsl = adapter.runtime?.kind === "wsl2" ? wslDiagnostics(root, adapter.runtime.distro) : null;
+  const wsl = adapter.runtime?.kind === "wsl2"
+    ? cachedWslDiagnostics(root, adapter.runtime.distro, options)
+    : null;
   if (wsl) {
     checks.push(check(
       "wsl-executable",
@@ -64,7 +71,7 @@ export function verifyAdapter(usbRoot: string, serviceId: string | undefined) {
     ));
   }
 
-  const health = healthBehavior(adapter);
+  const health = healthBehavior(adapter, options.probeHealth !== false);
   checks.push({
     id: "health-behavior",
     label: "Health behavior",
@@ -92,6 +99,21 @@ export function verifyAdapter(usbRoot: string, serviceId: string | undefined) {
   };
 }
 
+function cachedWslDiagnostics(
+  root: string,
+  distro: string | undefined,
+  options: { wslDiagnosticsByDistro?: Map<string, WslDiagnostic>; wslCommandTimeoutMs?: number },
+): WslDiagnostic {
+  const cache = options.wslDiagnosticsByDistro;
+  if (!cache) return wslDiagnostics(root, distro, { commandTimeoutMs: options.wslCommandTimeoutMs });
+  const key = distro?.trim().toLowerCase() || "<default>";
+  const cached = cache.get(key);
+  if (cached) return cached;
+  const diagnostics = wslDiagnostics(root, distro, { commandTimeoutMs: options.wslCommandTimeoutMs });
+  cache.set(key, diagnostics);
+  return diagnostics;
+}
+
 function check(id: string, label: string, passed: boolean, message: string): VerificationCheck {
   return {
     id,
@@ -101,9 +123,10 @@ function check(id: string, label: string, passed: boolean, message: string): Ver
   };
 }
 
-function healthBehavior(adapter: AdapterDescriptor) {
+function healthBehavior(adapter: AdapterDescriptor, probeHealth: boolean) {
   if (!adapter.health?.type) return { type: "unknown", ready: false, reason: "Health check is missing." };
   if (adapter.health.type === "process") return { type: "process", ready: Boolean(adapter.commands.start), reason: adapter.commands.start ? "Process health can be verified by managed startup." : "Process health requires a start command." };
+  if (!probeHealth) return { type: adapter.health.type, ready: false, reason: "Health behavior probe was skipped for this lightweight verification snapshot." };
   return adapterHealth(adapter, "running", false);
 }
 

@@ -2716,3 +2716,37 @@ Next steps:
 
 - Add a structured portal endpoint for adapter verification snapshots so operators can see WSL2 gate status without running CLI commands manually.
 - Continue real Hermes Agent and OpenClaw WSL2 payload verification when a prepared WSL2 distro is available.
+
+### Portal Adapter Verification Snapshot
+
+Status: `Done`
+
+Summary:
+
+- Added a read-only `/adapter-verification.json` portal endpoint.
+- The endpoint summarizes each adapter's verification checks, next steps, WSL diagnostics, and production-ready candidate status.
+- Portal HTML now renders an Adapter verification section from the snapshot so operators can see blocked checks without manually running CLI commands.
+- Kept the portal snapshot lightweight by caching WSL diagnostics per distro and skipping slow HTTP health probes in UI refreshes.
+
+Changed areas:
+
+- `core/node/src/adapter-verification.ts`
+- `core/node/src/portal-server.ts`
+- `core/node/src/portal.ts`
+- `core/node/dist/`
+- `docs/PROGRESS.md`
+- `tests/test_windows_core.py`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_start_generates_portal_from_adapter_metadata tests.test_windows_core.WindowsCoreTests.test_portal_serves_adapter_verification_snapshot -v`
+- `npm test`
+- `git diff --check`
+- UTF-8 smoke check
+- C temp cleanup check
+
+Next steps:
+
+- Move from readiness surfaces to real WSL2 payload validation for Hermes Agent and OpenClaw when a prepared distro is available.
+- Add portal log viewing so operators can inspect setup/start failures from the local UI.

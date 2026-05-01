@@ -10,9 +10,10 @@ const node_path_1 = require("node:path");
 const portable_1 = require("./portable");
 const WSL_INSTALL_DOCS = "https://learn.microsoft.com/en-us/windows/wsl/install";
 const WSL_COMMAND_DOCS = "https://learn.microsoft.com/en-us/windows/wsl/basic-commands";
-function wslDiagnostics(usbRoot, desiredDistro) {
+function wslDiagnostics(usbRoot, desiredDistro, options = {}) {
     const root = (0, portable_1.getRoot)(usbRoot);
     const targetDistro = normalizeDesiredDistro(desiredDistro);
+    const commandTimeoutMs = options.commandTimeoutMs ?? 5000;
     const executablePath = resolveWslExecutable();
     if (!executablePath) {
         return {
@@ -32,8 +33,8 @@ function wslDiagnostics(usbRoot, desiredDistro) {
             messages: ["wsl.exe not found. Install or enable WSL2 before running WSL2 adapters."],
         };
     }
-    const status = runWslCommand(executablePath, ["--status"]);
-    const list = runWslCommand(executablePath, ["--list", "--verbose"]);
+    const status = runWslCommand(executablePath, ["--status"], commandTimeoutMs);
+    const list = runWslCommand(executablePath, ["--list", "--verbose"], commandTimeoutMs);
     const distros = list.ok ? parseWslList(list.output) : [];
     const defaultDistro = distros.find((distro) => distro.default)?.name ?? null;
     const hasWsl2Distro = distros.some((distro) => distro.version === 2);
@@ -188,12 +189,12 @@ function resolveWslExecutable() {
         return null;
     }
 }
-function runWslCommand(executablePath, args) {
+function runWslCommand(executablePath, args, timeoutMs) {
     const invocation = wslExecutableInvocation(executablePath, args);
     try {
         return {
             ok: true,
-            output: decodeCommandOutput((0, node_child_process_1.execFileSync)(invocation.executablePath, invocation.args, { stdio: ["ignore", "pipe", "pipe"], timeout: 5000, windowsHide: true })).trim(),
+            output: decodeCommandOutput((0, node_child_process_1.execFileSync)(invocation.executablePath, invocation.args, { stdio: ["ignore", "pipe", "pipe"], timeout: timeoutMs, windowsHide: true })).trim(),
         };
     }
     catch (error) {

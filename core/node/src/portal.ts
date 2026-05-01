@@ -78,6 +78,12 @@ export function generatePortal(usbRoot: string, services: ServiceStatus[]): { pa
         <li>Check OpenClaw with <code>node core/node/dist/clawhermes.js wsl-workflow openclaw --json</code> and <code>node core/node/dist/clawhermes.js verify-adapter openclaw --json</code>.</li>
       </ul>
     </section>
+    <section>
+      <h2>Adapter verification</h2>
+      <ul data-adapter-verification>
+        <li>Checking adapter verification gates...</li>
+      </ul>
+    </section>
   </main>
   <script>
     async function refreshStatus() {
@@ -172,12 +178,45 @@ export function generatePortal(usbRoot: string, services: ServiceStatus[]): { pa
         // Backup status is optional for the static portal.
       }
     }
+    async function refreshAdapterVerification() {
+      try {
+        const response = await fetch('/adapter-verification.json', { cache: 'no-store' });
+        if (!response.ok) return;
+        const payload = await response.json();
+        const target = document.querySelector('[data-adapter-verification]');
+        if (!target) return;
+        const adapters = payload.adapters || [];
+        if (adapters.length === 0) {
+          target.innerHTML = '<li>No adapters found.</li>';
+          return;
+        }
+        target.innerHTML = '';
+        for (const adapter of adapters) {
+          const item = document.createElement('li');
+          const label = document.createElement('strong');
+          const ready = adapter.productionReadyCandidate ? 'ready candidate' : 'blocked';
+          label.textContent = (adapter.displayName || adapter.serviceId || 'Adapter') + ': ' + ready;
+          item.appendChild(label);
+          const failedChecks = (adapter.checks || []).filter((check) => check.status !== 'pass').slice(0, 3);
+          if (failedChecks.length > 0) {
+            const details = document.createElement('span');
+            details.textContent = ' - ' + failedChecks.map((check) => check.label || check.id).join(', ');
+            item.appendChild(details);
+          }
+          target.appendChild(item);
+        }
+      } catch {
+        // Adapter verification is an operator aid; keep the portal usable if it fails.
+      }
+    }
     refreshStatus();
     refreshSetupActions();
     refreshBackups();
+    refreshAdapterVerification();
     window.setInterval(refreshStatus, 5000);
     window.setInterval(refreshSetupActions, 15000);
     window.setInterval(refreshBackups, 15000);
+    window.setInterval(refreshAdapterVerification, 30000);
   </script>
 </body>
 </html>

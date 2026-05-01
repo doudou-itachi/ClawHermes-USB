@@ -7,9 +7,10 @@ import { getRoot } from "./portable";
 const WSL_INSTALL_DOCS = "https://learn.microsoft.com/en-us/windows/wsl/install";
 const WSL_COMMAND_DOCS = "https://learn.microsoft.com/en-us/windows/wsl/basic-commands";
 
-export function wslDiagnostics(usbRoot: string, desiredDistro?: string): WslDiagnostic {
+export function wslDiagnostics(usbRoot: string, desiredDistro?: string, options: { commandTimeoutMs?: number } = {}): WslDiagnostic {
   const root = getRoot(usbRoot);
   const targetDistro = normalizeDesiredDistro(desiredDistro);
+  const commandTimeoutMs = options.commandTimeoutMs ?? 5000;
   const executablePath = resolveWslExecutable();
   if (!executablePath) {
     return {
@@ -30,8 +31,8 @@ export function wslDiagnostics(usbRoot: string, desiredDistro?: string): WslDiag
     };
   }
 
-  const status = runWslCommand(executablePath, ["--status"]);
-  const list = runWslCommand(executablePath, ["--list", "--verbose"]);
+  const status = runWslCommand(executablePath, ["--status"], commandTimeoutMs);
+  const list = runWslCommand(executablePath, ["--list", "--verbose"], commandTimeoutMs);
   const distros = list.ok ? parseWslList(list.output) : [];
   const defaultDistro = distros.find((distro) => distro.default)?.name ?? null;
   const hasWsl2Distro = distros.some((distro) => distro.version === 2);
@@ -190,12 +191,12 @@ export function resolveWslExecutable(): string | null {
   }
 }
 
-function runWslCommand(executablePath: string, args: string[]): { ok: boolean; output: string } {
+function runWslCommand(executablePath: string, args: string[], timeoutMs: number): { ok: boolean; output: string } {
   const invocation = wslExecutableInvocation(executablePath, args);
   try {
     return {
       ok: true,
-      output: decodeCommandOutput(execFileSync(invocation.executablePath, invocation.args, { stdio: ["ignore", "pipe", "pipe"], timeout: 5000, windowsHide: true })).trim(),
+      output: decodeCommandOutput(execFileSync(invocation.executablePath, invocation.args, { stdio: ["ignore", "pipe", "pipe"], timeout: timeoutMs, windowsHide: true })).trim(),
     };
   } catch (error) {
     const failure = error as { stdout?: Buffer | string; stderr?: Buffer | string; message?: string };
