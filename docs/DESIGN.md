@@ -452,6 +452,16 @@ Use case:
 - Move to another USB drive.
 - Archive a working environment.
 
+### 10.3 Restore
+
+Restore is intentionally conservative for MVP.
+
+- `restore-plan --archive <zip>` reads `backup-manifest.json` without extracting files.
+- `restore --archive <zip> --confirm-restore` is required for execution.
+- Restore validates manifest paths and zip entry paths before extraction.
+- Restore stages files under `data/tmp/restores/`, copies only manifest-declared entries, and removes staging afterward.
+- Existing targets are not overwritten. Conflict resolution is deferred until a separate overwrite policy exists.
+
 ## 11. macOS Expansion Strategy
 
 macOS should be treated as a platform adapter, not a redesign.

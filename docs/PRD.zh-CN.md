@@ -453,10 +453,16 @@ OpenClaw 或 Hermes 可能假设宿主机 home 目录。缓解方式：设置进
 
 宿主机可能已经占用端口。缓解方式：启动前检测冲突，后续添加自动端口映射。
 
-## 12. 未决问题
+## 12. 已确定决策和剩余未决问题
+
+MVP 已确定决策：
+
+- 第一版使用宿主浏览器；便携浏览器 profile 延后。
+- 备份采用 profile：默认 `data-only` 不包含 `runtimes/` 和 `apps/`；`full` 包含除临时/cache 状态外的完整便携项目。
+- MVP portal 由 core 生成，并由绑定到 `127.0.0.1` 的轻量本地 Node server 提供。
+- 备份还原采用受保护流程：`restore-plan` 只读，`restore` 必须带 `--confirm-restore`，且不会覆盖已存在目标。
+
+剩余未决问题：
 
 - 哪个官方 OpenClaw 启动模式最适合 Windows 便携数据路径？
 - OpenClaw 是否暴露 home/data/cache 环境变量，还是只能依赖 `HOME`/`USERPROFILE` 重定向？
-- 第一版是否需要附带便携浏览器 profile，还是使用宿主浏览器？
-- 备份是否包含 runtimes 和 apps，还是只包含 config/data？
-- portal 应该是轻量 Node server，还是 core orchestrator 的一部分？

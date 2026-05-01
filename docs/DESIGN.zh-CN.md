@@ -450,6 +450,16 @@ MVP 使用纯文本即可。后续可以添加 JSON lines。
 - 迁移到另一个 U 盘。
 - 归档一个可工作的环境。
 
+### 10.3 还原
+
+MVP 的还原流程保持保守。
+
+- `restore-plan --archive <zip>` 只读取 `backup-manifest.json`，不解压文件。
+- 执行还原必须使用 `restore --archive <zip> --confirm-restore`。
+- 还原前会校验 manifest 路径和 zip entry 路径。
+- 还原先把文件暂存到 `data/tmp/restores/`，只复制 manifest 声明的条目，完成后删除暂存目录。
+- 已存在的目标不会被覆盖；冲突处理延后到单独的覆盖策略设计。
+
 ## 11. macOS 扩展策略
 
 macOS 应作为平台适配，而不是重新设计。

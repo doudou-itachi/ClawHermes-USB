@@ -2890,3 +2890,33 @@ Next steps:
 
 - Keep restore overwrite behavior out of MVP unless a separate conflict-resolution policy is designed.
 - Continue real Hermes Agent and OpenClaw WSL2 payload validation when a prepared distro is available.
+
+### MVP Decision Documentation Sync
+
+Status: `Done`
+
+Summary:
+
+- Updated PRD open questions to separate resolved MVP decisions from remaining OpenClaw integration questions.
+- Recorded the host-browser, backup-profile, lightweight-portal, and guarded-restore decisions.
+- Added restore design details to English and Chinese architecture docs.
+- Kept Chinese documentation in readable UTF-8.
+
+Changed areas:
+
+- `docs/PRD.md`
+- `docs/PRD.zh-CN.md`
+- `docs/DESIGN.md`
+- `docs/DESIGN.zh-CN.md`
+- `docs/PROGRESS.md`
+
+Validation performed:
+
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_chinese_docs_are_readable_utf8 -v`
+- `git diff --check`
+- UTF-8 smoke check
+- C temp cleanup check
+
+Next steps:
+
+- Continue real Hermes Agent and OpenClaw WSL2 payload validation when a prepared distro is available.
