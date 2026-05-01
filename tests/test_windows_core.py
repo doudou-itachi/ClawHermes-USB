@@ -811,6 +811,7 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertIn("--model", text)
         self.assertIn("--api-key", text)
         self.assertIn("--apply", text)
+        self.assertIn("Start-GuiDetachedAction -Action \"start\" -Json", text)
 
     def test_gui_control_theme_preference_and_docs_are_user_facing(self):
         text = (ROOT / "launcher" / "windows" / "ClawHermes-Control.ps1").read_text(encoding="utf-8")
@@ -3090,9 +3091,10 @@ class WindowsCoreTests(unittest.TestCase):
             metadata = payload["metadata"]
             self.assertEqual(metadata["status"], "running")
             self.assertFalse(metadata["placeholder"])
-            self.assertEqual(metadata["runner"], "wsl2")
+            self.assertEqual(metadata["runner"], "wsl2-background")
             expected_wsl_root = f"/mnt/{temp_root.drive[0].lower()}/{str(temp_root)[3:].replace(chr(92), '/')}"
             self.assertEqual(metadata["wsl"]["workingDirectory"].replace("\\", "/"), expected_wsl_root + "/apps/hermes-agent")
+            self.assertTrue(metadata["wsl"]["background"])
             self.assertIsInstance(metadata["processId"], int)
             self.assertTrue(process_exists(metadata["processId"]))
             wait_for_file(marker)
@@ -3104,14 +3106,14 @@ class WindowsCoreTests(unittest.TestCase):
             pid_file = temp_root / "data" / "tmp" / "pids" / "hermes-agent.pid"
             self.assertTrue(pid_file.exists())
             pid_metadata = json.loads(pid_file.read_text(encoding="utf-8"))
-            self.assertEqual(pid_metadata["runner"], "wsl2")
+            self.assertEqual(pid_metadata["runner"], "wsl2-background")
             self.assertEqual(pid_metadata["processId"], metadata["processId"])
 
             status = run_dispatcher_for_root(temp_root, "status", "-Json", env=env)
             self.assertEqual(status.returncode, 0, status.stderr)
             services = {service["id"]: service for service in json.loads(status.stdout)["services"]}
             self.assertEqual(services["hermes-agent"]["status"], "running")
-            self.assertEqual(services["hermes-agent"]["processId"], metadata["processId"])
+            self.assertIsNone(services["hermes-agent"]["processId"])
 
             stop = run_dispatcher_for_root(temp_root, "stop", "-Json", env=env)
             self.assertEqual(stop.returncode, 0, stop.stderr)
@@ -3214,9 +3216,10 @@ class WindowsCoreTests(unittest.TestCase):
             wait_for_file(marker)
             metadata = json.loads((temp_root / "data" / "tmp" / "pids" / "hermes-agent.pid").read_text(encoding="utf-8"))
             process_id = metadata["processId"]
-            self.assertEqual(metadata["runner"], "wsl2")
+            self.assertEqual(metadata["runner"], "wsl2-background")
             self.assertFalse(metadata["placeholder"])
             self.assertIn("--distribution", metadata["wsl"]["args"])
+            self.assertTrue(metadata["wsl"]["background"])
             self.assertTrue(process_exists(process_id))
         finally:
             run_dispatcher_for_root(temp_root, "stop", "-Json", env={"CLAWHERMES_WSL_EXE": str(temp_root / "fake-wsl.cmd")})

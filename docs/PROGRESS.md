@@ -186,6 +186,36 @@ Next steps:
 
 - Ask users to reopen the GUI after pulling this fix so the hidden runner uses the updated implementation.
 
+### Windows GUI Nonblocking Start And Hidden Services
+
+Status: `Done`
+
+Summary:
+
+- Changed the GUI "start services" action to launch the core `start` command in a hidden background process so the Windows Forms UI does not block or show "not responding" while services boot.
+- Updated WSL2 adapter startup to launch service commands in the managed WSL distro as background Linux processes with output redirected to the service log, instead of keeping visible `wsl.exe` terminals open for the lifetime of the service.
+- Updated native Node service startup to avoid `shell: true` for simple `node ...` commands, reducing visible `cmd.exe`/terminal windows for Hermes Web UI.
+- Preserved stop hooks so WSL services can still be stopped through the existing `stop` command.
+
+Changed areas:
+
+- `launcher/windows/ClawHermes-Control.ps1`
+- `core/node/src/core.ts`
+- `core/node/src/lifecycle.ts`
+- `core/node/dist/`
+- `tests/test_windows_core.py`
+- `docs/PROGRESS.md`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_gui_control_launcher_calls_powershell_gui tests.test_windows_core.WindowsCoreTests.test_gui_control_script_exposes_left_nav_theme_and_hidden_runner tests.test_windows_core.WindowsCoreTests.test_gui_control_script_wires_pages_to_dispatcher_actions tests.test_windows_core.WindowsCoreTests.test_gui_control_click_handlers_change_pages tests.test_windows_core.WindowsCoreTests.test_gui_control_hidden_runner_works_on_windows_powershell -v`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_start_adapter_wsl2_confirm_launches_managed_wsl_process_and_stop_kills_it tests.test_windows_core.WindowsCoreTests.test_stop_runs_wsl2_adapter_stop_hook_before_killing_managed_process tests.test_windows_core.WindowsCoreTests.test_start_uses_wsl2_plan_for_production_ready_wsl_adapter tests.test_windows_core.WindowsCoreTests.test_start_uses_hermes_web_ui_production_server_without_touching_upstream -v`
+
+Next steps:
+
+- Reopen the GUI and use "启动服务", then refresh status after the services have had time to boot.
+
 ## 2026-04-30
 
 ### Initial Project Foundation

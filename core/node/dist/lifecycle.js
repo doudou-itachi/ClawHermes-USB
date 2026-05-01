@@ -68,6 +68,7 @@ function launchManagedAdapterProcess(root, adapter, serviceEnv, processPlan) {
     const logFile = (0, portable_1.resolveRelative)(root, adapter.logFile);
     const logFd = (0, node_fs_1.openSync)(logFile, "a");
     try {
+        const nativePlan = processPlan ? null : nativeManagedProcessPlan(command);
         const child = processPlan
             ? (0, node_child_process_1.spawn)(processPlan.executablePath, processPlan.args, {
                 cwd: processPlan.workingDirectory,
@@ -77,14 +78,23 @@ function launchManagedAdapterProcess(root, adapter, serviceEnv, processPlan) {
                 stdio: ["ignore", logFd, logFd],
                 windowsHide: true,
             })
-            : (0, node_child_process_1.spawn)(command, {
-                cwd: workingDirectory,
-                env: { ...process.env, ...serviceEnv.env },
-                detached: true,
-                shell: true,
-                stdio: ["ignore", logFd, logFd],
-                windowsHide: true,
-            });
+            : nativePlan
+                ? (0, node_child_process_1.spawn)(nativePlan.executablePath, nativePlan.args, {
+                    cwd: workingDirectory,
+                    env: { ...process.env, ...serviceEnv.env },
+                    detached: true,
+                    shell: false,
+                    stdio: ["ignore", logFd, logFd],
+                    windowsHide: true,
+                })
+                : (0, node_child_process_1.spawn)(command, {
+                    cwd: workingDirectory,
+                    env: { ...process.env, ...serviceEnv.env },
+                    detached: true,
+                    shell: true,
+                    stdio: ["ignore", logFd, logFd],
+                    windowsHide: true,
+                });
         child.unref();
         return {
             serviceId: adapter.id,
@@ -176,6 +186,49 @@ function readJsonObject(path) {
 }
 function objectValue(value) {
     return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+function nativeManagedProcessPlan(command) {
+    const parts = splitCommandLine(command);
+    if (parts.length === 0)
+        return null;
+    const executable = parts[0].toLowerCase();
+    if (!["node", "node.exe"].includes(executable))
+        return null;
+    return { executablePath: parts[0], args: parts.slice(1) };
+}
+function splitCommandLine(command) {
+    const parts = [];
+    let current = "";
+    let quote = null;
+    let escaping = false;
+    for (const character of command) {
+        if (escaping) {
+            current += character;
+            escaping = false;
+            continue;
+        }
+        if (character === "\\") {
+            escaping = true;
+            continue;
+        }
+        if ((character === '"' || character === "'") && (!quote || quote === character)) {
+            quote = quote ? null : character;
+            continue;
+        }
+        if (!quote && /\s/.test(character)) {
+            if (current) {
+                parts.push(current);
+                current = "";
+            }
+            continue;
+        }
+        current += character;
+    }
+    if (escaping)
+        current += "\\";
+    if (current)
+        parts.push(current);
+    return parts;
 }
 function prepareHermesWebUiEnvironment(root, serviceEnv) {
     const home = serviceEnv.env.HOME || (0, node_path_1.join)(root, "data", "home");
@@ -297,7 +350,7 @@ function stopAdapter(root, adapter) {
     }
     const metadata = JSON.parse((0, node_fs_1.readFileSync)(pidFile, "utf8"));
     if (metadata.placeholder === false && metadata.processId) {
-        if (metadata.runner === "wsl2" && adapter.commands.stop) {
+        if (metadata.runner?.startsWith("wsl2") && adapter.commands.stop) {
             runWslStopHook(root, adapter);
         }
         try {

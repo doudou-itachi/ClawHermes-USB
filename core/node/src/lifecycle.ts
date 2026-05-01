@@ -76,6 +76,7 @@ function launchManagedAdapterProcess(root: string, adapter: AdapterDescriptor, s
   const logFile = resolveRelative(root, adapter.logFile);
   const logFd = openSync(logFile, "a");
   try {
+    const nativePlan = processPlan ? null : nativeManagedProcessPlan(command);
     const child = processPlan
       ? spawn(processPlan.executablePath, processPlan.args, {
         cwd: processPlan.workingDirectory,
@@ -85,6 +86,15 @@ function launchManagedAdapterProcess(root: string, adapter: AdapterDescriptor, s
         stdio: ["ignore", logFd, logFd],
         windowsHide: true,
       })
+      : nativePlan
+        ? spawn(nativePlan.executablePath, nativePlan.args, {
+          cwd: workingDirectory,
+          env: { ...process.env, ...serviceEnv.env },
+          detached: true,
+          shell: false,
+          stdio: ["ignore", logFd, logFd],
+          windowsHide: true,
+        })
       : spawn(command, {
         cwd: workingDirectory,
         env: { ...process.env, ...serviceEnv.env },
@@ -194,6 +204,47 @@ function readJsonObject(path: string): Record<string, unknown> {
 
 function objectValue(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function nativeManagedProcessPlan(command: string): { executablePath: string; args: string[] } | null {
+  const parts = splitCommandLine(command);
+  if (parts.length === 0) return null;
+  const executable = parts[0].toLowerCase();
+  if (!["node", "node.exe"].includes(executable)) return null;
+  return { executablePath: parts[0], args: parts.slice(1) };
+}
+
+function splitCommandLine(command: string): string[] {
+  const parts: string[] = [];
+  let current = "";
+  let quote: string | null = null;
+  let escaping = false;
+  for (const character of command) {
+    if (escaping) {
+      current += character;
+      escaping = false;
+      continue;
+    }
+    if (character === "\\") {
+      escaping = true;
+      continue;
+    }
+    if ((character === '"' || character === "'") && (!quote || quote === character)) {
+      quote = quote ? null : character;
+      continue;
+    }
+    if (!quote && /\s/.test(character)) {
+      if (current) {
+        parts.push(current);
+        current = "";
+      }
+      continue;
+    }
+    current += character;
+  }
+  if (escaping) current += "\\";
+  if (current) parts.push(current);
+  return parts;
 }
 
 function prepareHermesWebUiEnvironment(root: string, serviceEnv: ServiceEnvironment): void {
@@ -322,7 +373,7 @@ export function stopAdapter(root: string, adapter: AdapterDescriptor): boolean {
 
   const metadata = JSON.parse(readFileSync(pidFile, "utf8")) as { placeholder?: boolean; processId?: number; runner?: string };
   if (metadata.placeholder === false && metadata.processId) {
-    if (metadata.runner === "wsl2" && adapter.commands.stop) {
+    if (metadata.runner?.startsWith("wsl2") && adapter.commands.stop) {
       runWslStopHook(root, adapter);
     }
     try {

@@ -251,6 +251,45 @@ function Invoke-GuiRunAction {
     }
 }
 
+function Start-GuiDetachedAction {
+    param(
+        [string]$Action,
+        [string[]]$Arguments = @(),
+        [switch]$Json
+    )
+
+    try {
+        $logRoot = Join-Path -Path $script:GuiRoot -ChildPath "data\logs"
+        if (-not (Test-Path -LiteralPath $logRoot -PathType Container)) {
+            [void](New-Item -ItemType Directory -Path $logRoot -Force)
+        }
+        $dispatcher = Join-Path -Path $script:GuiRoot -ChildPath "core\windows\clawhermes.ps1"
+        $argumentList = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $dispatcher, $Action, "-UsbRoot", $script:GuiRoot)
+        if ($Json) {
+            $argumentList += "-Json"
+        }
+        if ($Arguments) {
+            $argumentList += $Arguments
+        }
+
+        $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+        $startInfo.FileName = "powershell.exe"
+        $startInfo.Arguments = (($argumentList | ForEach-Object { ConvertTo-ProcessArgument -Argument $_ }) -join " ")
+        $startInfo.CreateNoWindow = $true
+        $startInfo.UseShellExecute = $false
+        $startInfo.RedirectStandardOutput = $false
+        $startInfo.RedirectStandardError = $false
+        $startInfo.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden
+        $startInfo.EnvironmentVariables["CLAWHERMES_GUI_BACKGROUND"] = "1"
+        $process = New-Object System.Diagnostics.Process
+        $process.StartInfo = $startInfo
+        [void]$process.Start()
+        Set-GuiOutput -Text "已在后台启动：$Action`r`n`r`n界面不会再等待启动完成。请稍等 20-60 秒后点击“启动后刷新状态”。`r`n`r`n服务日志目录：$logRoot"
+    } catch {
+        Set-GuiOutput -Text ("后台启动失败：`r`n" + $_.Exception.Message)
+    }
+}
+
 function Update-GuiThemeFromBox {
     $selectedThemeId = switch ($script:GuiThemeBox.SelectedIndex) {
         0 { "system" }
@@ -384,7 +423,7 @@ function Show-ClawHermesControl {
             "start" {
                 $description.Text = "启动 OpenClaw、Hermes Agent、Hermes Web UI 和本地门户。"
                 $null = & $addInfoText -Text "点击后会在后台启动服务，不再弹出多个黑色命令行窗口。"
-                [void]$page.Controls.Add((New-ActionButton -Text "启动服务" -X 0 -Y 118 -OnClick ({ Invoke-GuiRunAction -Action "start" }).GetNewClosure()))
+                [void]$page.Controls.Add((New-ActionButton -Text "启动服务" -X 0 -Y 118 -OnClick ({ Start-GuiDetachedAction -Action "start" -Json }).GetNewClosure()))
                 [void]$page.Controls.Add((New-ActionButton -Text "启动后刷新状态" -X 205 -Y 118 -OnClick ({ Invoke-GuiRunAction -Action "status" -Json }).GetNewClosure()))
             }
             "stop" {

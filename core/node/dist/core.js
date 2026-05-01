@@ -104,7 +104,7 @@ async function startSkeleton(usbRoot) {
         if (wslPlan && adapter.integration?.productionReady === true) {
             (0, wsl_adapter_1.assertWslReadyForAdapterDistro)(root, adapter.id, adapter.runtime?.distro);
         }
-        (0, lifecycle_1.startAdapter)(root, adapter, wslPlan ? { processPlan: wslManagedProcessPlan(root, wslPlan), serviceEnv } : { serviceEnv });
+        (0, lifecycle_1.startAdapter)(root, adapter, wslPlan ? { processPlan: wslManagedProcessPlan(root, adapter, wslPlan), serviceEnv } : { serviceEnv });
         started.push(adapter.id);
     }
     (0, portal_1.generatePortal)(root, getStatus(root).services);
@@ -156,7 +156,7 @@ function startSingleAdapter(usbRoot, serviceId, options) {
         (0, wsl_adapter_1.assertWslReadyForAdapterDistro)(root, serviceId, runtimeAdapter.runtime?.distro);
         const metadata = (0, lifecycle_1.startAdapter)(root, runtimeAdapter, {
             forceManaged: true,
-            processPlan: wslManagedProcessPlan(root, wslPlan),
+            processPlan: wslManagedProcessPlan(root, runtimeAdapter, wslPlan),
             serviceEnv,
         });
         return { ...result, started: true, metadata };
@@ -164,20 +164,25 @@ function startSingleAdapter(usbRoot, serviceId, options) {
     const metadata = (0, lifecycle_1.startAdapter)(root, runtimeAdapter, { forceManaged: true, serviceEnv });
     return { ...result, started: true, metadata };
 }
-function wslManagedProcessPlan(root, wslPlan) {
-    const invocation = (0, wsl_1.wslExecutableInvocation)(wslPlan.executablePath, wslPlan.args);
+function wslManagedProcessPlan(root, adapter, wslPlan) {
+    const logPath = (0, portable_1.resolveRelative)(root, adapter.logFile);
+    const wslLogPath = logPath.match(/^[A-Za-z]:[\\/]/) ? logPath.replace(/^([A-Za-z]):[\\/]*(.*)$/, (_, drive, rest) => `/mnt/${drive.toLowerCase()}/${String(rest).replaceAll("\\", "/")}`) : logPath;
+    const backgroundScript = `mkdir -p "$(dirname '${wslLogPath.replaceAll("'", "'\"'\"'")}')" && nohup bash -lc '${wslPlan.script.replaceAll("'", "'\"'\"'")}' >> '${wslLogPath.replaceAll("'", "'\"'\"'")}' 2>&1 < /dev/null & echo $!`;
+    const backgroundArgs = [...wslPlan.args.slice(0, -1), backgroundScript];
+    const invocation = (0, wsl_1.wslExecutableInvocation)(wslPlan.executablePath, backgroundArgs);
     return {
-        runner: "wsl2",
+        runner: "wsl2-background",
         executablePath: invocation.executablePath,
         args: invocation.args,
-        command: [wslPlan.executablePath, ...wslPlan.args].join(" "),
+        command: [wslPlan.executablePath, ...backgroundArgs].join(" "),
         workingDirectory: root,
         metadata: {
             wsl: {
                 executablePath: wslPlan.executablePath,
-                args: wslPlan.args,
+                args: backgroundArgs,
                 workingDirectory: wslPlan.workingDirectory,
                 script: wslPlan.script,
+                background: true,
             },
         },
     };
@@ -194,7 +199,12 @@ function getStatus(usbRoot) {
         let healthOverride = null;
         if ((0, node_fs_1.existsSync)(pidFile)) {
             const metadata = JSON.parse((0, node_fs_1.readFileSync)(pidFile, "utf8"));
-            if (metadata.placeholder === false && metadata.processId && !(0, status_1.processExists)(metadata.processId)) {
+            if (metadata.placeholder === false && metadata.runner === "wsl2-background") {
+                status = metadata.status ?? "running";
+                processId = null;
+                placeholder = false;
+            }
+            else if (metadata.placeholder === false && metadata.processId && !(0, status_1.processExists)(metadata.processId)) {
                 const candidateStatus = metadata.status ?? "running";
                 const candidateHealth = adapter.runtime?.kind === "wsl2" && adapter.health?.type === "http"
                     ? (0, status_1.adapterHealth)(adapter, candidateStatus, false)
