@@ -2063,3 +2063,37 @@ Next steps:
 
 - Add optional portable `wsl --import` planning once a distro rootfs artifact policy is defined.
 - Add a workflow field that surfaces whether a WSL2 adapter declares a graceful stop hook.
+
+### WSL2 Import Planning
+
+Status: `Done`
+
+Summary:
+
+- Added a read-only `wsl-import-plan --distro Ubuntu --json` command.
+- The command reports a default ClawHermes distribution name, project-local install location, expected rootfs archive path, and `wsl.exe --import ... --version 2` arguments.
+- The plan makes the portability boundary explicit: imported distro files can live under the USB/project path, but the distribution is still registered on the current Windows host.
+- The command does not run `wsl.exe` and does not create or download rootfs archives.
+- Documented the command in the README and adapter contract.
+
+Changed areas:
+
+- `core/node/src/wsl-import.ts`
+- `core/node/src/core.ts`
+- `core/node/src/clawhermes.ts`
+- `core/node/dist/`
+- `tests/test_windows_core.py`
+- `README.md`
+- `docs/ADAPTER_CONTRACT.md`
+- `docs/PROGRESS.md`
+- `docs/superpowers/plans/2026-05-01-wsl2-import-plan.md`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_wsl_import_plan_reports_usb_storage_command_without_running_wsl -v`
+
+Next steps:
+
+- Add rootfs artifact policy documentation before allowing any guarded import execution.
+- Add a workflow field that surfaces whether a WSL2 adapter declares a graceful stop hook.

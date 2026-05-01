@@ -672,6 +672,26 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertIn("verify-adapter hermes-agent --json", phases["verify-adapter"]["command"])
         self.assertIn("--confirm-ready", phases["mark-ready"]["confirmCommand"])
 
+    def test_wsl_import_plan_reports_usb_storage_command_without_running_wsl(self):
+        result = run_dispatcher("wsl-import-plan", "--distro", "Ubuntu", "-Json")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertTrue(payload["dryRun"])
+        self.assertFalse(payload["executed"])
+        self.assertEqual(payload["distro"], "Ubuntu")
+        self.assertEqual(payload["distributionName"], "ClawHermes-Ubuntu")
+        self.assertTrue(payload["installLocation"].replace("\\", "/").endswith("data/wsl/ClawHermes-Ubuntu"))
+        self.assertTrue(payload["sourceArchive"].replace("\\", "/").endswith("runtimes/wsl/ubuntu-rootfs.tar"))
+        self.assertFalse(payload["sourceArchiveExists"])
+        self.assertTrue(payload["wouldModifyHost"])
+        self.assertTrue(payload["wouldUseProjectStorage"])
+        self.assertIn("--import", payload["args"])
+        self.assertIn("--version", payload["args"])
+        self.assertIn("2", payload["args"])
+        self.assertIn("registered on this Windows host", "\n".join(payload["messages"]))
+        self.assertIn("learn.microsoft.com", payload["docs"])
+
     def test_setup_json_reports_wsl2_action_when_hermes_agent_needs_wsl2(self):
         missing_wsl = str(ROOT / "data" / "tmp" / "missing-wsl.exe")
 

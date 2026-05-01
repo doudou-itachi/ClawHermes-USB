@@ -181,6 +181,19 @@ async function main() {
             }
             return;
         }
+        case "wsl-import-plan": {
+            const result = (0, core_1.wslImportPlan)(root, { distro });
+            if (json) {
+                printJson(result);
+            }
+            else {
+                console.log("ClawHermes-USB WSL2 import plan");
+                for (const message of result.messages)
+                    console.log(`- ${message}`);
+                console.log(`Command: ${result.command}`);
+            }
+            return;
+        }
         case "init-env": {
             const result = (0, core_1.initializeEnvFiles)(root, dryRun);
             if (json) {

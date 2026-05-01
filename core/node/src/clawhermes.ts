@@ -1,4 +1,4 @@
-import { adapterSetupPlan, appSourcePlan, checkoutAppSource, createBackup, getRoot, getStatus, initializeEnvFiles, installRuntimeFromArchive, markAdapterReady, portableEnv, prepareWsl, probeAppSources, readLogTail, runAdapterSetup, runtimePreparationPlan, serviceEnvironmentDiagnostic, setupDiagnostics, startSingleAdapter, startSkeleton, stopSkeleton, verifyAdapter, writeStatusSnapshot, wslDiagnostics, wslWorkflowPlan } from "./core";
+import { adapterSetupPlan, appSourcePlan, checkoutAppSource, createBackup, getRoot, getStatus, initializeEnvFiles, installRuntimeFromArchive, markAdapterReady, portableEnv, prepareWsl, probeAppSources, readLogTail, runAdapterSetup, runtimePreparationPlan, serviceEnvironmentDiagnostic, setupDiagnostics, startSingleAdapter, startSkeleton, stopSkeleton, verifyAdapter, writeStatusSnapshot, wslDiagnostics, wslImportPlan, wslWorkflowPlan } from "./core";
 import type { BackupProfile } from "./backup";
 
 type ParsedArgs = {
@@ -170,6 +170,17 @@ async function main(): Promise<void> {
           console.log(`  command: ${phase.command}`);
           if (phase.confirmCommand) console.log(`  confirm: ${phase.confirmCommand}`);
         }
+      }
+      return;
+    }
+    case "wsl-import-plan": {
+      const result = wslImportPlan(root, { distro });
+      if (json) {
+        printJson(result);
+      } else {
+        console.log("ClawHermes-USB WSL2 import plan");
+        for (const message of result.messages) console.log(`- ${message}`);
+        console.log(`Command: ${result.command}`);
       }
       return;
     }

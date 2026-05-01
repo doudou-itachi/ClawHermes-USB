@@ -554,6 +554,7 @@ Before attempting WSL2 setup or startup, run:
 
 ```powershell
 node core/node/dist/clawhermes.js wsl --distro Ubuntu --json
+node core/node/dist/clawhermes.js wsl-import-plan --distro Ubuntu --json
 node core/node/dist/clawhermes.js wsl-workflow hermes-agent --json
 ```
 
@@ -563,9 +564,11 @@ Rules:
 - Users must explicitly approve WSL2 preparation before WSL2 adapters can run; ClawHermes-USB must not silently enable Windows features or install Linux distributions.
 - `wsl-workflow <service-id>` is read-only and should show the full operator sequence from diagnostics through production-readiness metadata.
 - Inspect the host-level preparation plan with `node core/node/dist/clawhermes.js prepare-wsl --distro Ubuntu --dry-run --json`.
+- Inspect a USB/project-local import command with `node core/node/dist/clawhermes.js wsl-import-plan --distro Ubuntu --json`.
 - A typical explicit installation command is `wsl.exe --install -d Ubuntu`, followed by the standard WSL first-run initialization.
 - Real host preparation must require `--confirm-install`.
 - A future `wsl --import` workflow may store distro files under the USB/project path, but the imported distro is still registered on the current Windows host.
+- `wsl-import-plan` is read-only. It expects a compatible rootfs tar archive under `runtimes/wsl/` and reports the official `wsl.exe --import <name> <install-location> <archive> --version 2` command.
 - Missing `wsl.exe`, missing distributions, and missing WSL2 distributions must be reported as setup actions.
 - When `runtime.distro` is set, WSL commands must include `--distribution <name>` and diagnostics must verify that target distribution.
 - WSL2 adapter setup/start commands must not run until the WSL2 diagnostic is healthy.
