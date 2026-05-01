@@ -816,7 +816,7 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertEqual(payload["distro"], "ClawHermes-Ubuntu")
             self.assertEqual(payload["sourceDistro"], "Ubuntu")
             self.assertFalse(payload["wslReady"])
-            self.assertFalse(payload["stopHookDeclared"])
+            self.assertTrue(payload["stopHookDeclared"])
             phase_ids = [phase["id"] for phase in payload["phases"]]
             self.assertEqual(
                 phase_ids,
@@ -2737,6 +2737,7 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertFalse(process_exists(metadata["processId"]))
         finally:
             run_dispatcher_for_root(temp_root, "stop", "-Json", env={"CLAWHERMES_WSL_EXE": str(temp_root / "fake-wsl.cmd")})
+            time.sleep(0.5)
             temp_dir.cleanup()
 
     def test_stop_runs_wsl2_adapter_stop_hook_before_killing_managed_process(self):
@@ -2764,6 +2765,37 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertTrue(stop_marker.exists())
             self.assertFalse((temp_root / "data" / "tmp" / "pids" / "hermes-agent.pid").exists())
             self.assertFalse(process_exists(process_id))
+            wait_for_process_exit(process_id)
+            log_text = (temp_root / "data" / "logs" / "hermes-agent.log").read_text(encoding="utf-8")
+            self.assertIn("WSL2 stop hook", log_text)
+        finally:
+            run_dispatcher_for_root(temp_root, "stop", "-Json", env={"CLAWHERMES_WSL_EXE": str(temp_root / "fake-wsl.cmd")})
+            time.sleep(0.5)
+            temp_dir.cleanup()
+
+    def test_stop_runs_wsl2_adapter_stop_hook_when_pid_file_is_missing(self):
+        temp_dir, temp_root = make_temp_usb_root()
+        try:
+            make_hermes_agent_app_ready(temp_root)
+            adapter_path = temp_root / "adapters" / "hermes-agent" / "adapter.json"
+            adapter = json.loads(adapter_path.read_text(encoding="utf-8"))
+            adapter["commands"]["stop"] = "echo WSL_STOP_HOOK"
+            adapter_path.write_text(json.dumps(adapter, indent=2), encoding="utf-8")
+            defaults = temp_root / "config" / "defaults"
+            defaults.mkdir(parents=True, exist_ok=True)
+            for config_file in (ROOT / "config" / "defaults").glob("*.json"):
+                (defaults / config_file.name).write_text(config_file.read_text(encoding="utf-8"), encoding="utf-8")
+            services = json.loads((defaults / "services.json").read_text(encoding="utf-8"))
+            services["stopOrder"] = ["hermes-agent"]
+            (defaults / "services.json").write_text(json.dumps(services, indent=2), encoding="utf-8")
+            stop_marker = temp_root / "data" / "tmp" / "fake-wsl-stopped.txt"
+            fake_wsl = make_fake_wsl_cmd(temp_root, stay_running=False, stop_marker_path=stop_marker, list_distribution="ClawHermes-Ubuntu")
+
+            stop = run_dispatcher_for_root(temp_root, "stop", "-Json", env={"CLAWHERMES_WSL_EXE": str(fake_wsl)})
+
+            self.assertEqual(stop.returncode, 0, stop.stderr)
+            self.assertIn("hermes-agent", json.loads(stop.stdout)["stopped"])
+            self.assertTrue(stop_marker.exists())
             log_text = (temp_root / "data" / "logs" / "hermes-agent.log").read_text(encoding="utf-8")
             self.assertIn("WSL2 stop hook", log_text)
         finally:
@@ -2803,6 +2835,66 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertFalse(metadata["placeholder"])
             self.assertIn("--distribution", metadata["wsl"]["args"])
             self.assertTrue(process_exists(process_id))
+        finally:
+            run_dispatcher_for_root(temp_root, "stop", "-Json", env={"CLAWHERMES_WSL_EXE": str(temp_root / "fake-wsl.cmd")})
+            if process_id:
+                wait_for_process_exit(process_id)
+            temp_dir.cleanup()
+
+    def test_start_openclaw_refreshes_gateway_token_in_runtime_config(self):
+        temp_dir, temp_root = make_temp_skeleton_usb_root()
+        process_id = None
+        try:
+            app_dir = temp_root / "apps" / "openclaw"
+            (app_dir / "openclaw.mjs").write_text("console.log('openclaw test payload')\n", encoding="utf-8")
+            config_path = temp_root / "data" / "openclaw" / "openclaw.json"
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "gateway": {
+                            "mode": "local",
+                            "bind": "loopback",
+                            "auth": {
+                                "mode": "token",
+                                "token": "old-generated-token",
+                            },
+                        },
+                        "logging": {
+                            "file": "/tmp/old-openclaw.log",
+                        },
+                    },
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
+            adapter_path = temp_root / "adapters" / "openclaw" / "adapter.json"
+            adapter = json.loads(adapter_path.read_text(encoding="utf-8"))
+            adapter["health"] = {"type": "process", "timeoutSeconds": 5}
+            adapter_path.write_text(json.dumps(adapter, indent=2), encoding="utf-8")
+            fake_wsl = make_fake_wsl_cmd(
+                temp_root,
+                marker_path=temp_root / "data" / "tmp" / "fake-openclaw-wsl-started.txt",
+                list_distribution="ClawHermes-Ubuntu",
+            )
+
+            start = run_dispatcher_for_root(
+                temp_root,
+                "start-adapter",
+                "openclaw",
+                "--confirm-start",
+                "-Json",
+                env={"CLAWHERMES_WSL_EXE": str(fake_wsl)},
+            )
+
+            self.assertEqual(start.returncode, 0, start.stderr)
+            metadata = json.loads((temp_root / "data" / "tmp" / "pids" / "openclaw.pid").read_text(encoding="utf-8"))
+            process_id = metadata["processId"]
+            refreshed = json.loads(config_path.read_text(encoding="utf-8"))
+            self.assertEqual(refreshed["gateway"]["auth"]["mode"], "token")
+            self.assertEqual(refreshed["gateway"]["auth"]["token"], "clawhermes")
+            self.assertEqual(refreshed["gateway"]["mode"], "local")
+            self.assertEqual(refreshed["gateway"]["bind"], "loopback")
+            self.assertTrue(refreshed["logging"]["file"].endswith("data/logs/openclaw-runtime.log"))
         finally:
             run_dispatcher_for_root(temp_root, "stop", "-Json", env={"CLAWHERMES_WSL_EXE": str(temp_root / "fake-wsl.cmd")})
             if process_id:

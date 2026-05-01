@@ -62,7 +62,7 @@ function convertEnvValue(root: string, value: string): string {
   return value;
 }
 
-function windowsPathToWslPath(path: string): string {
+export function windowsPathToWslPath(path: string): string {
   const match = path.match(/^([A-Za-z]):[\\/]*(.*)$/);
   if (!match) throw new Error(`Cannot convert Windows path to WSL path: ${path}`);
   const drive = match[1].toLowerCase();

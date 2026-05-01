@@ -23,7 +23,7 @@
   "commands": {
     "setup": "tmp=$(mktemp) && sed 's/\\r$//' ./setup-hermes.sh > \"$tmp\" && printf 'n\\nn\\n' | bash \"$tmp\"; rc=$?; rm -f \"$tmp\"; exit $rc",
     "start": "./venv/bin/hermes gateway run",
-    "stop": null
+    "stop": "pkill -TERM -f './venv/bin/hermes gateway run' || pkill -TERM -f 'hermes gateway run' || true"
   },
   "env": {
     "files": [

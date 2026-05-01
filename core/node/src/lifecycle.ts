@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import type { AdapterDescriptor, ServiceEnvironment } from "./types";
 import { resolveServiceEnvironment } from "./environment";
 import { resolveRelative, writeLog } from "./portable";
-import { wslAdapterCommandPlan } from "./wsl-adapter";
+import { windowsPathToWslPath, wslAdapterCommandPlan } from "./wsl-adapter";
 import { wslExecutableInvocation } from "./wsl";
 import { expandCommandTemplate } from "./command-template";
 
@@ -115,6 +115,9 @@ function launchManagedAdapterProcess(root: string, adapter: AdapterDescriptor, s
 
 function prepareManagedServiceEnvironment(root: string, adapter: AdapterDescriptor, serviceEnv: ServiceEnvironment): void {
   ensureHermesConfigFile(serviceEnv);
+  if (adapter.id === "openclaw") {
+    prepareOpenClawEnvironment(root, serviceEnv);
+  }
   if (adapter.id === "hermes-web-ui") {
     prepareHermesWebUiEnvironment(root, serviceEnv);
   }
@@ -144,6 +147,53 @@ function activeHermesProfileDir(hermesHome: string): string {
     // Missing active_profile means Hermes uses the default profile.
   }
   return hermesHome;
+}
+
+function prepareOpenClawEnvironment(root: string, serviceEnv: ServiceEnvironment): void {
+  const configPath = serviceEnv.env.OPENCLAW_CONFIG_PATH || join(root, "data", "openclaw", "openclaw.json");
+  mkdirSync(dirname(configPath), { recursive: true });
+  const existing = readJsonObject(configPath);
+  const gateway = objectValue(existing.gateway);
+  const logging = objectValue(existing.logging);
+  const token = serviceEnv.env.OPENCLAW_GATEWAY_TOKEN || "clawhermes";
+  const runtimeLogPath = windowsPathToWslPath(resolveRelative(root, "data/logs/openclaw-runtime.log"));
+  writeFileSync(
+    configPath,
+    `${JSON.stringify(
+      {
+        ...existing,
+        gateway: {
+          ...gateway,
+          mode: "local",
+          bind: "loopback",
+          auth: {
+            ...objectValue(gateway.auth),
+            mode: "token",
+            token,
+          },
+        },
+        logging: {
+          ...logging,
+          file: runtimeLogPath,
+        },
+      },
+      null,
+      2,
+    )}\n`,
+    "utf8",
+  );
+}
+
+function readJsonObject(path: string): Record<string, unknown> {
+  try {
+    return objectValue(JSON.parse(readFileSync(path, "utf8")));
+  } catch {
+    return {};
+  }
+}
+
+function objectValue(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
 
 function prepareHermesWebUiEnvironment(root: string, serviceEnv: ServiceEnvironment): void {
@@ -261,7 +311,14 @@ function hermesWslCommandScript(): string {
 
 export function stopAdapter(root: string, adapter: AdapterDescriptor): boolean {
   const pidFile = resolveRelative(root, adapter.pidFile);
-  if (!existsSync(pidFile)) return false;
+  if (!existsSync(pidFile)) {
+    if (adapter.runtime?.kind === "wsl2" && adapter.commands.stop) {
+      runWslStopHook(root, adapter);
+      writeLog(root, adapter.id, "INFO", "Ran WSL2 stop hook without a managed pid file.");
+      return true;
+    }
+    return false;
+  }
 
   const metadata = JSON.parse(readFileSync(pidFile, "utf8")) as { placeholder?: boolean; processId?: number; runner?: string };
   if (metadata.placeholder === false && metadata.processId) {
@@ -281,6 +338,7 @@ export function stopAdapter(root: string, adapter: AdapterDescriptor): boolean {
 
 function runWslStopHook(root: string, adapter: AdapterDescriptor): void {
   const logFile = resolveRelative(root, adapter.logFile);
+  mkdirSync(dirname(logFile), { recursive: true });
   try {
     const serviceEnv = resolveServiceEnvironment(root, adapter.id);
     const plan = wslAdapterCommandPlan(root, adapter, serviceEnv, "stop");

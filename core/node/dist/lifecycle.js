@@ -107,6 +107,9 @@ function launchManagedAdapterProcess(root, adapter, serviceEnv, processPlan) {
 }
 function prepareManagedServiceEnvironment(root, adapter, serviceEnv) {
     ensureHermesConfigFile(serviceEnv);
+    if (adapter.id === "openclaw") {
+        prepareOpenClawEnvironment(root, serviceEnv);
+    }
     if (adapter.id === "hermes-web-ui") {
         prepareHermesWebUiEnvironment(root, serviceEnv);
     }
@@ -136,6 +139,43 @@ function activeHermesProfileDir(hermesHome) {
         // Missing active_profile means Hermes uses the default profile.
     }
     return hermesHome;
+}
+function prepareOpenClawEnvironment(root, serviceEnv) {
+    const configPath = serviceEnv.env.OPENCLAW_CONFIG_PATH || (0, node_path_1.join)(root, "data", "openclaw", "openclaw.json");
+    (0, node_fs_1.mkdirSync)((0, node_path_1.dirname)(configPath), { recursive: true });
+    const existing = readJsonObject(configPath);
+    const gateway = objectValue(existing.gateway);
+    const logging = objectValue(existing.logging);
+    const token = serviceEnv.env.OPENCLAW_GATEWAY_TOKEN || "clawhermes";
+    const runtimeLogPath = (0, wsl_adapter_1.windowsPathToWslPath)((0, portable_1.resolveRelative)(root, "data/logs/openclaw-runtime.log"));
+    (0, node_fs_1.writeFileSync)(configPath, `${JSON.stringify({
+        ...existing,
+        gateway: {
+            ...gateway,
+            mode: "local",
+            bind: "loopback",
+            auth: {
+                ...objectValue(gateway.auth),
+                mode: "token",
+                token,
+            },
+        },
+        logging: {
+            ...logging,
+            file: runtimeLogPath,
+        },
+    }, null, 2)}\n`, "utf8");
+}
+function readJsonObject(path) {
+    try {
+        return objectValue(JSON.parse((0, node_fs_1.readFileSync)(path, "utf8")));
+    }
+    catch {
+        return {};
+    }
+}
+function objectValue(value) {
+    return value && typeof value === "object" && !Array.isArray(value) ? value : {};
 }
 function prepareHermesWebUiEnvironment(root, serviceEnv) {
     const home = serviceEnv.env.HOME || (0, node_path_1.join)(root, "data", "home");
@@ -247,8 +287,14 @@ function hermesWslCommandScript() {
 }
 function stopAdapter(root, adapter) {
     const pidFile = (0, portable_1.resolveRelative)(root, adapter.pidFile);
-    if (!(0, node_fs_1.existsSync)(pidFile))
+    if (!(0, node_fs_1.existsSync)(pidFile)) {
+        if (adapter.runtime?.kind === "wsl2" && adapter.commands.stop) {
+            runWslStopHook(root, adapter);
+            (0, portable_1.writeLog)(root, adapter.id, "INFO", "Ran WSL2 stop hook without a managed pid file.");
+            return true;
+        }
         return false;
+    }
     const metadata = JSON.parse((0, node_fs_1.readFileSync)(pidFile, "utf8"));
     if (metadata.placeholder === false && metadata.processId) {
         if (metadata.runner === "wsl2" && adapter.commands.stop) {
@@ -267,6 +313,7 @@ function stopAdapter(root, adapter) {
 }
 function runWslStopHook(root, adapter) {
     const logFile = (0, portable_1.resolveRelative)(root, adapter.logFile);
+    (0, node_fs_1.mkdirSync)((0, node_path_1.dirname)(logFile), { recursive: true });
     try {
         const serviceEnv = (0, environment_1.resolveServiceEnvironment)(root, adapter.id);
         const plan = (0, wsl_adapter_1.wslAdapterCommandPlan)(root, adapter, serviceEnv, "stop");
