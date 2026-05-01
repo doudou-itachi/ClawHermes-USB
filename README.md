@@ -22,6 +22,7 @@ Implemented:
 - Verified WSL2 adapter path for Hermes Agent using the project-managed `ClawHermes-Ubuntu` distro and `http://127.0.0.1:8642/health`.
 - Verified WSL2 adapter path for OpenClaw using Node.js 24, pnpm 10.33.2, project-local state/log paths, and `http://127.0.0.1:18789/healthz`.
 - Project-local WSL export backups under `data/backups/wsl/`.
+- Read-only payload inventory for ignored app checkouts, WSL rootfs archives, and WSL backups.
 
 Not implemented yet:
 
@@ -53,6 +54,7 @@ Run the Node CLI directly:
 
 ```powershell
 node core/node/dist/clawhermes.js setup --json
+node core/node/dist/clawhermes.js payloads --json
 node core/node/dist/clawhermes.js wsl --distro Ubuntu --json
 node core/node/dist/clawhermes.js prepare-wsl --distro Ubuntu --dry-run --json
 node core/node/dist/clawhermes.js wsl-rootfs-guide --distro Ubuntu --json

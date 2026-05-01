@@ -2869,6 +2869,41 @@ Next steps:
 
 - Run the full test suite after documentation and adapter changes settle.
 - Review packaging expectations for distributing or regenerating the ignored WSL/app payload artifacts.
+
+### Payload Inventory Command
+
+Status: `Done`
+
+Summary:
+
+- Added a read-only `payloads --json` command.
+- The command inventories ignored upstream app payload directories, WSL rootfs archives, SHA256 sidecars, and latest WSL backup exports.
+- The inventory reports `wouldModify: false` and does not download, export, import, package, or hash large archives at runtime.
+- Added the command to the Windows PowerShell wrapper action allowlist and README CLI examples.
+- Added regression coverage using tiny temporary rootfs/backup fixtures so tests do not create large files.
+
+Changed areas:
+
+- `core/node/src/payloads.ts`
+- `core/node/src/core.ts`
+- `core/node/src/clawhermes.ts`
+- `core/node/dist/`
+- `core/windows/clawhermes.ps1`
+- `README.md`
+- `docs/PROGRESS.md`
+- `tests/test_windows_core.py`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_payloads_json_reports_ignored_payload_inventory tests.test_windows_core.WindowsCoreTests.test_powershell_wrapper_allows_wsl_import_actions -v`
+- `npm test`
+- `git diff --check`
+- C temp cleanup check
+
+Next steps:
+
+- Decide whether the next packaging step should remain an operator guide or become a guarded `payload-export` command that writes a manifest plus archive into `data/backups/`.
 - Review whether portal action execution should remain command-only for MVP or move behind a separate confirmation flow later.
 
 ### Real WSL2 Payload Host Preparation

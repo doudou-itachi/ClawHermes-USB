@@ -49,3 +49,9 @@ Show runtime preparation guidance:
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File core\windows\clawhermes.ps1 runtimes -UsbRoot .
 ```
+
+Show ignored payload inventory before packaging or refreshing local artifacts:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File core\windows\clawhermes.ps1 payloads -UsbRoot . -Json
+```

@@ -149,6 +149,23 @@ async function main() {
             }
             return;
         }
+        case "payloads": {
+            const result = (0, core_1.payloadInventory)(root);
+            if (json) {
+                printJson(result);
+            }
+            else {
+                console.log("ClawHermes-USB payload inventory");
+                console.log(`Root: ${result.root}`);
+                for (const app of result.apps)
+                    console.log(`- app ${app.serviceId}: ${app.ready ? "ready" : "missing/placeholder"} at ${app.path}`);
+                for (const rootfs of result.wslRootfs)
+                    console.log(`- rootfs ${rootfs.distro}: ${rootfs.archive.exists ? "present" : "missing"} at ${rootfs.archive.path}`);
+                for (const backup of result.wslBackups)
+                    console.log(`- backup ${backup.distributionName}: ${backup.latest ? "present" : "missing"}`);
+            }
+            return;
+        }
         case "wsl": {
             const result = (0, core_1.wslDiagnostics)(root, distro);
             if (json) {

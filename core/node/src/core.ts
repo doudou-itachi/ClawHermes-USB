@@ -21,6 +21,7 @@ export { envFileDiagnostics, initializeEnvFiles, resolveServiceEnvironment, serv
 export { pathDiagnostics, portDiagnostics, readLogTail, setupDiagnostics, writeSetupSnapshot } from "./diagnostics";
 export { PORTAL_URL, generatePortal, getPortalStatus, startPortalServer, stopPortalServer } from "./portal";
 export { installRuntimeFromArchive, loadRuntimeManifest, runtimeDiagnostics, runtimePreparationPlan } from "./runtimes";
+export { payloadInventory } from "./payloads";
 export { writeStatusSnapshot } from "./status";
 export { prepareWsl, wslDiagnostics } from "./wsl";
 export { wslExport, wslImport, wslImportPlan, wslRootfsGuide, wslUnregister, wslUnregisterPlan } from "./wsl-import";

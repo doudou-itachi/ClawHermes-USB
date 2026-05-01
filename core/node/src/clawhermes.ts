@@ -1,4 +1,4 @@
-import { adapterSetupPlan, appSourcePlan, checkoutAppSource, createBackup, getRoot, getStatus, initializeEnvFiles, installRuntimeFromArchive, markAdapterReady, portableEnv, prepareWsl, probeAppSources, readLogTail, restoreBackup, restorePlan, runAdapterSetup, runtimePreparationPlan, serviceEnvironmentDiagnostic, setupDiagnostics, startSingleAdapter, startSkeleton, stopSkeleton, verifyAdapter, writeStatusSnapshot, wslDiagnostics, wslExport, wslImport, wslImportPlan, wslRootfsGuide, wslUnregister, wslUnregisterPlan, wslWorkflowPlan } from "./core";
+import { adapterSetupPlan, appSourcePlan, checkoutAppSource, createBackup, getRoot, getStatus, initializeEnvFiles, installRuntimeFromArchive, markAdapterReady, payloadInventory, portableEnv, prepareWsl, probeAppSources, readLogTail, restoreBackup, restorePlan, runAdapterSetup, runtimePreparationPlan, serviceEnvironmentDiagnostic, setupDiagnostics, startSingleAdapter, startSkeleton, stopSkeleton, verifyAdapter, writeStatusSnapshot, wslDiagnostics, wslExport, wslImport, wslImportPlan, wslRootfsGuide, wslUnregister, wslUnregisterPlan, wslWorkflowPlan } from "./core";
 import type { BackupProfile } from "./backup";
 
 type ParsedArgs = {
@@ -147,6 +147,19 @@ async function main(): Promise<void> {
         console.log("ClawHermes-USB runtime preparation plan");
         console.log(`Root: ${result.root}`);
         for (const message of result.messages) console.log(`- ${message}`);
+      }
+      return;
+    }
+    case "payloads": {
+      const result = payloadInventory(root);
+      if (json) {
+        printJson(result);
+      } else {
+        console.log("ClawHermes-USB payload inventory");
+        console.log(`Root: ${result.root}`);
+        for (const app of result.apps) console.log(`- app ${app.serviceId}: ${app.ready ? "ready" : "missing/placeholder"} at ${app.path}`);
+        for (const rootfs of result.wslRootfs) console.log(`- rootfs ${rootfs.distro}: ${rootfs.archive.exists ? "present" : "missing"} at ${rootfs.archive.path}`);
+        for (const backup of result.wslBackups) console.log(`- backup ${backup.distributionName}: ${backup.latest ? "present" : "missing"}`);
       }
       return;
     }

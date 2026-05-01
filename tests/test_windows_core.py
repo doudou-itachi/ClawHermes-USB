@@ -854,6 +854,10 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertIn("ClawHermes-USB does not download", "\n".join(payload["messages"]))
 
     def test_powershell_wrapper_allows_wsl_import_actions(self):
+        payloads = run_powershell_dispatcher("payloads", "-Json")
+        self.assertEqual(payloads.returncode, 0, payloads.stderr)
+        self.assertFalse(json.loads(payloads.stdout)["wouldModify"])
+
         guide = run_powershell_dispatcher("wsl-rootfs-guide", "-Json", "--distro", "Ubuntu")
         self.assertEqual(guide.returncode, 0, guide.stderr)
         self.assertEqual(json.loads(guide.stdout)["distro"], "Ubuntu")
@@ -1823,7 +1827,9 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertFalse(payload["wouldModify"])
             self.assertFalse(payload["executed"])
             self.assertEqual(payload["runner"], "wsl2")
-            self.assertEqual(payload["command"], "sed -i 's/\\r$//' ./setup-hermes.sh && printf 'n\\nn\\n' | bash ./setup-hermes.sh")
+            self.assertIn("mktemp", payload["command"])
+            self.assertIn("setup-hermes.sh", payload["command"])
+            self.assertIn("printf 'n\\nn\\n'", payload["command"])
             self.assertIn("--cd", payload["wsl"]["args"])
             self.assertIn("--distribution", payload["wsl"]["args"])
             self.assertIn("ClawHermes-Ubuntu", payload["wsl"]["args"])
@@ -2049,6 +2055,43 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertEqual(requirements["hermes-web-ui"]["runtime"], "node")
         self.assertEqual(requirements["hermes-web-ui"]["versionRequirement"], ">=23.0.0")
         self.assertIn("requires node >=23.0.0", requirements["hermes-web-ui"]["message"])
+
+    def test_payloads_json_reports_ignored_payload_inventory(self):
+        temp_dir, temp_root = make_temp_skeleton_usb_root()
+        try:
+            rootfs = temp_root / "runtimes" / "wsl" / "ubuntu-rootfs.tar"
+            rootfs.parent.mkdir(parents=True, exist_ok=True)
+            rootfs.write_bytes(b"tiny-rootfs")
+            digest = hashlib.sha256(rootfs.read_bytes()).hexdigest()
+            (temp_root / "runtimes" / "wsl" / "ubuntu-rootfs.tar.sha256").write_text(
+                f"{digest}  ubuntu-rootfs.tar\n",
+                encoding="utf-8",
+            )
+            backup = temp_root / "data" / "backups" / "wsl" / "ClawHermes-Ubuntu-2026-05-01T00-00-00-000Z.tar"
+            backup.parent.mkdir(parents=True, exist_ok=True)
+            backup.write_bytes(b"tiny-backup")
+
+            result = run_dispatcher_for_root(temp_root, "payloads", "-Json")
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            apps = {item["serviceId"]: item for item in payload["apps"]}
+            rootfs_items = {item["distro"]: item for item in payload["wslRootfs"]}
+            backups = {item["distro"]: item for item in payload["wslBackups"]}
+
+            self.assertFalse(payload["wouldModify"])
+            self.assertTrue(Path(payload["root"]).samefile(temp_root))
+            self.assertIn("openclaw", apps)
+            self.assertTrue(apps["openclaw"]["exists"])
+            self.assertFalse(apps["openclaw"]["ready"])
+            self.assertTrue(rootfs_items["Ubuntu"]["archive"]["exists"])
+            self.assertEqual(rootfs_items["Ubuntu"]["archive"]["sizeBytes"], len(b"tiny-rootfs"))
+            self.assertEqual(rootfs_items["Ubuntu"]["archive"]["sha256Sidecar"]["value"], digest)
+            self.assertIsNotNone(backups["Ubuntu"]["latest"])
+            self.assertEqual(backups["Ubuntu"]["latest"]["sizeBytes"], len(b"tiny-backup"))
+            self.assertTrue(payload["policy"]["noAutomaticDownload"])
+        finally:
+            temp_dir.cleanup()
 
     def test_install_runtime_dry_run_reports_archive_plan(self):
         temp_dir = tempfile.TemporaryDirectory()

@@ -21,7 +21,7 @@
     "notes": "Official README says native Windows is not supported and Windows users should run Hermes Agent in WSL2."
   },
   "commands": {
-    "setup": "sed -i 's/\\r$//' ./setup-hermes.sh && printf 'n\\nn\\n' | bash ./setup-hermes.sh",
+    "setup": "tmp=$(mktemp) && sed 's/\\r$//' ./setup-hermes.sh > \"$tmp\" && printf 'n\\nn\\n' | bash \"$tmp\"; rc=$?; rm -f \"$tmp\"; exit $rc",
     "start": "./venv/bin/hermes gateway run",
     "stop": null
   },
