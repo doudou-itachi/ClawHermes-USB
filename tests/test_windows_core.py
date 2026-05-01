@@ -2454,6 +2454,93 @@ class WindowsCoreTests(unittest.TestCase):
             run_dispatcher_for_root(temp_root, "stop", "-Json")
             temp_dir.cleanup()
 
+    def test_start_uses_hermes_web_ui_production_server_without_touching_upstream(self):
+        temp_dir, temp_root = make_temp_skeleton_usb_root()
+        try:
+            defaults = temp_root / "config" / "defaults"
+            services = json.loads((defaults / "services.json").read_text(encoding="utf-8"))
+            services["startOrder"] = ["hermes-web-ui"]
+            services["stopOrder"] = ["hermes-web-ui"]
+            (defaults / "services.json").write_text(json.dumps(services, indent=2), encoding="utf-8")
+
+            adapter_path = temp_root / "adapters" / "hermes-web-ui" / "adapter.json"
+            adapter = json.loads(adapter_path.read_text(encoding="utf-8"))
+            adapter["health"] = {"type": "process", "timeoutSeconds": 5}
+            adapter["integration"]["productionReady"] = True
+            adapter_path.write_text(json.dumps(adapter, indent=2), encoding="utf-8")
+
+            app_dir = temp_root / "apps" / "hermes-web-ui"
+            stale_upstream_config = "\n".join(
+                [
+                    "import { defineConfig } from 'vite'",
+                    "",
+                    "const BACKEND = 'http://127.0.0.1:8648'",
+                    "",
+                    "export default defineConfig({ server: { proxy: { '/api': { target: BACKEND } } } })",
+                    "",
+                ]
+            )
+            (app_dir / "vite.config.ts").write_text(
+                stale_upstream_config,
+                encoding="utf-8",
+            )
+            (app_dir / "package.json").write_text(
+                json.dumps({"name": "hermes-web-ui-test", "version": "0.0.0"}, indent=2),
+                encoding="utf-8",
+            )
+            server_entry = app_dir / "dist" / "server" / "index.js"
+            server_entry.parent.mkdir(parents=True)
+            server_entry.write_text(
+                "\n".join(
+                    [
+                        "const http = require('node:http');",
+                        "const fs = require('node:fs');",
+                        "const path = require('node:path');",
+                        "const root = process.env.USB_ROOT;",
+                        "fs.writeFileSync(path.join(root, 'data', 'tmp', 'hermes-web-ui-server-env.json'), JSON.stringify({",
+                        "  argv: process.argv.slice(2),",
+                        "  port: process.env.PORT,",
+                        "  upstream: process.env.UPSTREAM,",
+                        "  hermesAgentApiBase: process.env.HERMES_AGENT_API_BASE",
+                        "}, null, 2));",
+                        "http.createServer((req, res) => { res.writeHead(200); res.end('ok'); }).listen(Number(process.env.PORT || 8648), '127.0.0.1');",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (temp_root / "config" / "env" / "hermes-web-ui.env").write_text(
+                "HERMES_AGENT_API_BASE=http://127.0.0.1:8642\nUPSTREAM=http://127.0.0.1:8642\n",
+                encoding="utf-8",
+            )
+
+            start = run_dispatcher_for_root(temp_root, "start", "-Json")
+
+            self.assertEqual(start.returncode, 0, start.stderr)
+            hermes_config = temp_root / "data" / "hermes" / "config.yaml"
+            self.assertTrue(hermes_config.exists())
+            self.assertEqual(hermes_config.read_text(encoding="utf-8"), "{}\n")
+            vite_config = (app_dir / "vite.config.ts").read_text(encoding="utf-8")
+            self.assertEqual(vite_config, stale_upstream_config)
+            generated_config = temp_root / "data" / "tmp" / "hermes-web-ui" / "vite.config.mjs"
+            self.assertFalse(generated_config.exists())
+            wait_for_file(temp_root / "data" / "tmp" / "hermes-web-ui-server-env.json")
+            launched = json.loads((temp_root / "data" / "tmp" / "hermes-web-ui-server-env.json").read_text(encoding="utf-8"))
+            ports = json.loads((temp_root / "data" / "tmp" / "ports.json").read_text(encoding="utf-8"))
+            hermes_agent_port = next(item for item in ports["services"] if item["serviceId"] == "hermes-agent")["assignedPort"]
+            hermes_web_ui_port = next(item for item in ports["services"] if item["serviceId"] == "hermes-web-ui")["assignedPort"]
+            expected_upstream = f"http://127.0.0.1:{hermes_agent_port}"
+            self.assertEqual(launched["argv"], [])
+            self.assertEqual(launched["port"], str(hermes_web_ui_port))
+            self.assertEqual(launched["upstream"], expected_upstream)
+            self.assertEqual(launched["hermesAgentApiBase"], expected_upstream)
+            metadata = json.loads((temp_root / "data" / "tmp" / "pids" / "hermes-web-ui.pid").read_text(encoding="utf-8"))
+            self.assertNotIn("runner", metadata)
+            self.assertIn("dist/server/index.js", metadata["command"].replace("\\", "/"))
+        finally:
+            run_dispatcher_for_root(temp_root, "stop", "-Json")
+            temp_dir.cleanup()
+
     def test_start_adapter_requires_explicit_confirmation(self):
         temp_dir, temp_root = make_temp_process_usb_root()
         try:

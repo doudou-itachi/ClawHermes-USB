@@ -21,7 +21,7 @@
   },
   "commands": {
     "setup": "npm install",
-    "start": "npm run start",
+    "start": "node dist/server/index.js",
     "stop": null
   },
   "env": {
@@ -31,6 +31,7 @@
     "variables": {
       "HERMES_HOME": "${USB_ROOT}/data/hermes",
       "HERMES_WEB_UI_DATA_DIR": "${USB_ROOT}/data/hermes-web-ui",
+      "PORT": "8648",
       "HERMES_AGENT_API_BASE": "http://127.0.0.1:8642",
       "UPSTREAM": "http://127.0.0.1:8642",
       "AUTH_TOKEN": "clawhermes",

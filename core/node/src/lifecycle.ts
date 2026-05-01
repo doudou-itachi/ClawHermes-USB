@@ -1,6 +1,6 @@
 import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 import type { AdapterDescriptor, ServiceEnvironment } from "./types";
 import { resolveServiceEnvironment } from "./environment";
 import { resolveRelative, writeLog } from "./portable";
@@ -73,6 +73,7 @@ function launchManagedAdapterProcess(root: string, adapter: AdapterDescriptor, s
   const command = expandCommandTemplate(commandTemplate, serviceEnv.env);
   const workingDirectory = resolveRelative(root, adapter.appDir);
   const logFile = resolveRelative(root, adapter.logFile);
+  ensureHermesConfigFile(serviceEnv);
   const logFd = openSync(logFile, "a");
   try {
     const child = processPlan
@@ -110,6 +111,32 @@ function launchManagedAdapterProcess(root: string, adapter: AdapterDescriptor, s
   } finally {
     closeSync(logFd);
   }
+}
+
+function ensureHermesConfigFile(serviceEnv: ServiceEnvironment): void {
+  const hermesHome = serviceEnv.env.HERMES_HOME;
+  if (!hermesHome) return;
+
+  const profileDir = activeHermesProfileDir(hermesHome);
+  mkdirSync(profileDir, { recursive: true });
+  const configPath = join(profileDir, "config.yaml");
+  if (!existsSync(configPath)) {
+    writeFileSync(configPath, "{}\n", "utf8");
+  }
+}
+
+function activeHermesProfileDir(hermesHome: string): string {
+  const activeProfilePath = join(hermesHome, "active_profile");
+  try {
+    const profileName = readFileSync(activeProfilePath, "utf8").trim();
+    if (profileName && profileName !== "default") {
+      const profileDir = join(hermesHome, "profiles", profileName);
+      if (existsSync(profileDir)) return profileDir;
+    }
+  } catch {
+    // Missing active_profile means Hermes uses the default profile.
+  }
+  return hermesHome;
 }
 
 export function stopAdapter(root: string, adapter: AdapterDescriptor): boolean {

@@ -65,6 +65,7 @@ function launchManagedAdapterProcess(root, adapter, serviceEnv, processPlan) {
     const command = (0, command_template_1.expandCommandTemplate)(commandTemplate, serviceEnv.env);
     const workingDirectory = (0, portable_1.resolveRelative)(root, adapter.appDir);
     const logFile = (0, portable_1.resolveRelative)(root, adapter.logFile);
+    ensureHermesConfigFile(serviceEnv);
     const logFd = (0, node_fs_1.openSync)(logFile, "a");
     try {
         const child = processPlan
@@ -103,6 +104,32 @@ function launchManagedAdapterProcess(root, adapter, serviceEnv, processPlan) {
     finally {
         (0, node_fs_1.closeSync)(logFd);
     }
+}
+function ensureHermesConfigFile(serviceEnv) {
+    const hermesHome = serviceEnv.env.HERMES_HOME;
+    if (!hermesHome)
+        return;
+    const profileDir = activeHermesProfileDir(hermesHome);
+    (0, node_fs_1.mkdirSync)(profileDir, { recursive: true });
+    const configPath = (0, node_path_1.join)(profileDir, "config.yaml");
+    if (!(0, node_fs_1.existsSync)(configPath)) {
+        (0, node_fs_1.writeFileSync)(configPath, "{}\n", "utf8");
+    }
+}
+function activeHermesProfileDir(hermesHome) {
+    const activeProfilePath = (0, node_path_1.join)(hermesHome, "active_profile");
+    try {
+        const profileName = (0, node_fs_1.readFileSync)(activeProfilePath, "utf8").trim();
+        if (profileName && profileName !== "default") {
+            const profileDir = (0, node_path_1.join)(hermesHome, "profiles", profileName);
+            if ((0, node_fs_1.existsSync)(profileDir))
+                return profileDir;
+        }
+    }
+    catch {
+        // Missing active_profile means Hermes uses the default profile.
+    }
+    return hermesHome;
 }
 function stopAdapter(root, adapter) {
     const pidFile = (0, portable_1.resolveRelative)(root, adapter.pidFile);
