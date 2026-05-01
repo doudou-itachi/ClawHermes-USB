@@ -1674,7 +1674,7 @@ class WindowsCoreTests(unittest.TestCase):
 
         self.assertFalse(payload["wouldModify"])
         self.assertEqual(set(sources), {"openclaw", "hermes-agent", "hermes-web-ui"})
-        self.assertFalse(sources["hermes-web-ui"]["appDirReady"])
+        self.assertTrue(sources["hermes-web-ui"]["appDirReady"])
         self.assertEqual(sources["hermes-web-ui"]["upstream"]["repositoryUrl"], "https://github.com/EKKOLearnAI/hermes-web-ui")
         self.assertIn("git clone", sources["hermes-web-ui"]["checkoutCommand"])
 
