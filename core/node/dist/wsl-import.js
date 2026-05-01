@@ -136,6 +136,7 @@ function wslUnregisterPlan(usbRoot, options) {
     const diagnostics = (0, wsl_1.wslDiagnostics)(plan.root);
     const registered = diagnostics.distros.some((item) => item.name.toLowerCase() === plan.distributionName.toLowerCase());
     const backupArchive = (0, node_path_1.join)(plan.root, "data", "backups", "wsl", `${plan.distributionName}-backup.tar`);
+    const latestBackup = latestWslBackup(plan.root, plan.distributionName);
     const args = ["--unregister", plan.distributionName];
     return {
         root: plan.root,
@@ -145,6 +146,8 @@ function wslUnregisterPlan(usbRoot, options) {
         diagnostics,
         backupArchive,
         backupCommand: `wsl.exe --export ${plan.distributionName} ${quoteCommandArg(backupArchive)}`,
+        exportCommand: `node core/node/dist/clawhermes.js wsl-export --distro ${plan.distro} --confirm-export --json`,
+        latestBackup,
         dryRun: true,
         executed: false,
         wouldModifyHost: true,
@@ -159,9 +162,14 @@ function wslUnregisterPlan(usbRoot, options) {
             `Export a backup first with: wsl.exe --export ${plan.distributionName} ${quoteCommandArg(backupArchive)}`,
             "This command is read-only and does not run wsl.exe.",
         ],
-        messages: registered
-            ? [`Distribution is registered on this host: ${plan.distributionName}.`]
-            : [`Distribution is not registered on this host: ${plan.distributionName}.`],
+        messages: [
+            registered
+                ? `Distribution is registered on this host: ${plan.distributionName}.`
+                : `Distribution is not registered on this host: ${plan.distributionName}.`,
+            latestBackup.exists
+                ? `Latest backup: ${latestBackup.path}.`
+                : `No project-local WSL backup found for ${plan.distributionName}.`,
+        ],
     };
 }
 function wslExport(usbRoot, options) {
@@ -263,4 +271,26 @@ function isUnderSystemTempOutsideRoot(path, root) {
     const underRoot = target === projectRoot || target.startsWith(`${projectRoot}\\`) || target.startsWith(`${projectRoot}/`);
     const underTemp = target === temp || target.startsWith(`${temp}\\`) || target.startsWith(`${temp}/`);
     return underTemp && !underRoot;
+}
+function latestWslBackup(root, distributionName) {
+    const backupDir = (0, node_path_1.join)(root, "data", "backups", "wsl");
+    if (!(0, node_fs_1.existsSync)(backupDir)) {
+        return { exists: false, path: null, sizeBytes: null, modifiedTime: null };
+    }
+    const prefix = `${distributionName}-`;
+    const candidates = (0, node_fs_1.readdirSync)(backupDir)
+        .filter((name) => name.startsWith(prefix) && name.endsWith(".tar"))
+        .sort();
+    const latest = candidates.at(-1);
+    if (!latest) {
+        return { exists: false, path: null, sizeBytes: null, modifiedTime: null };
+    }
+    const path = (0, node_path_1.join)(backupDir, latest);
+    const stats = (0, node_fs_1.statSync)(path);
+    return {
+        exists: true,
+        path,
+        sizeBytes: stats.size,
+        modifiedTime: stats.mtime.toISOString(),
+    };
 }

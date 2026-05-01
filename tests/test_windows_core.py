@@ -971,10 +971,45 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertTrue(payload["registered"])
             self.assertIn("--unregister", payload["args"])
             self.assertIn("wsl.exe --export ClawHermes-Ubuntu", payload["backupCommand"])
+            self.assertFalse(payload["latestBackup"]["exists"])
+            self.assertIn("wsl-export --distro Ubuntu --confirm-export --json", payload["exportCommand"])
             self.assertTrue(payload["backupArchive"].replace("\\", "/").endswith("data/backups/wsl/ClawHermes-Ubuntu-backup.tar"))
             self.assertIn("--confirm-unregister", payload["confirmCommand"])
             self.assertIn("permanently deletes", "\n".join(payload["warnings"]))
             self.assertFalse(marker.exists())
+        finally:
+            temp_dir.cleanup()
+
+    def test_wsl_unregister_plan_reports_latest_project_backup(self):
+        temp_dir, temp_root = make_temp_usb_root()
+        try:
+            backup_dir = temp_root / "data" / "backups" / "wsl"
+            backup_dir.mkdir(parents=True)
+            old_backup = backup_dir / "ClawHermes-Ubuntu-2026-01-01T00-00-00-000Z.tar"
+            latest_backup = backup_dir / "ClawHermes-Ubuntu-2026-02-01T00-00-00-000Z.tar"
+            old_backup.write_text("old backup\n", encoding="utf-8")
+            latest_backup.write_text("latest backup\n", encoding="utf-8")
+            fake_wsl = make_fake_wsl_cmd(
+                temp_root,
+                stay_running=False,
+                list_distribution="ClawHermes-Ubuntu",
+            )
+
+            result = run_dispatcher_for_root(
+                temp_root,
+                "wsl-unregister-plan",
+                "--distro",
+                "Ubuntu",
+                "-Json",
+                env={"CLAWHERMES_WSL_EXE": str(fake_wsl)},
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertTrue(payload["latestBackup"]["exists"])
+            self.assertEqual(Path(payload["latestBackup"]["path"]).resolve(), latest_backup.resolve())
+            self.assertGreater(payload["latestBackup"]["sizeBytes"], 0)
+            self.assertIn("Latest backup", "\n".join(payload["messages"]))
         finally:
             temp_dir.cleanup()
 

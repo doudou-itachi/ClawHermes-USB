@@ -69,7 +69,7 @@ Inspect the read-only unregister plan before removing an imported distribution:
 node core/node/dist/clawhermes.js wsl-unregister-plan --distro Ubuntu --json
 ```
 
-The plan reports whether `ClawHermes-Ubuntu` is registered, the destructive `wsl.exe --unregister` command, and a recommended `wsl.exe --export` backup command. It does not run WSL.
+The plan reports whether `ClawHermes-Ubuntu` is registered, the destructive `wsl.exe --unregister` command, the latest project-local backup when present, and a recommended export command. It does not run WSL.
 
 Create an explicit backup before unregistering:
 

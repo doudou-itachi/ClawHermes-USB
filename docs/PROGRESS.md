@@ -2472,3 +2472,34 @@ Next steps:
 
 - Update `wsl-unregister-plan` to surface latest backup state before enabling destructive unregister execution.
 - Consider requiring checksum sidecars once a trusted artifact source is chosen.
+
+### WSL2 Unregister Backup Awareness
+
+Status: `Done`
+
+Summary:
+
+- Enhanced `wsl-unregister-plan --json` with `latestBackup` metadata.
+- The plan scans `data/backups/wsl/` for the newest matching `ClawHermes-<distro>-*.tar` backup.
+- The plan now includes a guarded `wsl-export --confirm-export` command recommendation when no project-local backup exists.
+- Documented backup awareness in the adapter contract and rootfs artifact policy.
+
+Changed areas:
+
+- `core/node/src/wsl-import.ts`
+- `core/node/dist/wsl-import.js`
+- `docs/ADAPTER_CONTRACT.md`
+- `docs/wsl-rootfs-artifacts.md`
+- `docs/PROGRESS.md`
+- `tests/test_windows_core.py`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_wsl_unregister_plan_reports_destructive_risk_without_running_wsl tests.test_windows_core.WindowsCoreTests.test_wsl_unregister_plan_reports_latest_project_backup -v`
+- `npm test`
+
+Next steps:
+
+- Add guarded `wsl-unregister --confirm-unregister` execution with backup presence checks.
+- Consider requiring checksum sidecars once a trusted artifact source is chosen.

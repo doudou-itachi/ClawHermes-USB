@@ -580,6 +580,7 @@ Rules:
 - Real import execution must fail before running WSL when the planned distribution name is already registered on the current Windows host.
 - When a `.sha256` sidecar exists next to the rootfs archive, `wsl-import` must verify it before running WSL and reject mismatches.
 - `wsl-unregister-plan --distro <name>` is read-only and must warn that `wsl.exe --unregister` permanently deletes the registered Linux distribution data.
+- `wsl-unregister-plan` must report the latest project-local WSL backup under `data/backups/wsl/` when one exists, and should recommend `wsl-export --confirm-export` when no backup is present.
 - `wsl-export --distro <name> --confirm-export` must be explicit and should write backups under `data/backups/wsl/` by default.
 - WSL export must reject archive overrides under the system temp directory unless that path is still inside the current project root used by tests or disposable USB roots.
 - Any future unregister execution must require explicit confirmation and should recommend a WSL export backup first.
