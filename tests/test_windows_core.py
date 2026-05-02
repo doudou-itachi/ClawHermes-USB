@@ -737,15 +737,12 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertIn("# ClawHermes-managed model configuration", hermes_config)
             self.assertFalse(hermes_config.lstrip().startswith("{}"))
             self.assertIn("model:", hermes_config)
-            self.assertIn("  provider: clawhermes", hermes_config)
+            self.assertIn("  provider: custom:api.example.test", hermes_config)
             self.assertIn("  default: gpt-test", hermes_config)
-            self.assertIn("  base_url: https://api.example.test/v1", hermes_config)
-            self.assertIn("providers:", hermes_config)
-            self.assertIn("  clawhermes:", hermes_config)
-            self.assertIn("    api: https://api.example.test/v1", hermes_config)
-            self.assertIn("    default_model: gpt-test", hermes_config)
-            self.assertIn("    transport: chat_completions", hermes_config)
-            self.assertIn("      gpt-test: {}", hermes_config)
+            self.assertIn("custom_providers:", hermes_config)
+            self.assertIn("  - name: api.example.test", hermes_config)
+            self.assertIn("    base_url: https://api.example.test/v1", hermes_config)
+            self.assertIn("    model: gpt-test", hermes_config)
 
             hermes_env = (temp_root / "data" / "hermes" / ".env").read_text(encoding="utf-8")
             self.assertEqual(hermes_env.count("OPENAI_API_KEY="), 1)
@@ -777,6 +774,91 @@ class WindowsCoreTests(unittest.TestCase):
             hermes_config_after_rerun = hermes_config_path.read_text(encoding="utf-8")
             self.assertFalse(hermes_config_after_rerun.lstrip().startswith("{}"))
             self.assertEqual(hermes_config_after_rerun.count("# ClawHermes-managed model configuration"), 1)
+        finally:
+            temp_dir.cleanup()
+
+    def test_model_config_replaces_hermes_web_ui_model_block_without_duplicate_yaml_keys(self):
+        temp_dir, temp_root = make_temp_usb_root()
+        secret = "sk-test-hermes-web-ui-merge"
+        try:
+            hermes_config_path = temp_root / "data" / "hermes" / "config.yaml"
+            hermes_config_path.parent.mkdir(parents=True, exist_ok=True)
+            hermes_config_path.write_text(
+                "\n".join(
+                    [
+                        "model:",
+                        "  provider: custom:api.siliconflow.cn",
+                        "  default: Qwen/Qwen3.6-27B",
+                        "providers:",
+                        "  clawhermes:",
+                        "    name: ClawHermes",
+                        "    api: https://api.siliconflow.cn/v1",
+                        "    api_key: old-secret",
+                        "    default_model: Qwen/Qwen3.6-27B",
+                        "    transport: chat_completions",
+                        "    models:",
+                        "      Qwen/Qwen3.6-27B: {}",
+                        "custom_providers:",
+                        "  - name: api.siliconflow.cn",
+                        "    base_url: https://api.siliconflow.cn/v1/",
+                        "    api_key: old-secret",
+                        "    model: Qwen/Qwen3.6-27B",
+                        "",
+                        "# ClawHermes-managed model configuration",
+                        "model:",
+                        "  provider: clawhermes",
+                        "  default: Pro/zai-org/GLM-4.7",
+                        "  base_url: https://api.siliconflow.cn/v1/",
+                        "providers:",
+                        "  clawhermes:",
+                        "    name: ClawHermes",
+                        "    api: https://api.siliconflow.cn/v1/",
+                        "    api_key: old-secret",
+                        "    default_model: Pro/zai-org/GLM-4.7",
+                        "    transport: chat_completions",
+                        "    models:",
+                        "      Pro/zai-org/GLM-4.7: {}",
+                        "# End ClawHermes-managed model configuration",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = run_dispatcher_for_root(
+                temp_root,
+                "model-config",
+                "--provider-type",
+                "openai-compatible",
+                "--api-url",
+                "https://api.example.test/v1",
+                "--model",
+                "gpt-test",
+                "--api-key",
+                secret,
+                "--apply",
+                "hermes",
+                "-Json",
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertNotIn(secret, result.stdout)
+            self.assertNotIn(secret, result.stderr)
+
+            hermes_config = hermes_config_path.read_text(encoding="utf-8")
+            root_model_keys = [line for line in hermes_config.splitlines() if line == "model:"]
+            root_provider_keys = [line for line in hermes_config.splitlines() if line == "providers:"]
+            self.assertEqual(root_model_keys, ["model:"])
+            self.assertEqual(root_provider_keys, [])
+            self.assertIn("  provider: custom:api.example.test", hermes_config)
+            self.assertIn("  default: gpt-test", hermes_config)
+            self.assertIn("custom_providers:", hermes_config)
+            self.assertIn("  - name: api.example.test", hermes_config)
+            self.assertIn("    base_url: https://api.example.test/v1", hermes_config)
+            self.assertIn("    model: gpt-test", hermes_config)
+            self.assertNotIn("Qwen/Qwen3.6-27B", hermes_config)
+            self.assertEqual(hermes_config.count("# ClawHermes-managed model configuration"), 1)
+            self.assertNotIn("old-secret", hermes_config)
         finally:
             temp_dir.cleanup()
 

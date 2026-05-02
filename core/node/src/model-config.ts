@@ -164,7 +164,7 @@ function applyHermesModelConfig(root: string, config: SavedModelConfig): void {
 
   const configPath = resolveRelative(root, "data/hermes/config.yaml");
   const existingConfig = existsSync(configPath) ? readFileSync(configPath, "utf8") : "";
-  writeFileSync(configPath, upsertManagedYamlBlock(normalizeExistingYamlConfig(existingConfig), hermesModelBlock(config)), "utf8");
+  writeFileSync(configPath, buildHermesWebUiConfig(existingConfig, config), "utf8");
 
   const envPath = resolveRelative(root, "data/hermes/.env");
   const existingEnv = existsSync(envPath) ? readFileSync(envPath, "utf8") : "";
@@ -207,23 +207,27 @@ function ensureObjectProperty(target: Record<string, unknown>, key: string): Rec
 }
 
 function hermesModelBlock(config: SavedModelConfig): string {
+  const providerName = hermesCustomProviderName(config.apiUrl);
   return [
     "# ClawHermes-managed model configuration",
     "model:",
-    "  provider: clawhermes",
+    `  provider: custom:${yamlScalar(providerName)}`,
     `  default: ${yamlScalar(config.model)}`,
-    `  base_url: ${yamlScalar(config.apiUrl)}`,
-    "providers:",
-    "  clawhermes:",
-    "    name: ClawHermes",
-    `    api: ${yamlScalar(config.apiUrl)}`,
+    "custom_providers:",
+    `  - name: ${yamlScalar(providerName)}`,
+    `    base_url: ${yamlScalar(config.apiUrl)}`,
     `    api_key: ${yamlScalar(config.apiKey)}`,
-    `    default_model: ${yamlScalar(config.model)}`,
-    "    transport: chat_completions",
-    "    models:",
-    `      ${yamlScalar(config.model)}: {}`,
+    `    model: ${yamlScalar(config.model)}`,
     "# End ClawHermes-managed model configuration",
   ].join("\n");
+}
+
+function buildHermesWebUiConfig(existing: string, config: SavedModelConfig): string {
+  const normalized = normalizeExistingYamlConfig(existing);
+  const withoutManagedBlock = removeManagedYamlBlock(normalized);
+  const preserved = stripTopLevelYamlSections(withoutManagedBlock, new Set(["model", "providers", "custom_providers"])).trim();
+  const block = hermesModelBlock(config);
+  return preserved ? `${block}\n\n${preserved}\n` : `${block}\n`;
 }
 
 function normalizeExistingYamlConfig(existing: string): string {
@@ -232,6 +236,35 @@ function normalizeExistingYamlConfig(existing: string): string {
     return "";
   }
   return existing.replace(/^\s*\{\}\s*(?=# ClawHermes-managed model configuration|$)/, "");
+}
+
+function removeManagedYamlBlock(existing: string): string {
+  const start = "# ClawHermes-managed model configuration";
+  const end = "# End ClawHermes-managed model configuration";
+  const pattern = new RegExp(`${escapeRegExp(start)}[\\s\\S]*?${escapeRegExp(end)}\\r?\\n?`);
+  return existing.replace(pattern, "");
+}
+
+function stripTopLevelYamlSections(existing: string, keys: Set<string>): string {
+  const lines = existing.split(/\r?\n/);
+  const kept: string[] = [];
+  let skipping = false;
+  for (const line of lines) {
+    const key = topLevelYamlKey(line);
+    if (key) {
+      skipping = keys.has(key);
+    }
+    if (!skipping) {
+      kept.push(line);
+    }
+  }
+  return kept.join("\n").replace(/\n{3,}/g, "\n\n");
+}
+
+function topLevelYamlKey(line: string): string | null {
+  if (!line || /^\s/.test(line) || line.trimStart().startsWith("#")) return null;
+  const match = /^([A-Za-z0-9_-]+):(?:\s|$)/.exec(line);
+  return match?.[1] ?? null;
 }
 
 function upsertManagedYamlBlock(existing: string, block: string): string {
@@ -254,6 +287,15 @@ function upsertEnvValue(existing: string, key: string, value: string): string {
 
 function yamlScalar(value: string): string {
   return /^[A-Za-z0-9._:/-]+$/.test(value) ? value : JSON.stringify(value);
+}
+
+function hermesCustomProviderName(apiUrl: string): string {
+  try {
+    const hostname = new URL(apiUrl).hostname.trim().toLowerCase();
+    return hostname ? hostname.replace(/\s+/g, "-") : "clawhermes";
+  } catch {
+    return "clawhermes";
+  }
 }
 
 function ensureTrailingNewline(value: string): string {

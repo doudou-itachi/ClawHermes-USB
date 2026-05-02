@@ -3290,6 +3290,35 @@ Next steps:
 
 - Commit and push the repair after reviewing the final diff.
 
+### Hermes Web UI Model Format Alignment
+
+Status: `Done`
+
+Summary:
+
+- Aligned GUI-applied Hermes model configuration with Hermes Web UI's native `config.yaml` schema.
+- Replaced the previous `providers.clawhermes` YAML output with Hermes Web UI-compatible `custom_providers` entries.
+- Removed duplicate top-level `model`, `providers`, and `custom_providers` sections before writing the GUI-managed Hermes block, preventing `duplicated mapping key` errors when Hermes Web UI saves providers later.
+- Verified the E: USB copy by rewriting the broken Hermes config into a single `model` plus `custom_providers` structure and restarting services; Hermes Web UI no longer logged YAML duplicate-key errors, and OpenClaw continued to load the configured model.
+
+Changed areas:
+
+- `core/node/src/model-config.ts`
+- `core/node/dist/model-config.js`
+- `tests/test_windows_core.py`
+- `docs/PROGRESS.md`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_model_config_applies_openclaw_and_hermes_without_printing_api_key tests.test_windows_core.WindowsCoreTests.test_model_config_replaces_hermes_web_ui_model_block_without_duplicate_yaml_keys -v`
+- `npm test`
+- E: runtime restart and `status --json`
+
+Next steps:
+
+- Regenerate the runtime-only USB release package and push the alignment fix.
+
 ### USB Release Hardening and Removable Drive Validation
 
 Status: `Done`
