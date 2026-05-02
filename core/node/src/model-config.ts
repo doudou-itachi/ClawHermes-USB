@@ -49,7 +49,10 @@ export function configureSharedModel(usbRoot: string, input: ModelConfigInput) {
     apply: config.apply,
     applied,
     config: redactModelConfig(config),
-    messages: applied.map((target) => `Configured ${target} model settings.`),
+    messages: [
+      ...applied.map((target) => `Configured ${target} model settings.`),
+      ...(applied.length > 0 ? ["Restart the affected services for model settings to take effect."] : []),
+    ],
   };
 }
 
@@ -161,11 +164,12 @@ function applyHermesModelConfig(root: string, config: SavedModelConfig): void {
 
   const configPath = resolveRelative(root, "data/hermes/config.yaml");
   const existingConfig = existsSync(configPath) ? readFileSync(configPath, "utf8") : "";
-  writeFileSync(configPath, upsertManagedYamlBlock(existingConfig, hermesModelBlock(config)), "utf8");
+  writeFileSync(configPath, upsertManagedYamlBlock(normalizeExistingYamlConfig(existingConfig), hermesModelBlock(config)), "utf8");
 
   const envPath = resolveRelative(root, "data/hermes/.env");
   const existingEnv = existsSync(envPath) ? readFileSync(envPath, "utf8") : "";
-  writeFileSync(envPath, upsertEnvValue(existingEnv, "OPENAI_API_KEY", config.apiKey), "utf8");
+  const nextEnv = upsertEnvValue(upsertEnvValue(existingEnv, "OPENAI_API_KEY", config.apiKey), "OPENAI_BASE_URL", config.apiUrl);
+  writeFileSync(envPath, nextEnv, "utf8");
 }
 
 function readJsonFile(path: string): unknown {
@@ -206,11 +210,28 @@ function hermesModelBlock(config: SavedModelConfig): string {
   return [
     "# ClawHermes-managed model configuration",
     "model:",
-    "  provider: openai",
-    `  model: ${yamlScalar(config.model)}`,
+    "  provider: clawhermes",
+    `  default: ${yamlScalar(config.model)}`,
     `  base_url: ${yamlScalar(config.apiUrl)}`,
+    "providers:",
+    "  clawhermes:",
+    "    name: ClawHermes",
+    `    api: ${yamlScalar(config.apiUrl)}`,
+    `    api_key: ${yamlScalar(config.apiKey)}`,
+    `    default_model: ${yamlScalar(config.model)}`,
+    "    transport: chat_completions",
+    "    models:",
+    `      ${yamlScalar(config.model)}: {}`,
     "# End ClawHermes-managed model configuration",
   ].join("\n");
+}
+
+function normalizeExistingYamlConfig(existing: string): string {
+  const trimmed = existing.trim();
+  if (!trimmed || trimmed === "{}") {
+    return "";
+  }
+  return existing.replace(/^\s*\{\}\s*(?=# ClawHermes-managed model configuration|$)/, "");
 }
 
 function upsertManagedYamlBlock(existing: string, block: string): string {

@@ -301,9 +301,7 @@ $appExcludedFileNames = @(
     "dockerfile",
     "docker-compose.yml",
     "contributing.md",
-    "security.md",
-    "agents.md",
-    "agent.md"
+    "security.md"
 )
 
 if (-not $NoPayloads) {

@@ -3253,6 +3253,43 @@ Next steps:
 
 - Continue real Hermes Agent and OpenClaw WSL2 payload validation when a prepared distro is available.
 
+### Portable Model Configuration Repair
+
+Status: `Done`
+
+Summary:
+
+- Fixed ClawHermes model configuration so Hermes receives valid YAML instead of a leading `{}` document followed by a managed block.
+- Updated Hermes model output to use a `clawhermes` provider with `model.default`, provider API settings, and OpenAI-compatible environment variables.
+- Kept OpenClaw model configuration writing the `clawhermes/<model>` provider reference and auth profile.
+- Preserved OpenClaw runtime templates such as `docs/reference/templates/AGENTS.md` in USB release packages.
+- Hardened setup port diagnostics so Windows `LISTENING` sockets are detected before falling back to connection probing.
+- Verified the E: USB copy after restart: OpenClaw, Hermes Agent, Hermes Web UI, and Portal reported HTTP-ready status, and OpenClaw logged the configured `clawhermes` model.
+
+Changed areas:
+
+- `core/node/src/model-config.ts`
+- `core/node/src/diagnostics.ts`
+- `core/node/dist/model-config.js`
+- `core/node/dist/diagnostics.js`
+- `scripts/release/Build-UsbRelease.ps1`
+- `tests/test_windows_core.py`
+- `docs/PROGRESS.md`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_model_config_applies_openclaw_and_hermes_without_printing_api_key tests.test_windows_core.WindowsCoreTests.test_usb_release_script_prunes_development_app_payloads -v`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_setup_json_reports_occupied_port tests.test_windows_core.WindowsCoreTests.test_setup_json_reports_default_port_diagnostics tests.test_windows_core.WindowsCoreTests.test_model_config_applies_openclaw_and_hermes_without_printing_api_key tests.test_windows_core.WindowsCoreTests.test_usb_release_script_prunes_development_app_payloads -v`
+- `npm test`
+- `git diff --check`
+- `scripts/release/Build-UsbRelease.ps1 -Clean`
+- E: runtime `status --json`
+
+Next steps:
+
+- Commit and push the repair after reviewing the final diff.
+
 ### USB Release Hardening and Removable Drive Validation
 
 Status: `Done`

@@ -290,6 +290,9 @@ function portDiagnostics(usbRoot) {
     return diagnostics;
 }
 function isTcpPortAvailableSync(port) {
+    if (tcpPortListedSync(port)) {
+        return false;
+    }
     try {
         const output = (0, node_child_process_1.execFileSync)("powershell", [
             "-NoProfile",
@@ -300,5 +303,15 @@ function isTcpPortAvailableSync(port) {
     }
     catch {
         return true;
+    }
+}
+function tcpPortListedSync(port) {
+    try {
+        const output = (0, node_child_process_1.execFileSync)("netstat", ["-ano", "-p", "tcp"], { encoding: "utf8", timeout: 3000 });
+        const pattern = new RegExp(`(?:^|\\s)(?:127\\.0\\.0\\.1|0\\.0\\.0\\.0|\\[?::1\\]?|\\[?::\\]?):${port}\\s+[^\\r\\n]*\\sLISTENING\\s`, "im");
+        return pattern.test(output);
+    }
+    catch {
+        return false;
     }
 }

@@ -687,6 +687,9 @@ class WindowsCoreTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
+            hermes_config_path = temp_root / "data" / "hermes" / "config.yaml"
+            hermes_config_path.parent.mkdir(parents=True, exist_ok=True)
+            hermes_config_path.write_text("{}\n", encoding="utf-8")
 
             result = run_dispatcher_for_root(
                 temp_root,
@@ -732,14 +735,23 @@ class WindowsCoreTests(unittest.TestCase):
 
             hermes_config = (temp_root / "data" / "hermes" / "config.yaml").read_text(encoding="utf-8")
             self.assertIn("# ClawHermes-managed model configuration", hermes_config)
+            self.assertFalse(hermes_config.lstrip().startswith("{}"))
             self.assertIn("model:", hermes_config)
-            self.assertIn("  provider: openai", hermes_config)
-            self.assertIn("  model: gpt-test", hermes_config)
+            self.assertIn("  provider: clawhermes", hermes_config)
+            self.assertIn("  default: gpt-test", hermes_config)
             self.assertIn("  base_url: https://api.example.test/v1", hermes_config)
+            self.assertIn("providers:", hermes_config)
+            self.assertIn("  clawhermes:", hermes_config)
+            self.assertIn("    api: https://api.example.test/v1", hermes_config)
+            self.assertIn("    default_model: gpt-test", hermes_config)
+            self.assertIn("    transport: chat_completions", hermes_config)
+            self.assertIn("      gpt-test: {}", hermes_config)
 
             hermes_env = (temp_root / "data" / "hermes" / ".env").read_text(encoding="utf-8")
             self.assertEqual(hermes_env.count("OPENAI_API_KEY="), 1)
+            self.assertEqual(hermes_env.count("OPENAI_BASE_URL="), 1)
             self.assertIn(f"OPENAI_API_KEY={secret}", hermes_env)
+            self.assertIn("OPENAI_BASE_URL=https://api.example.test/v1", hermes_env)
 
             status = run_dispatcher_for_root(temp_root, "model-config-status", "-Json")
             self.assertEqual(status.returncode, 0, status.stderr)
@@ -747,6 +759,24 @@ class WindowsCoreTests(unittest.TestCase):
             status_payload = json.loads(status.stdout)
             self.assertTrue(status_payload["exists"])
             self.assertEqual(status_payload["config"]["apiKey"], "[redacted]")
+
+            rerun = run_dispatcher_for_root(
+                temp_root,
+                "model-config",
+                "--provider-type",
+                "openai-compatible",
+                "--api-url",
+                "https://api.example.test/v1",
+                "--model",
+                "gpt-test",
+                "--api-key",
+                secret,
+                "-Json",
+            )
+            self.assertEqual(rerun.returncode, 0, rerun.stderr)
+            hermes_config_after_rerun = hermes_config_path.read_text(encoding="utf-8")
+            self.assertFalse(hermes_config_after_rerun.lstrip().startswith("{}"))
+            self.assertEqual(hermes_config_after_rerun.count("# ClawHermes-managed model configuration"), 1)
         finally:
             temp_dir.cleanup()
 
@@ -3627,6 +3657,7 @@ class WindowsCoreTests(unittest.TestCase):
                 "apps/openclaw/src",
                 "apps/openclaw/tests",
                 "apps/openclaw/docs",
+                "apps/openclaw/docs/reference/templates",
                 "apps/openclaw/venv/bin",
                 "docs",
             ]:
@@ -3657,6 +3688,10 @@ class WindowsCoreTests(unittest.TestCase):
             (source_root / "apps" / "openclaw" / "src" / "source.ts").write_text("source\n", encoding="utf-8")
             (source_root / "apps" / "openclaw" / "tests" / "spec.txt").write_text("test\n", encoding="utf-8")
             (source_root / "apps" / "openclaw" / "docs" / "readme.md").write_text("docs\n", encoding="utf-8")
+            (source_root / "apps" / "openclaw" / "docs" / "reference" / "templates" / "AGENTS.md").write_text(
+                "runtime template\n",
+                encoding="utf-8",
+            )
             (source_root / "apps" / "openclaw" / ".git" / "config").write_text("git\n", encoding="utf-8")
             reparse_target = source_root / "apps" / "openclaw" / "missing-python-target"
             reparse_path = source_root / "apps" / "openclaw" / "venv" / "bin" / "python"
@@ -3696,6 +3731,7 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertTrue((output_root / "apps" / "openclaw" / "src" / "source.ts").exists())
             self.assertFalse((output_root / "apps" / "openclaw" / "tests").exists())
             self.assertTrue((output_root / "apps" / "openclaw" / "docs" / "readme.md").exists())
+            self.assertTrue((output_root / "apps" / "openclaw" / "docs" / "reference" / "templates" / "AGENTS.md").exists())
             self.assertFalse((output_root / "apps" / "openclaw" / "venv" / "bin" / "python").exists())
 
             manifest = json.loads((output_root / "release-manifest.json").read_text(encoding="utf-8"))

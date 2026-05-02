@@ -26,7 +26,10 @@ function configureSharedModel(usbRoot, input) {
         apply: config.apply,
         applied,
         config: redactModelConfig(config),
-        messages: applied.map((target) => `Configured ${target} model settings.`),
+        messages: [
+            ...applied.map((target) => `Configured ${target} model settings.`),
+            ...(applied.length > 0 ? ["Restart the affected services for model settings to take effect."] : []),
+        ],
     };
 }
 function sharedModelConfigStatus(usbRoot) {
@@ -127,10 +130,11 @@ function applyHermesModelConfig(root, config) {
     (0, node_fs_1.mkdirSync)(hermesDir, { recursive: true });
     const configPath = (0, portable_1.resolveRelative)(root, "data/hermes/config.yaml");
     const existingConfig = (0, node_fs_1.existsSync)(configPath) ? (0, node_fs_1.readFileSync)(configPath, "utf8") : "";
-    (0, node_fs_1.writeFileSync)(configPath, upsertManagedYamlBlock(existingConfig, hermesModelBlock(config)), "utf8");
+    (0, node_fs_1.writeFileSync)(configPath, upsertManagedYamlBlock(normalizeExistingYamlConfig(existingConfig), hermesModelBlock(config)), "utf8");
     const envPath = (0, portable_1.resolveRelative)(root, "data/hermes/.env");
     const existingEnv = (0, node_fs_1.existsSync)(envPath) ? (0, node_fs_1.readFileSync)(envPath, "utf8") : "";
-    (0, node_fs_1.writeFileSync)(envPath, upsertEnvValue(existingEnv, "OPENAI_API_KEY", config.apiKey), "utf8");
+    const nextEnv = upsertEnvValue(upsertEnvValue(existingEnv, "OPENAI_API_KEY", config.apiKey), "OPENAI_BASE_URL", config.apiUrl);
+    (0, node_fs_1.writeFileSync)(envPath, nextEnv, "utf8");
 }
 function readJsonFile(path) {
     if (!(0, node_fs_1.existsSync)(path))
@@ -167,11 +171,27 @@ function hermesModelBlock(config) {
     return [
         "# ClawHermes-managed model configuration",
         "model:",
-        "  provider: openai",
-        `  model: ${yamlScalar(config.model)}`,
+        "  provider: clawhermes",
+        `  default: ${yamlScalar(config.model)}`,
         `  base_url: ${yamlScalar(config.apiUrl)}`,
+        "providers:",
+        "  clawhermes:",
+        "    name: ClawHermes",
+        `    api: ${yamlScalar(config.apiUrl)}`,
+        `    api_key: ${yamlScalar(config.apiKey)}`,
+        `    default_model: ${yamlScalar(config.model)}`,
+        "    transport: chat_completions",
+        "    models:",
+        `      ${yamlScalar(config.model)}: {}`,
         "# End ClawHermes-managed model configuration",
     ].join("\n");
+}
+function normalizeExistingYamlConfig(existing) {
+    const trimmed = existing.trim();
+    if (!trimmed || trimmed === "{}") {
+        return "";
+    }
+    return existing.replace(/^\s*\{\}\s*(?=# ClawHermes-managed model configuration|$)/, "");
 }
 function upsertManagedYamlBlock(existing, block) {
     const start = "# ClawHermes-managed model configuration";

@@ -290,6 +290,9 @@ export function portDiagnostics(usbRoot: string): PortDiagnostic[] {
 }
 
 function isTcpPortAvailableSync(port: number): boolean {
+  if (tcpPortListedSync(port)) {
+    return false;
+  }
   try {
     const output = execFileSync("powershell", [
       "-NoProfile",
@@ -299,5 +302,15 @@ function isTcpPortAvailableSync(port: number): boolean {
     return output.toLowerCase() !== "true";
   } catch {
     return true;
+  }
+}
+
+function tcpPortListedSync(port: number): boolean {
+  try {
+    const output = execFileSync("netstat", ["-ano", "-p", "tcp"], { encoding: "utf8", timeout: 3000 });
+    const pattern = new RegExp(`(?:^|\\s)(?:127\\.0\\.0\\.1|0\\.0\\.0\\.0|\\[?::1\\]?|\\[?::\\]?):${port}\\s+[^\\r\\n]*\\sLISTENING\\s`, "im");
+    return pattern.test(output);
+  } catch {
+    return false;
   }
 }
