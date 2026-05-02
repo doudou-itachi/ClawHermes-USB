@@ -3253,6 +3253,43 @@ Next steps:
 
 - Continue real Hermes Agent and OpenClaw WSL2 payload validation when a prepared distro is available.
 
+### USB Release Hardening and Removable Drive Validation
+
+Status: `Done`
+
+Summary:
+
+- Investigated errors from a manually copied `E:\ClawHermes-USB` USB payload.
+- Restored the bundled Windows Node runtime requirement so release builds fail fast when `runtimes/windows/node/node.exe` is missing.
+- Hardened WSL-backed adapter startup so removable drive letters are mounted inside WSL before changing into `/mnt/<drive>/...`.
+- Adjusted the runtime payload copy policy to keep upstream `src`, `doc`, and `docs` directories because several installed dependencies require them at runtime.
+- Kept Linux/WSL reparse points out of the release package and recorded skipped entries in `release-manifest.json`.
+
+Changed areas:
+
+- `core/node/src/wsl-adapter.ts`
+- `core/node/dist/wsl-adapter.js`
+- `scripts/release/Build-UsbRelease.ps1`
+- `tests/test_windows_core.py`
+- `docs/PROGRESS.md`
+- `runtimes/windows/node/` local release runtime
+
+Validation performed:
+
+- `npm run build`
+- Focused WSL dry-run and USB release tests
+- Regenerated `D:\release\ClawHermes-USB`
+- Synced a clean test copy to `E:\ClawHermes-USB`
+- Verified portable Node `v24.15.0` from the E drive
+- Verified WSL can mount `E:` and see `/mnt/e/ClawHermes-USB/apps/openclaw`
+- Started the E drive copy and confirmed OpenClaw, Hermes Agent, Hermes Web UI, and Portal each returned HTTP 200 health checks
+- Stopped all E drive services after verification
+
+Next steps:
+
+- For future source-hiding work, add per-upstream bundling profiles instead of deleting broad directory names such as `src` or `doc`.
+- Keep recommending USB 3.x or portable SSD media for WSL-heavy runtime use.
+
 ### Hermes Web UI Runtime Bridge Hardening
 
 Status: `Done`

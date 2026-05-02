@@ -20,13 +20,15 @@ function wslAdapterCommandPlan(root, adapter, serviceEnv, phase) {
         throw new Error(`Adapter ${adapter.id} does not declare a ${phase} command.`);
     const command = (0, command_template_1.expandCommandTemplate)(commandTemplate, serviceEnv.env);
     const script = [
+        ensureWslDriveMount(workingDirectory),
+        `cd ${shellQuote(workingDirectory)}`,
         ...environmentExports(root, serviceEnv.env),
         command,
     ].join(" && ");
     return {
         executablePath: diagnostics.executablePath ?? "wsl.exe",
         workingDirectory,
-        args: [...distroArgs(distro), "--cd", workingDirectory, "--", "bash", "-lc", script],
+        args: [...distroArgs(distro), "--cd", "/", "--", "bash", "-lc", script],
         script,
         diagnostics,
     };
@@ -70,6 +72,15 @@ function windowsPathToWslPath(path) {
     const drive = match[1].toLowerCase();
     const rest = match[2].replaceAll("\\", "/").replace(/^\/+/, "");
     return `/mnt/${drive}/${rest}`;
+}
+function ensureWslDriveMount(wslPath) {
+    const match = wslPath.match(/^\/mnt\/([a-z])(?:\/|$)/i);
+    if (!match)
+        return "true";
+    const drive = match[1].toLowerCase();
+    const mountPoint = `/mnt/${drive}`;
+    const driveSpec = `${drive.toUpperCase()}:`;
+    return `mountpoint -q ${shellQuote(mountPoint)} || (mkdir -p ${shellQuote(mountPoint)} && mount -t drvfs ${shellQuote(driveSpec)} ${shellQuote(mountPoint)})`;
 }
 function isWindowsAbsolutePath(value) {
     return /^[A-Za-z]:[\\/]/.test(value);

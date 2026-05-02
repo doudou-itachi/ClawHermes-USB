@@ -46,8 +46,7 @@ function Copy-Tree {
 
     $sourceItem = Get-Item -LiteralPath $Source -Force
     if (($sourceItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
-        $relativePath = Get-RelativeReleasePath -Path $sourceItem.FullName
-        $script:SkippedReparsePoints += $relativePath
+        Add-SkippedReparsePoint -SourceItem $sourceItem
         return
     }
 
@@ -62,10 +61,24 @@ function Copy-Tree {
 
     New-Item -ItemType Directory -Force -Path $Destination | Out-Null
     foreach ($child in Get-ChildItem -LiteralPath $Source -Force) {
-        $name = $child.Name.ToLowerInvariant()
+        $childName = [string] ($child.Name)
+        if ([string]::IsNullOrWhiteSpace($childName)) {
+            $script:SkippedReparsePoints += "(unknown child under $(Get-RelativeReleasePath -Path $Source))"
+            continue
+        }
+        $childFullName = [string] ($child.FullName)
+        if ([string]::IsNullOrWhiteSpace($childFullName) -and $child.PSPath) {
+            $childFullName = ([string] $child.PSPath) -replace '^Microsoft\.PowerShell\.Core\\FileSystem::', ''
+        }
+        if ([string]::IsNullOrWhiteSpace($childFullName)) {
+            $script:SkippedReparsePoints += "(unknown child path under $(Get-RelativeReleasePath -Path $Source))"
+            continue
+        }
+
+        $name = $childName.ToLowerInvariant()
+        $childDestination = Join-Path $Destination $childName
         if (($child.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
-            $relativePath = Get-RelativeReleasePath -Path $child.FullName
-            $script:SkippedReparsePoints += $relativePath
+            Add-SkippedReparsePoint -SourceItem $child
             continue
         }
 
@@ -73,12 +86,12 @@ function Copy-Tree {
             if ($ExcludedDirectoryNames -contains $name) {
                 continue
             }
-            Copy-Tree -Source $child.FullName -Destination (Join-Path $Destination $child.Name) -ExcludedDirectoryNames $ExcludedDirectoryNames -ExcludedFileNames $ExcludedFileNames
+            Copy-Tree -Source $childFullName -Destination $childDestination -ExcludedDirectoryNames $ExcludedDirectoryNames -ExcludedFileNames $ExcludedFileNames
         } else {
             if ($ExcludedFileNames -contains $name) {
                 continue
             }
-            Copy-Item -LiteralPath $child.FullName -Destination (Join-Path $Destination $child.Name) -Force
+            Copy-Item -LiteralPath $childFullName -Destination $childDestination -Force
         }
     }
 }
@@ -96,6 +109,27 @@ function Write-Utf8File {
 
     $encoding = New-Object System.Text.UTF8Encoding($false)
     [System.IO.File]::WriteAllText($Path, $Value, $encoding)
+}
+
+function Add-SkippedReparsePoint {
+    param(
+        [Parameter(Mandatory = $true)] $SourceItem
+    )
+
+    $sourcePath = [string] ($SourceItem.FullName)
+    if ([string]::IsNullOrWhiteSpace($sourcePath) -and $SourceItem.PSPath) {
+        $sourcePath = ([string] $SourceItem.PSPath) -replace '^Microsoft\.PowerShell\.Core\\FileSystem::', ''
+    }
+    if ([string]::IsNullOrWhiteSpace($sourcePath)) {
+        $sourcePath = [string] $SourceItem
+    }
+    if ([string]::IsNullOrWhiteSpace($sourcePath)) {
+        $script:SkippedReparsePoints += "(unknown reparse point)"
+        return $false
+    }
+
+    $relativePath = Get-RelativeReleasePath -Path $sourcePath
+    $script:SkippedReparsePoints += $relativePath
 }
 
 function Get-RelativeReleasePath {
@@ -203,6 +237,20 @@ foreach ($relativePath in $runtimePaths) {
     Copy-ReleasePath -RelativePath $relativePath
 }
 
+$requiredPayloadFiles = @(
+    "core/node/dist/clawhermes.js",
+    "runtimes/windows/node/node.exe",
+    "runtimes/wsl/ubuntu-rootfs.tar",
+    "runtimes/wsl/ubuntu-rootfs.tar.sha256"
+)
+
+foreach ($relativePath in $requiredPayloadFiles) {
+    $targetPath = Join-Path $script:TargetRoot $relativePath
+    if (-not (Test-Path -LiteralPath $targetPath -PathType Leaf)) {
+        throw "Required release payload is missing: $relativePath. Prepare this artifact before building the USB release."
+    }
+}
+
 $documentationPaths = @(
     "README.md",
     "README.zh-CN.md",
@@ -232,8 +280,6 @@ $appExcludedDirectoryNames = @(
     ".github",
     ".vscode",
     ".idea",
-    "docs",
-    "doc",
     "test",
     "tests",
     "__tests__",
@@ -246,9 +292,7 @@ $appExcludedDirectoryNames = @(
     ".cache",
     ".turbo",
     ".next",
-    ".vite",
-    "src",
-    "sources"
+    ".vite"
 )
 
 $appExcludedFileNames = @(
@@ -307,7 +351,7 @@ $manifest = [ordered]@{
     includeData = [bool] $IncludeData
     payloadsIncluded = -not [bool] $NoPayloads
     appPayloadPolicy = [ordered]@{
-        purpose = "Copy runnable upstream payloads while removing checkout metadata, tests, docs, and obvious source-only directories."
+        purpose = "Copy runnable upstream payloads while removing checkout metadata, tests, examples, caches, and unsafe reparse points."
         excludedDirectoryNames = $appExcludedDirectoryNames
         excludedFileNames = $appExcludedFileNames
         note = "Some upstream projects may still require source-like runtime directories. The manifest lists any retained candidates for release review."
