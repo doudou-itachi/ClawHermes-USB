@@ -3619,6 +3619,7 @@ class WindowsCoreTests(unittest.TestCase):
                 "apps/openclaw/src",
                 "apps/openclaw/tests",
                 "apps/openclaw/docs",
+                "apps/openclaw/venv/bin",
                 "docs",
             ]:
                 (source_root / relative_dir).mkdir(parents=True, exist_ok=True)
@@ -3648,6 +3649,12 @@ class WindowsCoreTests(unittest.TestCase):
             (source_root / "apps" / "openclaw" / "tests" / "spec.txt").write_text("test\n", encoding="utf-8")
             (source_root / "apps" / "openclaw" / "docs" / "readme.md").write_text("docs\n", encoding="utf-8")
             (source_root / "apps" / "openclaw" / ".git" / "config").write_text("git\n", encoding="utf-8")
+            reparse_target = source_root / "apps" / "openclaw" / "missing-python-target"
+            reparse_path = source_root / "apps" / "openclaw" / "venv" / "bin" / "python"
+            try:
+                os.symlink(reparse_target, reparse_path)
+            except OSError as exc:
+                self.skipTest(f"Windows symlink creation is unavailable: {exc}")
             (source_root / "README.zh-CN.md").write_text("# 说明\n", encoding="utf-8")
             (source_root / "docs" / "usb-deployment.zh-CN.md").write_text("# U 盘部署\n", encoding="utf-8")
 
@@ -3680,6 +3687,7 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertFalse((output_root / "apps" / "openclaw" / "src").exists())
             self.assertFalse((output_root / "apps" / "openclaw" / "tests").exists())
             self.assertFalse((output_root / "apps" / "openclaw" / "docs").exists())
+            self.assertFalse((output_root / "apps" / "openclaw" / "venv" / "bin" / "python").exists())
 
             manifest = json.loads((output_root / "release-manifest.json").read_text(encoding="utf-8"))
             self.assertEqual(Path(manifest["sourceRoot"]).resolve(), source_root.resolve())
@@ -3687,6 +3695,10 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertIn(".git", manifest["appPayloadPolicy"]["excludedDirectoryNames"])
             self.assertIn("src", manifest["appPayloadPolicy"]["excludedDirectoryNames"])
             self.assertEqual([item["serviceId"] for item in manifest["appPayloads"]], ["openclaw"])
+            self.assertIn(
+                str(Path("apps") / "openclaw" / "venv" / "bin" / "python"),
+                manifest["skippedReparsePoints"],
+            )
         finally:
             temp_dir.cleanup()
             output_dir.cleanup()

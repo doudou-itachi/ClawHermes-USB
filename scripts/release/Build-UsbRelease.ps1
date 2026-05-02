@@ -45,6 +45,12 @@ function Copy-Tree {
     )
 
     $sourceItem = Get-Item -LiteralPath $Source -Force
+    if (($sourceItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+        $relativePath = Get-RelativeReleasePath -Path $sourceItem.FullName
+        $script:SkippedReparsePoints += $relativePath
+        return
+    }
+
     if (-not $sourceItem.PSIsContainer) {
         $parent = Split-Path -Parent $Destination
         if ($parent) {
@@ -57,6 +63,12 @@ function Copy-Tree {
     New-Item -ItemType Directory -Force -Path $Destination | Out-Null
     foreach ($child in Get-ChildItem -LiteralPath $Source -Force) {
         $name = $child.Name.ToLowerInvariant()
+        if (($child.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+            $relativePath = Get-RelativeReleasePath -Path $child.FullName
+            $script:SkippedReparsePoints += $relativePath
+            continue
+        }
+
         if ($child.PSIsContainer) {
             if ($ExcludedDirectoryNames -contains $name) {
                 continue
@@ -84,6 +96,18 @@ function Write-Utf8File {
 
     $encoding = New-Object System.Text.UTF8Encoding($false)
     [System.IO.File]::WriteAllText($Path, $Value, $encoding)
+}
+
+function Get-RelativeReleasePath {
+    param([Parameter(Mandatory = $true)][string] $Path)
+
+    $root = [System.IO.Path]::GetFullPath($script:SourceRoot).TrimEnd('\', '/')
+    $candidate = [System.IO.Path]::GetFullPath($Path)
+    if ($candidate.StartsWith($root + [System.IO.Path]::DirectorySeparatorChar, [System.StringComparison]::OrdinalIgnoreCase)) {
+        return $candidate.Substring($root.Length + 1)
+    }
+
+    return $candidate
 }
 
 function Copy-ReleasePath {
@@ -141,6 +165,7 @@ $script:TargetRoot = Resolve-FullPath $OutputRoot
 $script:CopiedPaths = @()
 $script:AppPayloads = @()
 $script:Warnings = @()
+$script:SkippedReparsePoints = @()
 
 if (-not (Test-Path -LiteralPath $script:SourceRoot -PathType Container)) {
     throw "UsbRoot does not exist or is not a directory: $script:SourceRoot"
@@ -289,6 +314,7 @@ $manifest = [ordered]@{
     }
     copiedPaths = $script:CopiedPaths
     appPayloads = $script:AppPayloads
+    skippedReparsePoints = $script:SkippedReparsePoints
     warnings = $script:Warnings
 }
 

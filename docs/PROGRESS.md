@@ -51,6 +51,7 @@ Summary:
 - Added `scripts/release/Build-UsbRelease.ps1` to generate a user-facing USB release directory from the development repository.
 - The release script copies the runtime surface, creates `启动 ClawHermes.vbs`, writes `START_HERE.txt`, and records a `release-manifest.json`.
 - The script prunes upstream app checkout metadata, tests, docs, examples, and obvious source-only directories from `apps/` during release packaging.
+- The script now skips Windows reparse points and records them in `release-manifest.json`, so Explorer copy to a USB drive does not fail on Linux virtualenv or package symlinks.
 - Updated the Chinese USB deployment guide with the new release script workflow and payload pruning policy.
 
 Changed areas:
