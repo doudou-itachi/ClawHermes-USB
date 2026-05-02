@@ -3380,6 +3380,7 @@ class WindowsCoreTests(unittest.TestCase):
             run_dispatcher_for_root(temp_root, "stop", "-Json", env={"CLAWHERMES_WSL_EXE": str(temp_root / "fake-wsl.cmd")})
             if process_id:
                 wait_for_process_exit(process_id)
+            wait_for_no_process_command_line_fragment(temp_root)
             temp_dir.cleanup()
 
     def test_status_removes_stale_managed_adapter_pid_file(self):
@@ -3596,6 +3597,99 @@ class WindowsCoreTests(unittest.TestCase):
         finally:
             if archive_path.exists():
                 archive_path.unlink()
+
+    def test_usb_release_script_prunes_development_app_payloads(self):
+        release_script = ROOT / "scripts" / "release" / "Build-UsbRelease.ps1"
+        temp_dir = tempfile.TemporaryDirectory()
+        output_dir = tempfile.TemporaryDirectory()
+        try:
+            source_root = Path(temp_dir.name)
+            output_root = Path(output_dir.name) / "ClawHermes-USB"
+            for relative_dir in [
+                "launcher/windows",
+                "core/windows",
+                "core/node/dist",
+                "adapters/openclaw",
+                "config/defaults",
+                "portal",
+                "runtimes/windows/node",
+                "runtimes/wsl",
+                "apps/openclaw/.git",
+                "apps/openclaw/dist",
+                "apps/openclaw/src",
+                "apps/openclaw/tests",
+                "apps/openclaw/docs",
+                "docs",
+            ]:
+                (source_root / relative_dir).mkdir(parents=True, exist_ok=True)
+
+            (source_root / "launcher" / "windows" / "ClawHermes-Control.vbs").write_text(
+                "WScript.Echo \"launcher\"\n",
+                encoding="utf-8",
+            )
+            (source_root / "core" / "windows" / "clawhermes.ps1").write_text(
+                "Write-Output 'core'\n",
+                encoding="utf-8",
+            )
+            (source_root / "core" / "node" / "dist" / "clawhermes.js").write_text(
+                "console.log('core')\n",
+                encoding="utf-8",
+            )
+            (source_root / "adapters" / "openclaw" / "adapter.json").write_text(
+                '{"id":"openclaw"}\n',
+                encoding="utf-8",
+            )
+            (source_root / "config" / "defaults" / "ports.json").write_text("{}\n", encoding="utf-8")
+            (source_root / "portal" / "portal-server.ps1").write_text("Write-Output 'portal'\n", encoding="utf-8")
+            (source_root / "runtimes" / "windows" / "node" / "node.exe").write_text("node\n", encoding="utf-8")
+            (source_root / "runtimes" / "wsl" / "ubuntu-rootfs.tar.sha256").write_text("sha  file\n", encoding="utf-8")
+            (source_root / "apps" / "openclaw" / "dist" / "runtime.js").write_text("runtime\n", encoding="utf-8")
+            (source_root / "apps" / "openclaw" / "src" / "source.ts").write_text("source\n", encoding="utf-8")
+            (source_root / "apps" / "openclaw" / "tests" / "spec.txt").write_text("test\n", encoding="utf-8")
+            (source_root / "apps" / "openclaw" / "docs" / "readme.md").write_text("docs\n", encoding="utf-8")
+            (source_root / "apps" / "openclaw" / ".git" / "config").write_text("git\n", encoding="utf-8")
+            (source_root / "README.zh-CN.md").write_text("# 说明\n", encoding="utf-8")
+            (source_root / "docs" / "usb-deployment.zh-CN.md").write_text("# U 盘部署\n", encoding="utf-8")
+
+            result = subprocess.run(
+                [
+                    "powershell",
+                    "-NoProfile",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(release_script),
+                    "-UsbRoot",
+                    str(source_root),
+                    "-OutputRoot",
+                    str(output_root),
+                    "-Clean",
+                ],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue((output_root / "启动 ClawHermes.vbs").exists())
+            self.assertTrue((output_root / "launcher" / "windows" / "ClawHermes-Control.vbs").exists())
+            self.assertTrue((output_root / "core" / "node" / "dist" / "clawhermes.js").exists())
+            self.assertTrue((output_root / "apps" / "openclaw" / "dist" / "runtime.js").exists())
+            self.assertFalse((output_root / "apps" / "openclaw" / ".git").exists())
+            self.assertFalse((output_root / "apps" / "openclaw" / "src").exists())
+            self.assertFalse((output_root / "apps" / "openclaw" / "tests").exists())
+            self.assertFalse((output_root / "apps" / "openclaw" / "docs").exists())
+
+            manifest = json.loads((output_root / "release-manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual(Path(manifest["sourceRoot"]).resolve(), source_root.resolve())
+            self.assertEqual(manifest["profile"], "runtime-payload")
+            self.assertIn(".git", manifest["appPayloadPolicy"]["excludedDirectoryNames"])
+            self.assertIn("src", manifest["appPayloadPolicy"]["excludedDirectoryNames"])
+            self.assertEqual([item["serviceId"] for item in manifest["appPayloads"]], ["openclaw"])
+        finally:
+            temp_dir.cleanup()
+            output_dir.cleanup()
 
     def test_status_reports_http_adapter_ready_when_endpoint_responds(self):
         temp_dir, temp_root, port = make_temp_http_usb_root()

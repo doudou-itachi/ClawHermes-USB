@@ -13,6 +13,38 @@ Update it whenever a milestone is completed, changed, blocked, or deferred.
 
 ## 2026-05-02
 
+### USB Runtime And Release Packaging
+
+Status: `Done`
+
+Summary:
+
+- Installed official Portable Node.js 24.15.0 under `runtimes/windows/node`, verified by SHA256 before extraction.
+- Added `scripts/release/Build-UsbRelease.ps1` to generate a user-facing USB release directory from the development repository.
+- The release script copies the runtime surface, creates `启动 ClawHermes.vbs`, writes `START_HERE.txt`, and records a `release-manifest.json`.
+- The script prunes upstream app checkout metadata, tests, docs, examples, and obvious source-only directories from `apps/` during release packaging.
+- Updated the Chinese USB deployment guide with the new release script workflow and payload pruning policy.
+
+Changed areas:
+
+- `scripts/release/Build-UsbRelease.ps1`
+- `docs/usb-deployment.zh-CN.md`
+- `docs/PROGRESS.md`
+- `tests/test_windows_core.py`
+- `runtimes/windows/node` (operator-managed ignored payload)
+
+Validation performed:
+
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_usb_release_script_prunes_development_app_payloads -v`
+- `runtimes/windows/node/node.exe --version`
+- `node core/node/dist/clawhermes.js setup --json`
+- `node core/node/dist/clawhermes.js payloads --json`
+
+Next steps:
+
+- Build and inspect a full release output on the target U disk or portable SSD before handing it to non-technical users.
+- If full source removal becomes a hard requirement, create per-upstream bundle profiles for OpenClaw, Hermes Agent, and Hermes Web UI instead of relying only on generic payload pruning.
+
 ### Documentation Visual Assets
 
 Status: `Done`

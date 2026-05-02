@@ -168,7 +168,73 @@ runtimes/windows
 runtimes/wsl
 ```
 
-创建交付目录，例如：
+### 使用 release 脚本生成交付目录
+
+现在推荐使用项目内置脚本生成 U 盘交付目录，而不是手工复制整棵开发仓库：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File scripts/release/Build-UsbRelease.ps1 `
+  -OutputRoot D:\release\ClawHermes-USB `
+  -Clean
+```
+
+脚本会复制运行需要的目录：
+
+```text
+launcher/
+core/windows/
+core/node/dist/
+adapters/
+config/
+portal/
+runtimes/
+apps/
+docs/
+```
+
+同时会在交付目录中生成：
+
+```text
+启动 ClawHermes.vbs
+START_HERE.txt
+release-manifest.json
+```
+
+`release-manifest.json` 会记录来源目录、输出目录、payload 列表、裁剪规则和警告信息，方便交付前复核。
+
+默认情况下，脚本不会复制当前开发机的 `data/` 用户数据，只会创建空的 `data/logs`、`data/tmp`、`data/backups`、`data/settings` 和 `data/cache`。如果确实要把当前数据一起带走，可以显式加上：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File scripts/release/Build-UsbRelease.ps1 `
+  -OutputRoot D:\release\ClawHermes-USB `
+  -Clean `
+  -IncludeData
+```
+
+### apps payload 裁剪策略
+
+脚本会从 `apps/` 复制上游应用 payload，但会剥离明显不适合交付给普通用户的开发内容：
+
+```text
+.git/
+.github/
+.vscode/
+docs/
+test/
+tests/
+examples/
+coverage/
+src/
+sources/
+```
+
+这能避免把上游 checkout 原样放到 U 盘上。需要注意的是，某些上游项目可能仍然把运行时文件放在类似 `packages`、`agent`、`gateway`、`plugins`、`skills` 这样的目录里。脚本不会盲目删除这些目录，而是把它们写入 `release-manifest.json` 的警告里，由交付人员判断是否需要进一步做独立 bundle、wheel、单文件产物或许可证处理。
+
+### 手工复制的备选方式
+
+如果 release 脚本不可用，也可以手工创建交付目录，例如：
 
 ```text
 D:\release\ClawHermes-USB
