@@ -13,6 +13,34 @@ Update it whenever a milestone is completed, changed, blocked, or deferred.
 
 ## 2026-05-02
 
+### USB Release Build Runbook
+
+Status: `Done`
+
+Summary:
+
+- Added a Chinese release build runbook for developers who clone the repository and need to generate a USB delivery directory.
+- Expanded the payload preparation guidance for `apps/openclaw`, `apps/hermes-agent`, and `apps/hermes-web-ui`.
+- Expanded the runtime and WSL artifact guidance for portable Windows runtimes, `ubuntu-rootfs.tar`, checksum generation, WSL import validation, and clean-machine release checks.
+- Linked the new runbook from the Chinese README and USB deployment guide.
+
+Changed areas:
+
+- `docs/usb-release-build-runbook.zh-CN.md`
+- `README.zh-CN.md`
+- `docs/usb-deployment.zh-CN.md`
+- `docs/PROGRESS.md`
+
+Validation performed:
+
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_chinese_docs_are_readable_utf8 -v`
+- Markdown relative-link check for the Chinese README, USB deployment guide, and new release build runbook.
+- `git diff --check`
+
+Next steps:
+
+- Keep the runbook aligned with `scripts/release/Build-UsbRelease.ps1` whenever release packaging behavior changes.
+
 ### USB Runtime And Release Packaging
 
 Status: `Done`

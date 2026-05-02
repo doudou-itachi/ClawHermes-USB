@@ -59,6 +59,7 @@ U 盘速度会影响启动和运行体验，尤其是 WSL 文件系统、`node_m
 完整交付说明见：
 
 - [U 盘部署与交付指南](docs/usb-deployment.zh-CN.md)
+- [U 盘交付包生成 Runbook](docs/usb-release-build-runbook.zh-CN.md)
 
 ## 关键目录
 

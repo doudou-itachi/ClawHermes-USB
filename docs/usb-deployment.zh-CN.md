@@ -4,6 +4,8 @@
 
 ![U 盘交付流程](assets/usb-flow.svg)
 
+如果你是交付人员，需要从 clone 下来的仓库生成一份可复制到 U 盘的目录，请优先阅读更细的 [U 盘交付包生成 Runbook](usb-release-build-runbook.zh-CN.md)。
+
 ## 结论
 
 这些担心不是多虑，确实会存在。
