@@ -36,6 +36,14 @@ data/**
 !data/**/.gitkeep
 data/openclaw/.openclaw/
 data/**/.git/
+data/home/AppData/
+
+# PyInstaller output
+/ClawHermes-Control.spec
+/build/
+/launcher/pyqt/build/
+/launcher/pyqt/dist/
+/dist-usb/
 
 # OS/editor
 Thumbs.db
@@ -46,6 +54,7 @@ node_modules/
 __pycache__/
 *.pyc
 .superpowers/
+.firecrawl/
 
 # Generated portal output
 portal/index.html

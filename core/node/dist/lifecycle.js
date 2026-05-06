@@ -17,8 +17,13 @@ function startAdapter(root, adapter, options = {}) {
     const serviceEnv = options.serviceEnv ?? (0, environment_1.resolveServiceEnvironment)(root, adapter.id);
     (0, node_fs_1.mkdirSync)((0, node_path_1.dirname)(pidFile), { recursive: true });
     (0, node_fs_1.mkdirSync)((0, node_path_1.dirname)(logFile), { recursive: true });
+    const existingMetadata = readReusableStartMetadata(pidFile);
+    if (existingMetadata) {
+        (0, portable_1.writeLog)(root, adapter.id, "INFO", `Reused existing ${adapter.id} service metadata.`);
+        return existingMetadata;
+    }
     const metadata = shouldLaunchManagedProcess(root, adapter, options.forceManaged === true)
-        ? launchManagedAdapterProcess(root, adapter, serviceEnv, options.processPlan)
+        ? launchManagedAdapterProcess(root, adapter, serviceEnv, options.processPlan, options.attachToParent === true)
         : {
             serviceId: adapter.id,
             displayName: adapter.displayName,
@@ -40,6 +45,23 @@ function startAdapter(root, adapter, options = {}) {
     }
     return metadata;
 }
+function readReusableStartMetadata(pidFile) {
+    if (!(0, node_fs_1.existsSync)(pidFile))
+        return null;
+    try {
+        const metadata = JSON.parse((0, node_fs_1.readFileSync)(pidFile, "utf8"));
+        if (metadata.placeholder === true)
+            return metadata;
+        if (metadata.placeholder === false && typeof metadata.processId === "number" && processExists(metadata.processId)) {
+            return metadata;
+        }
+    }
+    catch {
+        // Corrupt pid files are treated as stale and replaced by a fresh launch.
+    }
+    (0, node_fs_1.rmSync)(pidFile, { force: true });
+    return null;
+}
 function shouldLaunchManagedProcess(root, adapter, forceManaged) {
     return (forceManaged || adapter.integration?.productionReady === true) && Boolean(adapter.commands.start) && appDirHasRealContent(root, adapter);
 }
@@ -58,7 +80,7 @@ function environmentMetadata(serviceEnv) {
         variables: Object.keys(serviceEnv.env).sort(),
     };
 }
-function launchManagedAdapterProcess(root, adapter, serviceEnv, processPlan) {
+function launchManagedAdapterProcess(root, adapter, serviceEnv, processPlan, attachToParent = false) {
     const commandTemplate = adapter.commands.start;
     if (!commandTemplate)
         throw new Error(`Adapter ${adapter.id} has no start command.`);
@@ -67,34 +89,38 @@ function launchManagedAdapterProcess(root, adapter, serviceEnv, processPlan) {
     const workingDirectory = (0, portable_1.resolveRelative)(root, adapter.appDir);
     const logFile = (0, portable_1.resolveRelative)(root, adapter.logFile);
     const logFd = (0, node_fs_1.openSync)(logFile, "a");
+    const serviceStdio = process.platform === "win32" ? "ignore" : ["ignore", logFd, logFd];
+    const serviceDetached = !(process.platform === "win32" && attachToParent);
     try {
         const nativePlan = processPlan ? null : nativeManagedProcessPlan(command);
         const child = processPlan
             ? (0, node_child_process_1.spawn)(processPlan.executablePath, processPlan.args, {
                 cwd: processPlan.workingDirectory,
                 env: { ...process.env, ...(processPlan.env ?? {}) },
-                detached: true,
+                detached: serviceDetached,
                 shell: false,
-                stdio: ["ignore", logFd, logFd],
+                stdio: serviceStdio,
                 windowsHide: true,
             })
             : nativePlan
                 ? (0, node_child_process_1.spawn)(nativePlan.executablePath, nativePlan.args, {
                     cwd: workingDirectory,
                     env: { ...process.env, ...serviceEnv.env },
-                    detached: true,
+                    detached: serviceDetached,
                     shell: false,
-                    stdio: ["ignore", logFd, logFd],
+                    stdio: serviceStdio,
                     windowsHide: true,
                 })
-                : (0, node_child_process_1.spawn)(command, {
-                    cwd: workingDirectory,
-                    env: { ...process.env, ...serviceEnv.env },
-                    detached: true,
-                    shell: true,
-                    stdio: ["ignore", logFd, logFd],
-                    windowsHide: true,
-                });
+                : process.platform === "win32"
+                    ? throwShellManagedCommandError(adapter.id, command)
+                    : (0, node_child_process_1.spawn)(command, {
+                        cwd: workingDirectory,
+                        env: { ...process.env, ...serviceEnv.env },
+                        detached: serviceDetached,
+                        shell: true,
+                        stdio: serviceStdio,
+                        windowsHide: true,
+                    });
         child.unref();
         return {
             serviceId: adapter.id,
@@ -114,6 +140,10 @@ function launchManagedAdapterProcess(root, adapter, serviceEnv, processPlan) {
     finally {
         (0, node_fs_1.closeSync)(logFd);
     }
+}
+function throwShellManagedCommandError(serviceId, command) {
+    throw new Error(`Adapter ${serviceId} start command cannot be launched without a shell on Windows: ${command}. ` +
+        "Use a simple executable-plus-arguments command so ClawHermes can start it without opening cmd.exe.");
 }
 function prepareManagedServiceEnvironment(root, adapter, serviceEnv) {
     ensureHermesConfigFile(serviceEnv);
@@ -188,11 +218,10 @@ function objectValue(value) {
     return value && typeof value === "object" && !Array.isArray(value) ? value : {};
 }
 function nativeManagedProcessPlan(command) {
+    if (/[&|<>]/.test(command))
+        return null;
     const parts = splitCommandLine(command);
     if (parts.length === 0)
-        return null;
-    const executable = parts[0].toLowerCase();
-    if (!["node", "node.exe"].includes(executable))
         return null;
     return { executablePath: parts[0], args: parts.slice(1) };
 }
@@ -200,17 +229,7 @@ function splitCommandLine(command) {
     const parts = [];
     let current = "";
     let quote = null;
-    let escaping = false;
     for (const character of command) {
-        if (escaping) {
-            current += character;
-            escaping = false;
-            continue;
-        }
-        if (character === "\\") {
-            escaping = true;
-            continue;
-        }
         if ((character === '"' || character === "'") && (!quote || quote === character)) {
             quote = quote ? null : character;
             continue;
@@ -224,8 +243,6 @@ function splitCommandLine(command) {
         }
         current += character;
     }
-    if (escaping)
-        current += "\\";
     if (current)
         parts.push(current);
     return parts;

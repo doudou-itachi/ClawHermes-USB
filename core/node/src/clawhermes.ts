@@ -1,5 +1,6 @@
 import { adapterSetupPlan, appSourcePlan, checkoutAppSource, configureSharedModel, createBackup, getRoot, getStatus, initializeEnvFiles, installRuntimeFromArchive, markAdapterReady, payloadExport, payloadInventory, portableEnv, prepareWsl, probeAppSources, readLogTail, restoreBackup, restorePlan, runAdapterSetup, runtimePreparationPlan, serviceEnvironmentDiagnostic, setupDiagnostics, setupWizard, sharedModelConfigStatus, startSingleAdapter, startSkeleton, stopSkeleton, verifyAdapter, writeStatusSnapshot, wslDiagnostics, wslExport, wslImport, wslImportPlan, wslRootfsGuide, wslUnregister, wslUnregisterPlan, wslWorkflowPlan } from "./core";
 import type { BackupProfile } from "./backup";
+import { startControlServer, stopControlServer } from "./control-server";
 
 type ParsedArgs = {
   action: string;
@@ -28,6 +29,7 @@ type ParsedArgs = {
   apiKey?: string;
   apply?: string;
   lines: number;
+  port: number;
 };
 
 function parseArgs(argv: string[]): ParsedArgs {
@@ -58,6 +60,7 @@ function parseArgs(argv: string[]): ParsedArgs {
   let apiKey: string | undefined;
   let apply: string | undefined;
   let lines = 50;
+  let port = 17100;
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
     if ((arg === "--usb-root" || arg === "-UsbRoot") && args[index + 1]) {
@@ -120,11 +123,14 @@ function parseArgs(argv: string[]): ParsedArgs {
     } else if (arg === "--lines" && args[index + 1]) {
       lines = Number(args[index + 1]);
       index += 1;
+    } else if (arg === "--port" && args[index + 1]) {
+      port = Number(args[index + 1]);
+      index += 1;
     } else {
       positional.push(arg);
     }
   }
-  return { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, confirmCheckout, confirmSetup, confirmInstall, confirmReady, confirmStart, confirmImport, confirmExport, confirmUnregister, confirmRestore, distro, summary, providerType, apiUrl, model, apiKey, apply, lines };
+  return { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, confirmCheckout, confirmSetup, confirmInstall, confirmReady, confirmStart, confirmImport, confirmExport, confirmUnregister, confirmRestore, distro, summary, providerType, apiUrl, model, apiKey, apply, lines, port };
 }
 
 function optionValue(value: string | undefined): value is string {
@@ -141,7 +147,7 @@ function printJson(value: unknown): void {
 }
 
 async function main(): Promise<void> {
-  const { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, confirmCheckout, confirmSetup, confirmInstall, confirmReady, confirmStart, confirmImport, confirmExport, confirmUnregister, confirmRestore, distro, summary, providerType, apiUrl, model, apiKey, apply, lines } = parseArgs(process.argv.slice(2));
+  const { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, confirmCheckout, confirmSetup, confirmInstall, confirmReady, confirmStart, confirmImport, confirmExport, confirmUnregister, confirmRestore, distro, summary, providerType, apiUrl, model, apiKey, apply, lines, port } = parseArgs(process.argv.slice(2));
   const root = getRoot(usbRoot);
 
   switch (action) {
@@ -532,6 +538,24 @@ async function main(): Promise<void> {
         console.log("ClawHermes-USB services started:");
         for (const id of result.started) console.log(`- ${id}`);
         console.log(`Portal target: ${result.portal.url}`);
+      }
+      return;
+    }
+    case "control-server": {
+      const result = startControlServer(root, { port });
+      if (json) {
+        printJson(result);
+      } else {
+        console.log(`ClawHermes-USB control server: ${result.url}`);
+      }
+      return;
+    }
+    case "control-server-stop": {
+      const result = stopControlServer(root);
+      if (json) {
+        printJson(result);
+      } else {
+        console.log(result.stopped ? "ClawHermes-USB control server stopped." : "ClawHermes-USB control server was not running.");
       }
       return;
     }

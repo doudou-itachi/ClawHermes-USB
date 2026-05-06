@@ -51,28 +51,8 @@ function httpAdapterHealth(adapter) {
 }
 function probeHttpHealth(url, timeoutSeconds) {
     const timeoutMs = Math.max(1, Math.min(timeoutSeconds, 60)) * 1000;
-    const script = [
-        "$utf8NoBom = New-Object System.Text.UTF8Encoding $false",
-        "[Console]::OutputEncoding = $utf8NoBom",
-        "$OutputEncoding = $utf8NoBom",
-        "$ProgressPreference = 'SilentlyContinue'",
-        `$timeoutMs = ${timeoutMs}`,
-        `$request = [System.Net.WebRequest]::Create('${escapePowerShellSingleQuoted(url)}')`,
-        "$request.Method = 'GET'",
-        "$request.Timeout = $timeoutMs",
-        "try {",
-        "  $response = $request.GetResponse()",
-        "  [pscustomobject]@{ ok = ($response.StatusCode -ge 200 -and $response.StatusCode -lt 400); statusCode = [int]$response.StatusCode; error = $null } | ConvertTo-Json -Compress",
-        "} catch {",
-        "  $statusCode = $null",
-        "  if ($_.Exception.Response -and $_.Exception.Response.StatusCode) { $statusCode = [int]$_.Exception.Response.StatusCode }",
-        "  [pscustomobject]@{ ok = $false; statusCode = $statusCode; error = $_.Exception.Message } | ConvertTo-Json -Compress",
-        "} finally {",
-        "  if ($response) { $response.Close() }",
-        "}",
-    ].join("; ");
     try {
-        const output = execPowerShell(script, timeoutMs + 1000).trim();
+        const output = execNodeHealthProbe(url, timeoutMs).trim();
         const parsed = JSON.parse(output);
         if (parsed.ok === true) {
             return { ready: true, statusCode: parsed.statusCode ?? null, reason: `HTTP health endpoint responded with ${parsed.statusCode}.` };
@@ -87,17 +67,25 @@ function probeHttpHealth(url, timeoutSeconds) {
         return { ready: false, statusCode: null, reason: `HTTP health endpoint is unreachable: ${message}.` };
     }
 }
-function execPowerShell(script, timeout) {
-    const powershell = process.env.CLAWHERMES_POWERSHELL_EXE || "powershell";
-    const args = ["-NoProfile", "-Command", script];
-    const lower = powershell.toLowerCase();
-    if (lower.endsWith(".cmd") || lower.endsWith(".bat")) {
-        return (0, node_child_process_1.execFileSync)("cmd", ["/d", "/c", powershell, ...args], { encoding: "utf8", timeout });
-    }
-    return (0, node_child_process_1.execFileSync)(powershell, args, { encoding: "utf8", timeout });
-}
-function escapePowerShellSingleQuoted(value) {
-    return value.replaceAll("'", "''");
+function execNodeHealthProbe(url, timeoutMs) {
+    const script = [
+        "const url = process.argv[1];",
+        "const timeoutMs = Number(process.argv[2]);",
+        "const client = url.startsWith('https:') ? require('node:https') : require('node:http');",
+        "const finish = (payload) => { console.log(JSON.stringify(payload)); };",
+        "const request = client.request(url, { method: 'GET', timeout: timeoutMs }, (response) => {",
+        "  response.resume();",
+        "  response.on('end', () => finish({ ok: response.statusCode >= 200 && response.statusCode < 400, statusCode: response.statusCode ?? null, error: null }));",
+        "});",
+        "request.on('timeout', () => request.destroy(new Error('request timed out')));",
+        "request.on('error', (error) => finish({ ok: false, statusCode: null, error: error.message }));",
+        "request.end();",
+    ].join("");
+    return (0, node_child_process_1.execFileSync)(process.execPath, ["-e", script, url, String(timeoutMs)], {
+        encoding: "utf8",
+        timeout: timeoutMs + 1000,
+        windowsHide: true,
+    });
 }
 function processExists(pid) {
     if (!Number.isInteger(pid) || pid <= 0)

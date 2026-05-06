@@ -148,7 +148,7 @@ function portAvailable(port) {
 }
 function tcpPortListed(port) {
     try {
-        const output = (0, node_child_process_1.execFileSync)("netstat", ["-ano", "-p", "tcp"], { encoding: "utf8", timeout: 3000 });
+        const output = (0, node_child_process_1.execFileSync)("netstat", ["-ano", "-p", "tcp"], { encoding: "utf8", timeout: 3000, windowsHide: true });
         const pattern = new RegExp(`(?:^|\\s)(?:127\\.0\\.0\\.1|0\\.0\\.0\\.0|\\[?::1\\]?|\\[?::\\]?):${port}\\s+[^\\r\\n]*\\sLISTENING\\s`, "im");
         return pattern.test(output);
     }

@@ -24,6 +24,20 @@ launcher/windows/ClawHermes-Control.vbs
 launcher/windows/ClawHermes-Control.bat
 ```
 
+新的 PyQt 控制面板源码位于：
+
+```text
+launcher/pyqt/clawhermes_control.py
+```
+
+它在打开时会启动或复用本地控制服务，并通过 `127.0.0.1` 上的 JSON API 完成状态检测、启动停止、模型配置和日志读取。打包 EXE 时运行：
+
+```powershell
+launcher/pyqt/build.ps1
+```
+
+本地 Windows 原生验证已通过：OpenClaw 使用提交 `82c4fd8f56751faa03470e32f4763b7245c69b71`，Hermes Agent 使用提交 `f27fcb6a82b8487174ca941c15e7a5887371eede`；两者均可通过控制服务启动、健康检查和停止。
+
 ## 本地开发
 
 开发者 clone 仓库后，先安装依赖并构建核心：
@@ -51,10 +65,10 @@ launcher/windows/ClawHermes-Control.vbs
 - `apps/hermes-agent`
 - `apps/hermes-web-ui`
 - `runtimes/`
-- WSL rootfs 或 WSL 备份 payload
+- 可选的 WSL rootfs 或 WSL 备份 payload（仅在交付 WSL 适配路径时需要）
 - `core/node/dist`
 
-U 盘速度会影响启动和运行体验，尤其是 WSL 文件系统、`node_modules`、SQLite 数据、日志和缓存。建议使用 USB 3.x 高速 U 盘或移动 SSD，并尽量交付预构建产物，不在 U 盘上做依赖安装。
+U 盘速度会影响启动和运行体验，尤其是 `node_modules`、Python 虚拟环境、SQLite 数据、日志和缓存。建议使用 USB 3.x 高速 U 盘或移动 SSD，并尽量交付预构建产物，不在 U 盘上做依赖安装。
 
 完整交付说明见：
 
@@ -68,8 +82,8 @@ launcher/   面向用户的 Windows 启动脚本和 GUI 入口
 core/       ClawHermes 自己的 Node/TypeScript 编排核心
 adapters/   服务适配器描述，定义 OpenClaw、Hermes 等如何启动和检查
 apps/       上游应用 payload，交付版建议放预构建产物而不是源码工作树
-runtimes/   便携 Node、Python、Git、WSL rootfs 等运行时 payload
-data/       用户配置、日志、缓存、会话、备份和 WSL 导入数据
+runtimes/   便携 Node、Python、Git，以及可选 WSL rootfs 等运行时 payload
+data/       用户配置、日志、缓存、会话、备份，以及可选 WSL 导入数据
 docs/       产品、架构、开发和交付文档
 ```
 
@@ -77,6 +91,8 @@ docs/       产品、架构、开发和交付文档
 
 ```powershell
 node core/node/dist/clawhermes.js setup --json
+node core/node/dist/clawhermes.js control-server --port 0 --json
+node core/node/dist/clawhermes.js control-server-stop --json
 node core/node/dist/clawhermes.js status --json
 node core/node/dist/clawhermes.js start --json
 node core/node/dist/clawhermes.js stop --json

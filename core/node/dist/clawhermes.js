@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const core_1 = require("./core");
+const control_server_1 = require("./control-server");
 function parseArgs(argv) {
     const args = [...argv];
     const action = args.shift() ?? "setup";
@@ -29,6 +30,7 @@ function parseArgs(argv) {
     let apiKey;
     let apply;
     let lines = 50;
+    let port = 17100;
     for (let index = 0; index < args.length; index += 1) {
         const arg = args[index];
         if ((arg === "--usb-root" || arg === "-UsbRoot") && args[index + 1]) {
@@ -115,11 +117,15 @@ function parseArgs(argv) {
             lines = Number(args[index + 1]);
             index += 1;
         }
+        else if (arg === "--port" && args[index + 1]) {
+            port = Number(args[index + 1]);
+            index += 1;
+        }
         else {
             positional.push(arg);
         }
     }
-    return { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, confirmCheckout, confirmSetup, confirmInstall, confirmReady, confirmStart, confirmImport, confirmExport, confirmUnregister, confirmRestore, distro, summary, providerType, apiUrl, model, apiKey, apply, lines };
+    return { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, confirmCheckout, confirmSetup, confirmInstall, confirmReady, confirmStart, confirmImport, confirmExport, confirmUnregister, confirmRestore, distro, summary, providerType, apiUrl, model, apiKey, apply, lines, port };
 }
 function optionValue(value) {
     return Boolean(value) && !value.startsWith("-");
@@ -133,7 +139,7 @@ function printJson(value) {
     process.stdout.write(`${JSON.stringify(value, null, 2)}\n`);
 }
 async function main() {
-    const { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, confirmCheckout, confirmSetup, confirmInstall, confirmReady, confirmStart, confirmImport, confirmExport, confirmUnregister, confirmRestore, distro, summary, providerType, apiUrl, model, apiKey, apply, lines } = parseArgs(process.argv.slice(2));
+    const { action, positional, usbRoot, json, archive, sha256, profile, includeLogs, dryRun, confirmCheckout, confirmSetup, confirmInstall, confirmReady, confirmStart, confirmImport, confirmExport, confirmUnregister, confirmRestore, distro, summary, providerType, apiUrl, model, apiKey, apply, lines, port } = parseArgs(process.argv.slice(2));
     const root = (0, core_1.getRoot)(usbRoot);
     switch (action) {
         case "env-json":
@@ -595,6 +601,26 @@ async function main() {
                 for (const id of result.started)
                     console.log(`- ${id}`);
                 console.log(`Portal target: ${result.portal.url}`);
+            }
+            return;
+        }
+        case "control-server": {
+            const result = (0, control_server_1.startControlServer)(root, { port });
+            if (json) {
+                printJson(result);
+            }
+            else {
+                console.log(`ClawHermes-USB control server: ${result.url}`);
+            }
+            return;
+        }
+        case "control-server-stop": {
+            const result = (0, control_server_1.stopControlServer)(root);
+            if (json) {
+                printJson(result);
+            }
+            else {
+                console.log(result.stopped ? "ClawHermes-USB control server stopped." : "ClawHermes-USB control server was not running.");
             }
             return;
         }

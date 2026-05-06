@@ -1,6 +1,5 @@
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory = $true)]
     [string] $OutputRoot,
 
     [string] $UsbRoot,
@@ -9,7 +8,13 @@ param(
 
     [switch] $IncludeData,
 
-    [switch] $NoPayloads
+    [switch] $NoPayloads,
+
+    [switch] $SkipBuild,
+
+    [switch] $NoStop,
+
+    [switch] $NoBundleHostRuntimes
 )
 
 $ErrorActionPreference = "Stop"
@@ -166,28 +171,171 @@ function Copy-ReleasePath {
     }
 }
 
-function New-RootLauncher {
+function Copy-PyQtControlToRoot {
     param([Parameter(Mandatory = $true)][string] $ReleaseRoot)
 
-    $localizedStart = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String("5ZCv5Yqo"))
-    $launcherPath = Join-Path $ReleaseRoot ($localizedStart + " ClawHermes.vbs")
-    $content = @'
-Set shell = CreateObject("WScript.Shell")
-Set fso = CreateObject("Scripting.FileSystemObject")
-root = fso.GetParentFolderName(WScript.ScriptFullName)
-target = root & "\launcher\windows\ClawHermes-Control.vbs"
-shell.Run Chr(34) & target & Chr(34), 1, False
-'@
-    Write-Utf8File -Path $launcherPath -Value $content
+    $pyqtDist = Join-Path $script:SourceRoot "launcher\pyqt\dist\ClawHermes-Control"
+    $pyqtExe = Join-Path $pyqtDist "ClawHermes-Control.exe"
+    if (-not (Test-Path -LiteralPath $pyqtExe -PathType Leaf)) {
+        throw "PyQt control executable is missing: $pyqtExe. Run launcher\pyqt\build.ps1 or build this release without -SkipBuild."
+    }
+
+    Copy-Tree -Source $pyqtDist -Destination $ReleaseRoot
+    $script:CopiedPaths += [ordered]@{
+        path = "ClawHermes-Control.exe"
+        source = $pyqtExe
+        target = (Join-Path $ReleaseRoot "ClawHermes-Control.exe")
+    }
 }
 
 function New-QuickStart {
     param([Parameter(Mandatory = $true)][string] $ReleaseRoot)
 
     $quickStartPath = Join-Path $ReleaseRoot "START_HERE.txt"
-    $quickStartBase64 = "Q2xhd0hlcm1lcy1VU0Ig5Lqk5LuY5YyFCgrnu5nmma7pgJrnlKjmiLfvvJoKMS4g5Y+M5Ye74oCc5ZCv5YqoIENsYXdIZXJtZXMudmJz4oCd5omT5byA5Zu+5b2i5o6n5Yi25Lit5b+D44CCCjIuIOesrOS4gOasoeS9v+eUqOWFiOeCueKAnOWuieijheWQkeWvvOKAne+8jOehruiupCBXU0wg5ZKM6L+Q6KGM5pe25bey5YeG5aSH5aW944CCCjMuIOWcqOKAnOaooeWei+mFjee9ruKAneWhq+WGmSBBUEkgVVJM44CB5qih5Z6L5ZCN56ew5ZKMIEFQSSBLZXnjgIIKNC4g54K54oCc5ZCv5Yqo5pyN5Yqh4oCd77yM5YaN54K54oCc5omT5byA55WM6Z2i4oCd6L+b5YWlIE9wZW5DbGF3IOaIliBIZXJtZXMgV2ViIFVJ44CCCjUuIOeUqOWujOWQjueCueKAnOWBnOatouacjeWKoeKAneOAggoK57uZ5Lqk5LuY5Lq65ZGY77yaCi0g5pys55uu5b2V55SxIHNjcmlwdHMvcmVsZWFzZS9CdWlsZC1Vc2JSZWxlYXNlLnBzMSDnlJ/miJDjgIIKLSByZWxlYXNlLW1hbmlmZXN0Lmpzb24g6K6w5b2V5LqG5p2l5rqQ44CB6KOB5Ymq6KeE5YiZ5ZKMIHBheWxvYWQg5YiX6KGo44CCCi0g5LiN6KaB6K6p5pmu6YCa55So5oi35ZyoIFUg55uY5LiK6L+Q6KGMIG5wbSBpbnN0YWxs44CBcG5wbSBpbnN0YWxs44CBcGlwIGluc3RhbGwg5oiWIHV2IHN5bmPjgII="
-    $content = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($quickStartBase64))
+    $content = @'
+ClawHermes-USB 交付包
+
+普通用户：
+1. 双击本目录下的 ClawHermes-Control.exe。
+2. 控制面板会自动拉起本地控制服务。
+3. 在控制面板里配置 API URL、模型名称和 API Key。
+4. 点击 Start 启动 OpenClaw、Hermes Agent、Hermes Web UI 和 Portal。
+5. 使用完成后点击 Stop，或关闭控制面板。
+
+交付说明：
+- release-manifest.json 记录来源目录、入口策略、payload 列表和裁剪规则。
+- 根目录只开放 PyQt 控制面板入口；内部 Node/Python/PowerShell 文件由控制面板调用。
+- 如果 manifest 提示 portable runtime missing，需要在交付前补齐 runtimes/windows/node 和 runtimes/windows/python，或确保目标机器 PATH 中已有对应运行时。
+'@
     Write-Utf8File -Path $quickStartPath -Value $content
+}
+
+function Invoke-ReleaseCommand {
+    param(
+        [Parameter(Mandatory = $true)][string] $Title,
+        [Parameter(Mandatory = $true)][string] $FilePath,
+        [Parameter(Mandatory = $true)][string[]] $Arguments,
+        [Parameter(Mandatory = $true)][string] $WorkingDirectory
+    )
+
+    Write-Output "==> $Title"
+    Push-Location $WorkingDirectory
+    try {
+        $commandLine = (@($FilePath) + $Arguments | ForEach-Object { ConvertTo-CmdArgument $_ }) -join " "
+        & cmd.exe /d /c $commandLine
+        if ($LASTEXITCODE -ne 0) {
+            throw "$Title failed with exit code $LASTEXITCODE."
+        }
+    } finally {
+        Pop-Location
+    }
+}
+
+function ConvertTo-CmdArgument {
+    param([Parameter(Mandatory = $true)][string] $Value)
+
+    if ($Value -notmatch '[\s"`&|<>^]') {
+        return $Value
+    }
+    return '"' + ($Value -replace '"', '\"') + '"'
+}
+
+function Stop-LocalControlServices {
+    $metadataPath = Join-Path $script:SourceRoot "data\tmp\control-server.json"
+    if (-not (Test-Path -LiteralPath $metadataPath -PathType Leaf)) {
+        return
+    }
+
+    try {
+        $metadata = Get-Content -LiteralPath $metadataPath -Raw | ConvertFrom-Json
+        $baseUrl = ([string] $metadata.url).TrimEnd("/")
+        if ([string]::IsNullOrWhiteSpace($baseUrl)) {
+            return
+        }
+        Invoke-RestMethod -Method Post -Uri "$baseUrl/api/services/stop" -Body "{}" -ContentType "application/json" -TimeoutSec 5 | Out-Null
+        Invoke-RestMethod -Method Post -Uri "$baseUrl/api/shutdown" -Body "{}" -ContentType "application/json" -TimeoutSec 5 | Out-Null
+        Start-Sleep -Seconds 1
+    } catch {
+        $script:Warnings += "Could not stop existing control server cleanly: $($_.Exception.Message)"
+    }
+}
+
+function Invoke-ReleaseBuilds {
+    if (Test-Path -LiteralPath (Join-Path $script:SourceRoot "package.json") -PathType Leaf) {
+        Invoke-ReleaseCommand -Title "Build ClawHermes Node control core" -FilePath "npm" -Arguments @("run", "build") -WorkingDirectory $script:SourceRoot
+    }
+
+    $webUiRoot = Join-Path $script:SourceRoot "apps\hermes-web-ui"
+    if (Test-Path -LiteralPath (Join-Path $webUiRoot "package.json") -PathType Leaf) {
+        Invoke-ReleaseCommand -Title "Build Hermes Web UI with local Windows fixes" -FilePath "npm" -Arguments @("run", "build") -WorkingDirectory $webUiRoot
+    }
+
+    $pyqtBuild = Join-Path $script:SourceRoot "launcher\pyqt\build.ps1"
+    if (Test-Path -LiteralPath $pyqtBuild -PathType Leaf) {
+        Invoke-ReleaseCommand -Title "Build PyQt control executable" -FilePath "powershell" -Arguments @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $pyqtBuild) -WorkingDirectory $script:SourceRoot
+    }
+}
+
+function Copy-HostRuntimesIfMissing {
+    if (-not (Test-Path -LiteralPath (Join-Path $script:TargetRoot "runtimes\windows\node\node.exe") -PathType Leaf)) {
+        Copy-HostNodeRuntime
+    }
+    if (-not (Test-Path -LiteralPath (Join-Path $script:TargetRoot "runtimes\windows\python\python.exe") -PathType Leaf)) {
+        Copy-HostPythonRuntime
+    }
+}
+
+function Copy-HostNodeRuntime {
+    $command = Get-Command node.exe -ErrorAction SilentlyContinue
+    if ($null -eq $command) {
+        $script:Warnings += "Host node.exe was not found; release will require Node.js on the target PATH."
+        return
+    }
+
+    $source = [string] $command.Source
+    $target = Join-Path $script:TargetRoot "runtimes\windows\node\node.exe"
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $target) | Out-Null
+    Copy-Item -LiteralPath $source -Destination $target -Force
+    $script:CopiedPaths += [ordered]@{
+        path = "runtimes/windows/node/node.exe"
+        source = $source
+        target = $target
+    }
+}
+
+function Copy-HostPythonRuntime {
+    $command = Get-Command python.exe -ErrorAction SilentlyContinue
+    if ($null -eq $command) {
+        $script:Warnings += "Host python.exe was not found; release will require Python on the target PATH."
+        return
+    }
+
+    $sourceRoot = Split-Path -Parent ([string] $command.Source)
+    $targetRoot = Join-Path $script:TargetRoot "runtimes\windows\python"
+    New-Item -ItemType Directory -Force -Path $targetRoot | Out-Null
+
+    foreach ($name in @("DLLs", "Lib", "libs")) {
+        $source = Join-Path $sourceRoot $name
+        if (Test-Path -LiteralPath $source) {
+            $excluded = @("__pycache__", "test", "tests")
+            if ($name -eq "Lib") {
+                $excluded += @("site-packages")
+            }
+            Copy-Tree -Source $source -Destination (Join-Path $targetRoot $name) -ExcludedDirectoryNames $excluded -ExcludedFileNames @("*.pyc", "*.pyo")
+        }
+    }
+
+    foreach ($pattern in @("python.exe", "pythonw.exe", "python3*.dll", "python*.dll", "vcruntime*.dll", "LICENSE.txt")) {
+        foreach ($file in Get-ChildItem -LiteralPath $sourceRoot -Filter $pattern -File -ErrorAction SilentlyContinue) {
+            Copy-Item -LiteralPath $file.FullName -Destination (Join-Path $targetRoot $file.Name) -Force
+        }
+    }
+
+    $script:CopiedPaths += [ordered]@{
+        path = "runtimes/windows/python"
+        source = $sourceRoot
+        target = $targetRoot
+    }
 }
 
 if ([string]::IsNullOrWhiteSpace($UsbRoot)) {
@@ -195,6 +343,9 @@ if ([string]::IsNullOrWhiteSpace($UsbRoot)) {
 }
 
 $script:SourceRoot = Resolve-FullPath $UsbRoot
+if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
+    $OutputRoot = Join-Path $script:SourceRoot "dist-usb\ClawHermes"
+}
 $script:TargetRoot = Resolve-FullPath $OutputRoot
 $script:CopiedPaths = @()
 $script:AppPayloads = @()
@@ -209,8 +360,12 @@ if ($script:TargetRoot.Equals($script:SourceRoot, [System.StringComparison]::Ord
     throw "OutputRoot must be different from UsbRoot."
 }
 
-if (Test-IsSubPath -Candidate $script:TargetRoot -Parent $script:SourceRoot) {
-    throw "OutputRoot must not be inside UsbRoot, otherwise the release copy can recursively include itself."
+if (-not $NoStop) {
+    Stop-LocalControlServices
+}
+
+if (-not $SkipBuild) {
+    Invoke-ReleaseBuilds
 }
 
 if ((Test-Path -LiteralPath $script:TargetRoot) -and $Clean) {
@@ -224,8 +379,6 @@ if ((Test-Path -LiteralPath $script:TargetRoot) -and -not $Clean) {
 New-Item -ItemType Directory -Force -Path $script:TargetRoot | Out-Null
 
 $runtimePaths = @(
-    "launcher",
-    "core/windows",
     "core/node/dist",
     "adapters",
     "config",
@@ -237,17 +390,25 @@ foreach ($relativePath in $runtimePaths) {
     Copy-ReleasePath -RelativePath $relativePath
 }
 
+if (-not $NoBundleHostRuntimes) {
+    Copy-HostRuntimesIfMissing
+}
+
 $requiredPayloadFiles = @(
-    "core/node/dist/clawhermes.js",
-    "runtimes/windows/node/node.exe",
-    "runtimes/wsl/ubuntu-rootfs.tar",
-    "runtimes/wsl/ubuntu-rootfs.tar.sha256"
+    "core/node/dist/clawhermes.js"
 )
 
 foreach ($relativePath in $requiredPayloadFiles) {
     $targetPath = Join-Path $script:TargetRoot $relativePath
     if (-not (Test-Path -LiteralPath $targetPath -PathType Leaf)) {
         throw "Required release payload is missing: $relativePath. Prepare this artifact before building the USB release."
+    }
+}
+
+foreach ($relativePath in @("runtimes/windows/node/node.exe", "runtimes/windows/python/python.exe")) {
+    $targetPath = Join-Path $script:TargetRoot $relativePath
+    if (-not (Test-Path -LiteralPath $targetPath -PathType Leaf)) {
+        $script:Warnings += "Portable runtime is missing in release: $relativePath. The target machine must provide this runtime on PATH unless you install it before shipping."
     }
 }
 
@@ -337,7 +498,7 @@ if (-not $NoPayloads) {
     }
 }
 
-New-RootLauncher -ReleaseRoot $script:TargetRoot
+Copy-PyQtControlToRoot -ReleaseRoot $script:TargetRoot
 New-QuickStart -ReleaseRoot $script:TargetRoot
 
 $manifest = [ordered]@{
@@ -348,6 +509,13 @@ $manifest = [ordered]@{
     outputRoot = $script:TargetRoot
     includeData = [bool] $IncludeData
     payloadsIncluded = -not [bool] $NoPayloads
+    entryPoint = "ClawHermes-Control.exe"
+    rootEntrypointPolicy = "Only the PyQt control executable is placed at the release root. Legacy VBS/PowerShell launchers are not exposed as root entrypoints."
+    build = [ordered]@{
+        skipped = [bool] $SkipBuild
+        stoppedExistingServices = -not [bool] $NoStop
+        bundledHostRuntimes = -not [bool] $NoBundleHostRuntimes
+    }
     appPayloadPolicy = [ordered]@{
         purpose = "Copy runnable upstream payloads while removing checkout metadata, tests, examples, caches, and unsafe reparse points."
         excludedDirectoryNames = $appExcludedDirectoryNames
