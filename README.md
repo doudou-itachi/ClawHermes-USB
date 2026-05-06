@@ -17,7 +17,7 @@ Implemented:
 - USB root detection from launcher location.
 - Process-local portable environment variables.
 - Runtime, path, port, adapter, env-file, and readiness diagnostics.
-- Read-only setup wizard that orders diagnostics, runtime preparation, WSL2, env files, payload packaging, adapter setup, verification, backup, and release steps.
+- Read-only setup wizard that orders diagnostics, runtime preparation, env files, optional WSL2 workflows, payload packaging, adapter setup, verification, backup, and release steps.
 - Adapter descriptor loading and dependency ordering.
 - Placeholder service start/status/stop with logs and PID metadata.
 - Managed process launch for production-ready adapters.
@@ -26,15 +26,19 @@ Implemented:
 - Unified local gateway/auth token defaults set to `clawhermes` for OpenClaw, Hermes Agent, and Hermes Web UI.
 - Portable backup command that writes timestamped zip archives under `data/backups/`.
 - Read-only restore planning and guarded no-overwrite restore execution for backup archives.
-- Verified WSL2 adapter path for Hermes Agent using the project-managed `ClawHermes-Ubuntu` distro and `http://127.0.0.1:8642/health`.
-- Verified WSL2 adapter path for OpenClaw using Node.js 24, pnpm 10.33.2, project-local state/log paths, and `http://127.0.0.1:18789/healthz`.
+- Windows-native verified adapter path for Hermes Agent using a project-local Python virtual environment and `http://127.0.0.1:8642/health`.
+- Windows-native verified adapter path for OpenClaw using Node.js, pnpm, project-local state/log paths, and `http://127.0.0.1:18789/healthz`.
+- Local control service for desktop clients at `127.0.0.1` with JSON APIs for status, install diagnostics, logs, model configuration, service start/stop, and shutdown.
+- PyQt control panel scaffold under `launcher/pyqt/` that starts or reuses the local control service when opened.
+- Optional WSL2 diagnostics, import/export, and unregister workflows remain available for adapters or operators that still need WSL.
 - Project-local WSL export backups under `data/backups/wsl/`.
 - Read-only payload inventory for ignored app checkouts, WSL rootfs archives, and WSL backups.
 
 Not implemented yet:
 
 - Automatic download, vendoring, or installation of OpenClaw, Hermes Agent, or Hermes Web UI.
-- One-click packaging of the ignored upstream app payloads and WSL rootfs artifacts.
+- One-click packaging of the ignored upstream app payloads and optional WSL rootfs artifacts.
+- Final PyInstaller-built `ClawHermes-Control.exe` binary in source control; build it from `launcher/pyqt/build.ps1` when packaging a release.
 
 ## Quick Start
 
@@ -59,6 +63,12 @@ launcher/windows/Backup.bat
 
 For non-technical USB users, the recommended entry is `launcher/windows/ClawHermes-Control.vbs` because it opens the GUI without a console window. `launcher/windows/ClawHermes-Control.bat` remains as a compatibility launcher and delegates to the same VBS entry. The GUI control center opens as a single Windows window with left-side navigation for installation, service start/stop, OpenClaw Chat, Hermes Web UI, model configuration, logs, backup, repair/update, and light/dark/system theme switching. The GUI stores its preference in `data\settings\gui.json` and runs status/log/config commands asynchronously so the window remains responsive.
 
+The new PyQt control panel source lives under `launcher/pyqt/`. It starts a localhost control service on open, then communicates through `/api/status`, `/api/services/*`, `/api/model-config`, and `/api/logs`. Build the executable with:
+
+```powershell
+launcher/pyqt/build.ps1
+```
+
 Model configuration in the GUI asks for API URL / Base URL, model name, API key, and whether to apply the settings to OpenClaw, Hermes, or both. The shared core command stores the redacted user-facing status under `data/settings/model-config.json`, writes OpenClaw settings under `data/openclaw/openclaw.json`, and writes Hermes settings under `data/hermes/`.
 
 The numbered double-click launchers remain available as fallback actions when the GUI is unavailable.
@@ -82,7 +92,7 @@ launcher/windows/Tools-Repair-Or-Update-ClawHermes.bat
 
 `6-Uninstall-Host-WSL-ClawHermes.bat` is not part of normal use. It removes the managed WSL distro from the current Windows host after backup and explicit confirmation. `Tools-Repair-Or-Update-ClawHermes.bat` is for advanced maintenance and may require network access.
 
-The normal release path is offline-first: prepare portable runtimes, app payloads, and WSL artifacts before handing the USB drive to a user.
+The normal release path is offline-first: prepare portable runtimes and app payloads before handing the USB drive to a user. Prepare WSL artifacts only when you intentionally ship a WSL-based adapter path.
 
 `Start.bat` opens the local portal after a successful start. If port `17000` is occupied, the core selects a free local port and `Start.bat` opens the assigned URL from `data/tmp/ports.json`. All Windows Batch launchers forward the core command exit code.
 
@@ -114,6 +124,8 @@ node core/node/dist/clawhermes.js start-adapter hermes-web-ui --dry-run --json
 node core/node/dist/clawhermes.js verify-adapter hermes-web-ui --json
 node core/node/dist/clawhermes.js mark-adapter-ready hermes-web-ui --confirm-ready --summary "Verified locally" --json
 node core/node/dist/clawhermes.js start --json
+node core/node/dist/clawhermes.js control-server --port 0 --json
+node core/node/dist/clawhermes.js control-server-stop --json
 node core/node/dist/clawhermes.js status --json
 node core/node/dist/clawhermes.js logs openclaw --lines 50 --json
 node core/node/dist/clawhermes.js model-config --provider-type openai-compatible --api-url https://api.example.com/v1 --model demo-model --api-key sk-example --apply both --json
@@ -129,7 +141,7 @@ Run verification:
 npm test
 ```
 
-WSL2 note: `prepare-wsl` is guarded because enabling WSL2 and registering a Linux distribution modify the current Windows host. The command only prints a plan by default; real host preparation requires `--confirm-install`. WSL2 adapters run in `ClawHermes-Ubuntu`; rootfs/import/export planning uses `Ubuntu` as the source distro. Rootfs archives for `wsl-import-plan` are operator-managed payloads under `runtimes/wsl/`; see [WSL2 Rootfs Artifact Policy](docs/wsl-rootfs-artifacts.md).
+WSL2 note: WSL2 is no longer required for the default OpenClaw and Hermes Agent adapter metadata, but the guarded WSL workflow remains available. `prepare-wsl` is guarded because enabling WSL2 and registering a Linux distribution modify the current Windows host. The command only prints a plan by default; real host preparation requires `--confirm-install`. WSL2 adapters run in `ClawHermes-Ubuntu`; rootfs/import/export planning uses `Ubuntu` as the source distro. Rootfs archives for `wsl-import-plan` are operator-managed payloads under `runtimes/wsl/`; see [WSL2 Rootfs Artifact Policy](docs/wsl-rootfs-artifacts.md).
 
 Local auth note: the default portable env templates set OpenClaw gateway token, Hermes Agent API server key, and Hermes Web UI auth token to `clawhermes`. Change `config/env/*.env` before sharing a running instance beyond trusted localhost use.
 
@@ -176,4 +188,4 @@ ClawHermes-USB/
   docs/       Product and architecture documentation.
 ```
 
-Real OpenClaw, Hermes Agent, and Hermes Web UI integration paths are now verified. Large upstream checkouts, dependency folders, WSL rootfs archives, and WSL backups remain local ignored payloads rather than source files.
+OpenClaw and Hermes Agent now default to Windows-native verified adapters; Hermes Web UI remains a verified Windows Node adapter. The current local verification used OpenClaw `82c4fd8f56751faa03470e32f4763b7245c69b71` and Hermes Agent `f27fcb6a82b8487174ca941c15e7a5887371eede`. Large upstream checkouts, dependency folders, optional WSL rootfs archives, and WSL backups remain local ignored payloads rather than source files.

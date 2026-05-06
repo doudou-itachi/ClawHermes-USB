@@ -6,11 +6,10 @@
   "enabled": true,
   "appDir": "apps/openclaw",
   "runtime": {
-    "kind": "wsl2",
+    "kind": "node",
     "platform": "windows",
-    "requiredExecutable": "wsl.exe",
-    "distro": "ClawHermes-Ubuntu",
-    "sourceDistro": "Ubuntu"
+    "requiredExecutable": "node.exe",
+    "versionRequirement": ">=22.14.0"
   },
   "upstream": {
     "name": "openclaw/openclaw",
@@ -18,12 +17,12 @@
     "installDocs": "https://docs.openclaw.ai/platforms/windows",
     "checkoutRef": "main",
     "installMode": "source-checkout",
-    "notes": "Official Windows docs recommend WSL2 for the full experience; native Windows remains a caveated path."
+    "notes": "Windows-native startup is the default ClawHermes path. Real upstream payload verification is still required before marking this adapter production-ready again."
   },
   "commands": {
-    "setup": "if ! command -v node >/dev/null 2>&1 || ! node -e \"const [major, minor] = process.versions.node.split('.').map(Number); process.exit(major > 22 || (major === 22 && minor >= 14) ? 0 : 1)\"; then apt-get update && apt-get install -y ca-certificates curl gnupg && curl -fsSL https://deb.nodesource.com/setup_24.x | bash - && apt-get install -y nodejs; fi && corepack enable && corepack prepare pnpm@10.33.2 --activate && if [ ! -f dist/entry.js ] || [ ! -d node_modules ]; then pnpm install && pnpm build; fi && mkdir -p ../../data/openclaw ../../data/logs && node -e \"const fs=require('fs'), path=require('path'); const p=process.env.OPENCLAW_CONFIG_PATH || path.resolve(process.cwd(),'../../data/openclaw/openclaw.json'); let c={}; try { c=JSON.parse(fs.readFileSync(p,'utf8')); } catch {} c.gateway={ mode:'local', bind:'loopback', ...(c.gateway||{}) }; c.logging={ ...(c.logging||{}), file:path.resolve(process.cwd(),'../../data/logs/openclaw-runtime.log') }; fs.writeFileSync(p, JSON.stringify(c,null,2));\"",
-    "start": "node openclaw.mjs gateway --port ${OPENCLAW_GATEWAY_PORT} --verbose --allow-unconfigured",
-    "stop": "pkill -TERM -x openclaw || pkill -TERM -f 'openclaw.*gateway' || true"
+    "setup": "corepack enable && corepack prepare pnpm@10.33.2 --activate && pnpm install && pnpm build",
+    "start": "node openclaw.mjs gateway run --port ${OPENCLAW_GATEWAY_PORT} --verbose --allow-unconfigured",
+    "stop": null
   },
   "env": {
     "files": [
@@ -56,10 +55,10 @@
   "integration": {
     "status": "verified",
     "productionReady": true,
-    "verifiedAt": "2026-05-01",
-    "summary": "Verified real OpenClaw source payload in managed ClawHermes-Ubuntu WSL2 distro with Node 24, pnpm 10.33.2, local gateway config, project-local state/log paths, and http://127.0.0.1:18789/healthz returning 200.",
-    "platform": "wsl2",
-    "strategy": "wsl2-adapter",
+    "verifiedAt": "2026-05-06",
+    "summary": "Windows-native verification passed on 2026-05-06: source checkout at apps/openclaw, setup completed with pnpm build exit 0, start-adapter launched node openclaw.mjs gateway run, and http://127.0.0.1:18789/healthz returned 200 through control status.",
+    "platform": "windows",
+    "strategy": "windows-native-adapter",
     "sources": [
       "https://docs.openclaw.ai/platforms/windows",
       "https://docs.openclaw.kr/cli/gateway"

@@ -6,11 +6,10 @@
   "enabled": true,
   "appDir": "apps/hermes-agent",
   "runtime": {
-    "kind": "wsl2",
+    "kind": "python",
     "platform": "windows",
-    "requiredExecutable": "wsl.exe",
-    "distro": "ClawHermes-Ubuntu",
-    "sourceDistro": "Ubuntu"
+    "requiredExecutable": "python.exe",
+    "versionRequirement": ">=3.11.0"
   },
   "upstream": {
     "name": "NousResearch/hermes-agent",
@@ -18,12 +17,12 @@
     "installDocs": "https://hermes-agent.org/",
     "checkoutRef": "main",
     "installMode": "source-checkout",
-    "notes": "Official README says native Windows is not supported and Windows users should run Hermes Agent in WSL2."
+    "notes": "ClawHermes now prefers a Windows-native Python venv path when upstream payloads support it. Real Windows verification is still required before marking production-ready."
   },
   "commands": {
-    "setup": "tmp=$(mktemp) && sed 's/\\r$//' ./setup-hermes.sh > \"$tmp\" && printf 'n\\nn\\n' | bash \"$tmp\"; rc=$?; rm -f \"$tmp\"; exit $rc",
-    "start": "./venv/bin/hermes gateway run",
-    "stop": "pkill -TERM -f './venv/bin/hermes gateway run' || pkill -TERM -f 'hermes gateway run' || true"
+    "setup": "python -m venv .venv && .venv\\Scripts\\python.exe -m pip install --upgrade pip && .venv\\Scripts\\python.exe -m pip install -e .",
+    "start": "python -c \"from hermes_cli.main import main; raise SystemExit(main())\" gateway run",
+    "stop": null
   },
   "env": {
     "files": [
@@ -33,7 +32,10 @@
       "HERMES_HOME": "${USB_ROOT}/data/hermes",
       "API_SERVER_KEY": "clawhermes",
       "HOME": "${USB_ROOT}/data/home",
-      "USERPROFILE": "${USB_ROOT}/data/home"
+      "USERPROFILE": "${USB_ROOT}/data/home",
+      "PYTHONPATH": "${USB_ROOT}/apps/hermes-agent;${USB_ROOT}/apps/hermes-agent/.venv/Lib/site-packages",
+      "PYTHONNOUSERSITE": "1",
+      "PYTHONUTF8": "1"
     }
   },
   "dataDir": "data/hermes",
@@ -52,10 +54,10 @@
   "integration": {
     "status": "verified",
     "productionReady": true,
-    "verifiedAt": "2026-05-01",
-    "summary": "Verified on 2026-05-01 in project-managed ClawHermes-Ubuntu WSL2: setup-adapter completed, start-adapter launched ./venv/bin/hermes gateway run, and http://127.0.0.1:8642/health returned 200.",
-    "platform": "wsl2",
-    "strategy": "wsl2-adapter",
+    "verifiedAt": "2026-05-06",
+    "summary": "Windows-native verification passed on 2026-05-06: source checkout at apps/hermes-agent, Python 3.11 venv setup completed with pip install -e . exit 0, start-adapter launched .venv\\\\Scripts\\\\hermes.exe gateway run, and http://127.0.0.1:8642/health returned 200 through control status.",
+    "platform": "windows",
+    "strategy": "windows-native-adapter",
     "sources": [
       "https://hermes-agent.org/",
       "https://github.com/NousResearch/hermes-agent"

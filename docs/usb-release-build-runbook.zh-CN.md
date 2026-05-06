@@ -2,7 +2,74 @@
 
 本文面向其他开发者或交付人员，目标是说明：从 clone 下来的源码仓库开始，如何准备上游应用 payload、runtime 和 WSL rootfs，并生成可以复制到 U 盘的 ClawHermes-USB 交付内容。
 
-这不是普通用户文档。普通用户只需要双击交付包里的 `启动 ClawHermes.vbs`。
+这不是普通用户文档。当前交付包的普通用户入口是根目录下的 `ClawHermes-Control.exe`。
+
+## 2026-05-06 当前交付形态
+
+当前推荐交付形态已经切换为 PyQt EXE 控制面板入口：
+
+```text
+dist-usb/ClawHermes/ClawHermes-Control.exe
+```
+
+普通用户只需要双击 `ClawHermes-Control.exe`。这个 EXE 会在打开时启动或复用本地 control-server，再通过本机 `127.0.0.1` JSON API 完成状态检测、启动、停止、模型配置和日志读取。交付包根目录不再暴露 VBS/PowerShell 作为用户入口；这些内部脚本和 Node 控制服务只由 PyQt 控制面板间接调用。
+
+默认生成命令：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File scripts/release/Build-UsbRelease.ps1 `
+  -Clean
+```
+
+未显式传入 `-OutputRoot` 时，脚本输出到：
+
+```text
+dist-usb/ClawHermes
+```
+
+当前脚本会执行这些动作：
+
+- 停止已有本地 control-server 和托管服务，避免复制运行中的 pid/log 状态。
+- 构建 `core/node/dist`。
+- 重新构建 Hermes Web UI，确保 Windows 下 Terminal 不再回退到 `/bin/bash`。
+- 重新构建 PyQt `ClawHermes-Control.exe`。
+- 把 `ClawHermes-Control.exe` 和 PyInstaller `_internal/` 复制到交付包根目录。
+- 复制 OpenClaw、Hermes Agent、Hermes Web UI payload。
+- 复制或内置 `runtimes/windows/node/node.exe` 和 `runtimes/windows/python/python.exe`，使目标机器无需全局安装 Node/Python。
+- 写入 `release-manifest.json`，其中 `entryPoint` 应为 `ClawHermes-Control.exe`。
+
+当前已验证的本地交付输出：
+
+```text
+dist-usb/ClawHermes/
+  ClawHermes-Control.exe
+  _internal/
+  core/node/dist/
+  adapters/
+  config/
+  portal/
+  runtimes/windows/node/node.exe      # Node.js v24.15.0
+  runtimes/windows/python/python.exe  # Python 3.11.7
+  apps/openclaw/
+  apps/hermes-agent/
+  apps/hermes-web-ui/
+  data/
+  START_HERE.txt
+  release-manifest.json
+```
+
+验证命令示例：
+
+```powershell
+.\dist-usb\ClawHermes\runtimes\windows\node\node.exe --version
+.\dist-usb\ClawHermes\runtimes\windows\python\python.exe --version
+.\dist-usb\ClawHermes\runtimes\windows\node\node.exe `
+  .\dist-usb\ClawHermes\core\node\dist\clawhermes.js `
+  setup --usb-root .\dist-usb\ClawHermes --json
+```
+
+最终 smoke test 已使用交付包自己的 `node.exe` 启动整套服务，OpenClaw、Hermes Agent、Hermes Web UI 和 Portal 均返回 ready，然后通过 `stop` 停止，无残留进程。
 
 ## 总体原则
 
@@ -384,7 +451,8 @@ powershell -NoProfile -ExecutionPolicy Bypass `
 脚本会复制运行所需内容，并生成：
 
 ```text
-启动 ClawHermes.vbs
+ClawHermes-Control.exe
+_internal/
 START_HERE.txt
 release-manifest.json
 ```
@@ -448,7 +516,7 @@ robocopy D:\release\ClawHermes-USB E:\ClawHermes-USB /MIR
 
 在干净 Windows 机器上验收：
 
-1. 双击 `启动 ClawHermes.vbs`。
+1. 双击 `ClawHermes-Control.exe`。
 2. 打开“安装向导”，确认 WSL、runtime、payload 没有缺项。
 3. 打开“模型配置”，填写 API URL、模型名称和 API Key。
 4. 点击“启动服务”。
@@ -521,12 +589,13 @@ node core/node/dist/clawhermes.js setup-wizard --json
 ## 最终交付检查清单
 
 - `core/node/dist/clawhermes.js` 存在。
-- `launcher/windows/ClawHermes-Control.vbs` 存在。
-- `启动 ClawHermes.vbs` 存在。
+- `ClawHermes-Control.exe` 存在于交付包根目录。
+- `_internal/` 存在于交付包根目录。
 - `apps/openclaw` 是可运行 payload。
 - `apps/hermes-agent` 是可运行 payload。
 - `apps/hermes-web-ui` 是可运行 payload。
 - `runtimes/windows/node/node.exe` 可执行。
-- `runtimes/wsl/ubuntu-rootfs.tar` 和 `.sha256` 存在。
+- `runtimes/windows/python/python.exe` 可执行。
+- 如交付 WSL 路径，`runtimes/wsl/ubuntu-rootfs.tar` 和 `.sha256` 存在；当前 Windows-native 路径不要求 WSL rootfs。
 - `release-manifest.json` 已复核。
 - 干净 Windows 机器上完成 GUI 启动、模型配置、服务启动、界面打开、真实回复、停止和备份测试。

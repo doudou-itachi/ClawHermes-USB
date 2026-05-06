@@ -11,6 +11,120 @@ Update it whenever a milestone is completed, changed, blocked, or deferred.
 - `Blocked`: Waiting on external information or action.
 - `Deferred`: Intentionally postponed.
 
+## 2026-05-06
+
+### PyQt-Only USB Release With Bundled Windows Runtimes
+
+Status: `Done`
+
+Summary:
+
+- Updated the release packaging path so the generated USB delivery directory exposes `ClawHermes-Control.exe` as the only root entry point.
+- The PyQt executable is copied from `launcher/pyqt/dist/ClawHermes-Control/` to the release root together with its PyInstaller `_internal/` runtime files.
+- `scripts/release/Build-UsbRelease.ps1` now defaults to `dist-usb/ClawHermes` when no output path is supplied, stops any running local control services before copying, builds the Node control core, rebuilds Hermes Web UI, rebuilds the PyQt executable, and writes a manifest with the entry-point policy.
+- The release script can bundle Windows runtimes into `runtimes/windows/` so a target machine does not need global Node.js or Python installed.
+- Installed official Node.js `v24.15.0` under `runtimes/windows/node` and verified it satisfies OpenClaw (`>=22.14.0`) and Hermes Web UI (`>=23.0.0`).
+- Bundled Python `3.11.7` into the generated release under `runtimes/windows/python`.
+- Changed the Hermes Agent adapter start command away from `.venv\Scripts\hermes.exe` because that generated executable points back to the build machine's Python path. It now starts through portable Python with `PYTHONPATH` pointing at the Hermes source tree and `.venv/Lib/site-packages`.
+- Rebuilt the final local delivery output at `dist-usb/ClawHermes`.
+
+Final generated delivery directory:
+
+```text
+dist-usb/ClawHermes/
+  ClawHermes-Control.exe
+  _internal/
+  core/node/dist/
+  adapters/
+  config/
+  portal/
+  runtimes/windows/node/node.exe
+  runtimes/windows/python/python.exe
+  apps/openclaw/
+  apps/hermes-agent/
+  apps/hermes-web-ui/
+  data/
+  START_HERE.txt
+  release-manifest.json
+```
+
+Changed areas:
+
+- `.gitignore`
+- `adapters/hermes-agent/adapter.json`
+- `scripts/release/Build-UsbRelease.ps1`
+- `tests/test_windows_core.py`
+- `docs/PROGRESS.md`
+- `docs/usb-release-build-runbook.zh-CN.md`
+- `runtimes/windows/node` (operator-managed ignored payload)
+- `dist-usb/ClawHermes` (generated ignored delivery output)
+
+Validation performed:
+
+- `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/release/Build-UsbRelease.ps1 -OutputRoot E:\ClawHermes-USB\dist-usb\ClawHermes -Clean`
+- `dist-usb/ClawHermes/runtimes/windows/node/node.exe --version` returned `v24.15.0`.
+- `dist-usb/ClawHermes/runtimes/windows/python/python.exe --version` returned `Python 3.11.7`.
+- Release Python loaded `hermes_cli.main` through the adapter `PYTHONPATH`.
+- `dist-usb/ClawHermes/runtimes/windows/node/node.exe dist-usb/ClawHermes/core/node/dist/clawhermes.js setup --usb-root dist-usb/ClawHermes --json` reported Node and Python runtime requirements satisfied.
+- Full release smoke test using only release-local `node.exe` started OpenClaw, Hermes Agent, Hermes Web UI, and Portal; all four reported ready, then `stop` removed the test processes.
+- Targeted tests passed:
+  `test_usb_release_script_exposes_pyqt_as_only_root_entrypoint`,
+  `test_pyqt_control_panel_bootstraps_control_server_and_polls_status`.
+
+Notes:
+
+- Portable Git is still optional for the current no-install runtime path; it is only needed for update/checkout workflows on a target machine.
+- The release manifest still warns that some upstream app directories look source-like. These are retained because they are part of the current runtime payload and should be reviewed before external distribution.
+
+### Native PyQt Control Service Path
+
+Status: `Done`
+
+Summary:
+
+- Created branch `codex/native-pyqt-control`.
+- Reviewed `uxiaohan/vh-claw` at commit `6719096af358daa9aed2f4d8b1c8d27bc0978ad4` as an MIT-licensed reference for a thin desktop UI delegating runtime work to a backend manager.
+- Added a design spec and implementation plan for a PyQt control panel that starts or reuses a localhost Node control service.
+- Changed default OpenClaw and Hermes Agent adapter metadata from WSL2 to Windows-native verified paths.
+- Added `control-server` and `control-server-stop` CLI actions with JSON APIs for health, status, install diagnostics, logs, model configuration, all-service start/stop, single-service start/stop, and shutdown.
+- Added a PyQt6 scaffold under `launcher/pyqt/` plus a PyInstaller build script for `ClawHermes-Control.exe`.
+- Checked out real upstream payloads locally and verified Windows-native setup/start/health/stop:
+  OpenClaw `82c4fd8f56751faa03470e32f4763b7245c69b71` and Hermes Agent `f27fcb6a82b8487174ca941c15e7a5887371eede`.
+- Built the local PyInstaller output at `launcher/pyqt/dist/ClawHermes-Control/ClawHermes-Control.exe`.
+
+Changed areas:
+
+- `.gitignore`
+- `adapters/openclaw/adapter.json`
+- `adapters/hermes-agent/adapter.json`
+- `core/node/src/control-server.ts`
+- `core/node/src/core.ts`
+- `core/node/src/clawhermes.ts`
+- `core/windows/clawhermes.ps1`
+- `launcher/pyqt/`
+- `README.md`
+- `README.zh-CN.md`
+- `docs/PRD.md`
+- `docs/superpowers/specs/2026-05-06-native-pyqt-control-design.md`
+- `docs/superpowers/plans/2026-05-06-native-pyqt-control.md`
+- `tests/test_windows_core.py`
+
+Validation performed:
+
+- `npm run build`
+- Targeted unittest coverage for native adapter metadata, WSL fallback diagnostics, control server APIs, and PyQt scaffold checks.
+- `setup-adapter openclaw --confirm-setup --json` completed with exit code 0.
+- `setup-adapter hermes-agent --confirm-setup --json` completed with exit code 0.
+- `start-adapter openclaw --confirm-start --json` and `start-adapter hermes-agent --confirm-start --json` launched Windows-native processes.
+- Control service `/api/status` reported OpenClaw `http://127.0.0.1:18789/healthz` and Hermes `http://127.0.0.1:8642/health` as HTTP 200.
+- Control service `POST /api/services/{id}/stop` stopped both services and `/api/status` returned both to `stopped`.
+- `launcher/pyqt/build.ps1` produced `launcher/pyqt/dist/ClawHermes-Control/ClawHermes-Control.exe`.
+- `npm test` passed: 145 tests OK, 1 symlink privilege test skipped on this Windows host.
+
+Next steps:
+
+- Release packaging is now covered by the PyQt-only USB release milestone above. Future work should focus on optional portable Git/update workflows and reducing source-like upstream payload directories where license and runtime behavior allow it.
+
 ## 2026-05-02
 
 ### USB Release Build Runbook

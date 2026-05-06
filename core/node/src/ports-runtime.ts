@@ -161,7 +161,7 @@ function portAvailable(port: number): Promise<boolean> {
 
 function tcpPortListed(port: number): boolean {
   try {
-    const output = execFileSync("netstat", ["-ano", "-p", "tcp"], { encoding: "utf8", timeout: 3000 });
+    const output = execFileSync("netstat", ["-ano", "-p", "tcp"], { encoding: "utf8", timeout: 3000, windowsHide: true });
     const pattern = new RegExp(`(?:^|\\s)(?:127\\.0\\.0\\.1|0\\.0\\.0\\.0|\\[?::1\\]?|\\[?::\\]?):${port}\\s+[^\\r\\n]*\\sLISTENING\\s`, "im");
     return pattern.test(output);
   } catch {

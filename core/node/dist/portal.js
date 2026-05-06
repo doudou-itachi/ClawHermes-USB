@@ -307,33 +307,8 @@ function portalPidFile(usbRoot) {
 function portalServerPath(usbRoot) {
     return (0, node_path_1.join)((0, portable_1.getRoot)(usbRoot), "core", "node", "dist", "portal-server.js");
 }
-function portalProcesses(usbRoot) {
-    const root = (0, portable_1.getRoot)(usbRoot);
-    try {
-        const output = (0, node_child_process_1.execFileSync)("powershell", [
-            "-NoProfile",
-            "-Command",
-            "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*portal-server.js*' } | Select-Object ProcessId,CommandLine | ConvertTo-Json -Compress",
-        ], { encoding: "utf8" }).trim();
-        if (!output)
-            return [];
-        const parsed = JSON.parse(output);
-        const rows = Array.isArray(parsed) ? parsed : [parsed];
-        return rows.filter((row) => {
-            const item = row;
-            return (typeof item.ProcessId === "number" &&
-                typeof item.CommandLine === "string" &&
-                /\bnode(?:\.exe)?\b/i.test(item.CommandLine) &&
-                item.CommandLine.includes("portal-server.js") &&
-                item.CommandLine.includes(root));
-        });
-    }
-    catch {
-        return [];
-    }
-}
-function portalProcessById(usbRoot, pid) {
-    return portalProcesses(usbRoot).find((processInfo) => processInfo.ProcessId === pid) ?? null;
+function portalProcessById(_usbRoot, pid) {
+    return processExists(pid) ? { ProcessId: pid } : null;
 }
 async function tcpPortAvailable(port) {
     return new Promise((resolveAvailable) => {
@@ -385,13 +360,6 @@ async function startPortalServer(usbRoot, port = 17000) {
         }
         (0, node_fs_1.rmSync)(pidFile, { force: true });
     }
-    const existingProcess = portalProcesses(root)[0];
-    if (existingProcess) {
-        const metadata = portalMetadata(root, existingProcess.ProcessId, url);
-        (0, node_fs_1.writeFileSync)(pidFile, JSON.stringify(metadata, null, 2), "utf8");
-        (0, portable_1.writeLog)(root, "portal", "INFO", `Reused existing portal server on ${url}.`);
-        return metadata;
-    }
     if (!(await tcpPortAvailable(port))) {
         throw new Error(`Port ${port} is already in use. Stop the conflicting process or change config/defaults/ports.json.`);
     }
@@ -423,18 +391,10 @@ function getPortalStatus(usbRoot) {
             status = "running";
             processId = metadata.processId;
         }
-        else if (portalProcesses(root).length > 0) {
-            status = "running";
-            processId = portalProcesses(root)[0]?.ProcessId ?? null;
-        }
         else {
             (0, node_fs_1.rmSync)(pidFile, { force: true });
             status = "stopped";
         }
-    }
-    else if (portalProcesses(root).length > 0) {
-        status = "running";
-        processId = portalProcesses(root)[0]?.ProcessId ?? null;
     }
     return {
         id: "portal",
@@ -464,16 +424,16 @@ function stopPortalServer(usbRoot) {
         }
         (0, node_fs_1.rmSync)(pidFile, { force: true });
     }
-    for (const processInfo of portalProcesses(root)) {
-        try {
-            (0, lifecycle_1.killProcessTree)(processInfo.ProcessId);
-            stopped = true;
-        }
-        catch {
-            // Already gone.
-        }
-    }
     if (stopped)
         (0, portable_1.writeLog)(root, "portal", "INFO", "Stopped portal server.");
     return stopped;
+}
+function processExists(pid) {
+    try {
+        process.kill(pid, 0);
+        return true;
+    }
+    catch {
+        return false;
+    }
 }

@@ -294,11 +294,17 @@ function isTcpPortAvailableSync(port) {
         return false;
     }
     try {
-        const output = (0, node_child_process_1.execFileSync)("powershell", [
-            "-NoProfile",
-            "-Command",
-            `$client = [System.Net.Sockets.TcpClient]::new(); $async = $client.BeginConnect('127.0.0.1', ${port}, $null, $null); if ($async.AsyncWaitHandle.WaitOne(200)) { try { $client.EndConnect($async); 'true' } catch { 'false' } } else { 'false' }; $client.Close()`,
-        ], { encoding: "utf8", timeout: 3000 }).trim();
+        const script = [
+            "const net = require('node:net');",
+            "const port = Number(process.argv[1]);",
+            "const socket = net.createConnection({ host: '127.0.0.1', port });",
+            "let done = false;",
+            "const finish = (connected) => { if (done) return; done = true; socket.destroy(); console.log(connected ? 'true' : 'false'); };",
+            "socket.setTimeout(200, () => finish(false));",
+            "socket.on('connect', () => finish(true));",
+            "socket.on('error', () => finish(false));",
+        ].join("");
+        const output = (0, node_child_process_1.execFileSync)(process.execPath, ["-e", script, String(port)], { encoding: "utf8", timeout: 3000, windowsHide: true }).trim();
         return output.toLowerCase() !== "true";
     }
     catch {
@@ -307,7 +313,7 @@ function isTcpPortAvailableSync(port) {
 }
 function tcpPortListedSync(port) {
     try {
-        const output = (0, node_child_process_1.execFileSync)("netstat", ["-ano", "-p", "tcp"], { encoding: "utf8", timeout: 3000 });
+        const output = (0, node_child_process_1.execFileSync)("netstat", ["-ano", "-p", "tcp"], { encoding: "utf8", timeout: 3000, windowsHide: true });
         const pattern = new RegExp(`(?:^|\\s)(?:127\\.0\\.0\\.1|0\\.0\\.0\\.0|\\[?::1\\]?|\\[?::\\]?):${port}\\s+[^\\r\\n]*\\sLISTENING\\s`, "im");
         return pattern.test(output);
     }

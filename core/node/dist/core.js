@@ -4,6 +4,7 @@ exports.wslUnregister = exports.wslRootfsGuide = exports.wslImportPlan = exports
 exports.wslWorkflowPlan = exports.wslUnregisterPlan = void 0;
 exports.startSkeleton = startSkeleton;
 exports.startSingleAdapter = startSingleAdapter;
+exports.stopSingleAdapter = stopSingleAdapter;
 exports.getStatus = getStatus;
 exports.stopSkeleton = stopSkeleton;
 const node_fs_1 = require("node:fs");
@@ -89,13 +90,16 @@ Object.defineProperty(exports, "wslUnregister", { enumerable: true, get: functio
 Object.defineProperty(exports, "wslUnregisterPlan", { enumerable: true, get: function () { return wsl_import_1.wslUnregisterPlan; } });
 var wsl_workflow_1 = require("./wsl-workflow");
 Object.defineProperty(exports, "wslWorkflowPlan", { enumerable: true, get: function () { return wsl_workflow_1.wslWorkflowPlan; } });
-async function startSkeleton(usbRoot) {
+async function startSkeleton(usbRoot, options = {}) {
     const root = (0, portable_1.getRoot)(usbRoot);
     const setup = (0, diagnostics_1.setupDiagnostics)(root);
     (0, diagnostics_1.writeSetupSnapshot)(root, setup);
     const started = [];
     const adapters = (0, adapters_1.serviceOrder)(root, "start").filter((item) => item.enabled);
-    const portState = await (0, ports_runtime_1.assignRuntimePorts)(root, adapters);
+    const existingPortState = (0, ports_runtime_1.readRuntimePortState)(root);
+    const portState = existingPortState && adapters.some((adapter) => adapterHasRunningPid(root, adapter))
+        ? existingPortState
+        : await (0, ports_runtime_1.assignRuntimePorts)(root, adapters);
     for (const sourceAdapter of adapters) {
         const adapter = (0, ports_runtime_1.applyRuntimePortsToAdapter)(sourceAdapter, portState);
         const serviceEnv = (0, ports_runtime_1.applyRuntimePortsToEnvironment)((0, environment_1.resolveServiceEnvironment)(root, adapter.id), portState);
@@ -104,13 +108,22 @@ async function startSkeleton(usbRoot) {
         if (wslPlan && adapter.integration?.productionReady === true) {
             (0, wsl_adapter_1.assertWslReadyForAdapterDistro)(root, adapter.id, adapter.runtime?.distro);
         }
-        (0, lifecycle_1.startAdapter)(root, adapter, wslPlan ? { processPlan: wslManagedProcessPlan(root, wslPlan), serviceEnv } : { serviceEnv });
+        (0, lifecycle_1.startAdapter)(root, adapter, wslPlan ? { processPlan: wslManagedProcessPlan(root, wslPlan), serviceEnv, attachToParent: options.attachManagedToParent === true } : { serviceEnv, attachToParent: options.attachManagedToParent === true });
         started.push(adapter.id);
     }
     (0, portal_1.generatePortal)(root, getStatus(root).services);
     const portal = await (0, portal_1.startPortalServer)(root, portState.portal.assignedPort);
     (0, status_1.writeStatusSnapshot)(root, getStatus(root));
     return { root, started, portal, setupMessages: setup.messages };
+}
+function adapterHasRunningPid(root, adapter) {
+    try {
+        const metadata = JSON.parse((0, node_fs_1.readFileSync)((0, portable_1.resolveRelative)(root, adapter.pidFile), "utf8"));
+        return metadata.placeholder === false && typeof metadata.processId === "number" && (0, status_1.processExists)(metadata.processId);
+    }
+    catch {
+        return false;
+    }
 }
 function startSingleAdapter(usbRoot, serviceId, options) {
     const root = (0, portable_1.getRoot)(usbRoot);
@@ -158,11 +171,26 @@ function startSingleAdapter(usbRoot, serviceId, options) {
             forceManaged: true,
             processPlan: wslManagedProcessPlan(root, wslPlan),
             serviceEnv,
+            attachToParent: options.attachManagedToParent === true,
         });
         return { ...result, started: true, metadata };
     }
-    const metadata = (0, lifecycle_1.startAdapter)(root, runtimeAdapter, { forceManaged: true, serviceEnv });
+    const metadata = (0, lifecycle_1.startAdapter)(root, runtimeAdapter, { forceManaged: true, serviceEnv, attachToParent: options.attachManagedToParent === true });
     return { ...result, started: true, metadata };
+}
+function stopSingleAdapter(usbRoot, serviceId) {
+    const root = (0, portable_1.getRoot)(usbRoot);
+    if (!serviceId)
+        throw new Error("Service id is required. Example: stop-adapter hermes-web-ui");
+    const adapter = (0, adapters_1.loadAdapters)(root).find((item) => item.id === serviceId);
+    if (!adapter)
+        throw new Error(`Unknown adapter: ${serviceId}`);
+    return {
+        root,
+        serviceId,
+        displayName: adapter.displayName,
+        stopped: (0, lifecycle_1.stopAdapter)(root, adapter),
+    };
 }
 function wslManagedProcessPlan(root, wslPlan) {
     const invocation = (0, wsl_1.wslExecutableInvocation)(wslPlan.executablePath, wslPlan.args);
@@ -269,5 +297,6 @@ function stopSkeleton(usbRoot) {
         if ((0, lifecycle_1.stopAdapter)(root, adapter))
             stopped.push(adapter.id);
     }
+    (0, node_fs_1.rmSync)((0, ports_runtime_1.runtimePortsPath)(root), { force: true });
     return { root, stopped };
 }
