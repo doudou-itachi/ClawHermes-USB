@@ -9,7 +9,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "npm run build && set PYTHONUTF8=1&& set PYTHONIOENCODING=utf-8&& python -m unittest tests.test_windows_core -v"
+    "test": "npm run build && set PYTHONUTF8=1&& set PYTHONIOENCODING=utf-8&& python -m unittest tests.test_windows_core tests.test_pyqt_ui_theme -v"
   },
   "repository": {
     "type": "git",
