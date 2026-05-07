@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { computed, h, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
+import { computed, h, onBeforeUnmount, onMounted, reactive, ref } from "vue";
 import { Electroview } from "electrobun/view";
 import type { BootstrapPayload, LogPayload, ModelConfig, ServiceStatus, StatusPayload } from "../shared/types";
-import product12Image from "./assets/product12.png";
 
 type IconName =
   | "home"
@@ -66,7 +65,6 @@ const IconGlyph = (props: { name: IconName }) =>
 const tabs: Array<{ id: string; label: string; icon: IconName; tone: string }> = [
   { id: "console", label: "控制台", icon: "home", tone: "sky" },
   { id: "models", label: "模型配置", icon: "bot", tone: "violet" },
-  { id: "services", label: "服务", icon: "plug", tone: "blue" },
   { id: "logs", label: "运行日志", icon: "terminal", tone: "emerald" },
   { id: "settings", label: "设置", icon: "service", tone: "amber" },
 ];
@@ -104,10 +102,7 @@ const closing = ref(false);
 const bootstrap = reactive<BootstrapPayload>({ root: "", controlUrl: "" });
 const model = reactive<ModelConfig>({ apiUrl: "", model: "", apiKey: "" });
 const selectedProviderId = ref("custom");
-const serviceParticles = ref<HTMLCanvasElement | null>(null);
 let timer: number | undefined;
-let particleFrame: number | undefined;
-let particleResizeHandler: (() => void) | undefined;
 
 function requestFromBun(name: string, payload: unknown = {}) {
   const requests = electrobun.rpc?.request as Record<string, (params: unknown) => Promise<unknown>> | undefined;
@@ -155,11 +150,6 @@ async function runAction(action: "startAll" | "stopAll") {
   }
 }
 
-async function useNow() {
-  activeTab.value = "console";
-  await runAction("startAll");
-}
-
 async function saveModel() {
   busy.value = true;
   try {
@@ -191,14 +181,6 @@ function selectedProvider() {
 function openProviderKeyPage() {
   const url = selectedProvider().keyUrl;
   if (url) requestFromBun("openUrl", { url });
-}
-
-function openContact() {
-  requestFromBun("openUrl", { url: "https://work.weixin.qq.com/kfid/kfcd0aac5881ee8d453" });
-}
-
-function openDtSite() {
-  requestFromBun("openUrl", { url: "https://digiteam.cn/" });
 }
 
 function openService(service: ServiceStatus) {
@@ -286,86 +268,6 @@ async function shutdown() {
   await requestFromBun("shutdown");
 }
 
-function initServiceParticles() {
-  stopServiceParticles();
-  const canvas = serviceParticles.value;
-  const parent = canvas?.parentElement;
-  if (!canvas || !parent) return;
-
-  const context = canvas.getContext("2d");
-  if (!context) return;
-
-  const particles = Array.from({ length: 58 }, () => ({
-    x: Math.random(),
-    y: Math.random(),
-    vx: (Math.random() - 0.5) * 0.00055,
-    vy: (Math.random() - 0.5) * 0.00055,
-  }));
-
-  const resize = () => {
-    const rect = parent.getBoundingClientRect();
-    const scale = Math.max(window.devicePixelRatio || 1, 1);
-    canvas.width = Math.max(1, Math.floor(rect.width * scale));
-    canvas.height = Math.max(1, Math.floor(rect.height * scale));
-    canvas.style.width = `${rect.width}px`;
-    canvas.style.height = `${rect.height}px`;
-    context.setTransform(scale, 0, 0, scale, 0, 0);
-  };
-
-  const draw = () => {
-    const width = canvas.clientWidth;
-    const height = canvas.clientHeight;
-    context.clearRect(0, 0, width, height);
-
-    particles.forEach((particle) => {
-      particle.x += particle.vx;
-      particle.y += particle.vy;
-      if (particle.x < 0 || particle.x > 1) particle.vx *= -1;
-      if (particle.y < 0 || particle.y > 1) particle.vy *= -1;
-    });
-
-    for (let i = 0; i < particles.length; i += 1) {
-      for (let j = i + 1; j < particles.length; j += 1) {
-        const a = particles[i];
-        const b = particles[j];
-        const ax = a.x * width;
-        const ay = a.y * height;
-        const bx = b.x * width;
-        const by = b.y * height;
-        const distance = Math.hypot(ax - bx, ay - by);
-        if (distance > 145) continue;
-        context.strokeStyle = `rgba(255,255,255,${0.28 * (1 - distance / 145)})`;
-        context.lineWidth = 1;
-        context.beginPath();
-        context.moveTo(ax, ay);
-        context.lineTo(bx, by);
-        context.stroke();
-      }
-    }
-
-    particles.forEach((particle) => {
-      context.fillStyle = "rgba(255,255,255,0.62)";
-      context.beginPath();
-      context.arc(particle.x * width, particle.y * height, 2, 0, Math.PI * 2);
-      context.fill();
-    });
-
-    particleFrame = window.requestAnimationFrame(draw);
-  };
-
-  resize();
-  particleResizeHandler = resize;
-  window.addEventListener("resize", resize);
-  particleFrame = window.requestAnimationFrame(draw);
-}
-
-function stopServiceParticles() {
-  if (particleFrame) window.cancelAnimationFrame(particleFrame);
-  particleFrame = undefined;
-  if (particleResizeHandler) window.removeEventListener("resize", particleResizeHandler);
-  particleResizeHandler = undefined;
-}
-
 onMounted(async () => {
   const data = (await requestFromBun("getBootstrap")) as BootstrapPayload;
   bootstrap.root = data.root;
@@ -374,18 +276,8 @@ onMounted(async () => {
   timer = window.setInterval(refresh, 1500);
 });
 
-watch(activeTab, async (tab) => {
-  if (tab !== "services") {
-    stopServiceParticles();
-    return;
-  }
-  await nextTick();
-  initServiceParticles();
-});
-
 onBeforeUnmount(() => {
   if (timer) window.clearInterval(timer);
-  stopServiceParticles();
 });
 </script>
 
@@ -522,68 +414,6 @@ onBeforeUnmount(() => {
           <button v-if="selectedProvider().keyUrl" class="ghost key-link" type="button" @click="openProviderKeyPage">获取 API Key</button>
           <button class="primary" :disabled="busy">保存模型</button>
         </form>
-      </section>
-
-      <section v-if="activeTab === 'services'" class="services-page">
-        <nav class="service-nav">
-          <div class="service-brand">
-            <strong>DTClaw</strong>
-            <span>双核版</span>
-          </div>
-          <div class="service-nav-links">
-            <a href="#service-overview">产品概述</a>
-            <a href="#service-core">核心功能</a>
-            <a href="#service-setup">快速启动</a>
-            <a href="#service-faq">常见问题</a>
-          </div>
-          <button class="service-nav-cta" type="button" @click="useNow">立即使用</button>
-        </nav>
-
-        <section class="service-hero">
-          <canvas ref="serviceParticles" class="service-particles" aria-hidden="true" />
-          <div class="service-hero-copy">
-            <h3>DTClaw 即插即用<br />龙虾双核版</h3>
-            <p>内置 OpenClaw 技能调优中文版和 Hermes 爱马仕智能体中文版，插入 U 盘即可从本地控制台启动、配置和管理。</p>
-            <div class="service-hero-actions">
-              <button class="dt-primary" type="button" @click="openContact">联系我们</button>
-              <button class="dt-secondary" type="button" @click="useNow">立即使用</button>
-              <button class="dt-outline" type="button" @click="openDtSite">DT 官网</button>
-            </div>
-            <div class="service-token-line">
-              <span>100万</span>
-              <span>免费</span>
-              <span>Tokens</span>
-              <strong>赠送100万Tokens</strong>
-            </div>
-          </div>
-          <div class="service-product-wrap">
-            <div class="service-product-glow" />
-            <img :src="product12Image" alt="DTClaw U盘即插即用龙虾双核版" />
-          </div>
-        </section>
-
-        <section id="service-overview" class="service-info-grid">
-          <article>
-            <span>01</span>
-            <h4>产品概述</h4>
-            <p>把 OpenClaw 与 Hermes 的本地运行、模型配置、Web UI 和日志管理收束到一个便携式入口，适合 U 盘交付和跨机器使用。</p>
-          </article>
-          <article id="service-core">
-            <span>02</span>
-            <h4>核心功能</h4>
-            <p>一键启动/停止服务、检测运行状态、配置模型供应商、打开 Web 界面，并在关闭窗口后自动释放相关服务占用。</p>
-          </article>
-          <article id="service-setup">
-            <span>03</span>
-            <h4>快速启动</h4>
-            <p>插入 U 盘后运行控制入口，选择模型服务商并填写 API Key，再返回控制台点击启动即可开始使用。</p>
-          </article>
-          <article id="service-faq">
-            <span>04</span>
-            <h4>常见问题</h4>
-            <p>无需目标电脑预装 Node/Python；当前交付包内置运行时和完整 OpenClaw、Hermes、Hermes Web UI payload。</p>
-          </article>
-        </section>
       </section>
 
       <section v-if="activeTab === 'logs'" class="panel logs-page">
