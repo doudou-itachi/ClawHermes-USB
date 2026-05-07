@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, h, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { Electroview } from "electrobun/view";
-import type { BootstrapPayload, LogPayload, ModelConfig, ServiceStatus, StatusPayload } from "../shared/types";
+import type { BootstrapPayload, ChannelLoginStatus, LogPayload, ModelConfig, ServiceStatus, StatusPayload } from "../shared/types";
 import product12Image from "./assets/product12.png";
 
 type IconName =
@@ -66,6 +66,7 @@ const IconGlyph = (props: { name: IconName }) =>
 const tabs: Array<{ id: string; label: string; icon: IconName; tone: string }> = [
   { id: "console", label: "控制台", icon: "home", tone: "sky" },
   { id: "models", label: "模型配置", icon: "bot", tone: "violet" },
+  { id: "channels", label: "渠道接入", icon: "target", tone: "rose" },
   { id: "services", label: "服务", icon: "plug", tone: "blue" },
   { id: "logs", label: "运行日志", icon: "terminal", tone: "emerald" },
   { id: "settings", label: "设置", icon: "service", tone: "amber" },
@@ -99,7 +100,10 @@ const providerPresets: ProviderPreset[] = [
 const activeTab = ref("console");
 const services = ref<ServiceStatus[]>([]);
 const logs = ref<string[]>([]);
+const channelLogs = ref<string[]>([]);
+const weixinChannel = ref<ChannelLoginStatus>({});
 const busy = ref(false);
+const channelBusy = ref(false);
 const closing = ref(false);
 const workspaceRef = ref<HTMLElement | null>(null);
 const bootstrap = reactive<BootstrapPayload>({ root: "", controlUrl: "" });
@@ -138,6 +142,15 @@ async function refreshLogs() {
   logs.value = payload.lines ?? [];
 }
 
+async function refreshWeixinChannel() {
+  weixinChannel.value = (await requestFromBun("getWeixinChannelStatus")) as ChannelLoginStatus;
+}
+
+async function refreshWeixinChannelLogs() {
+  const payload = (await requestFromBun("getWeixinChannelLogs")) as LogPayload;
+  channelLogs.value = payload.lines ?? [];
+}
+
 async function loadModelConfig() {
   const payload = (await requestFromBun("getModelConfig")) as { config?: ModelConfig };
   model.apiUrl = payload.config?.apiUrl ?? "";
@@ -164,6 +177,26 @@ async function saveModel() {
     await refreshLogs();
   } finally {
     busy.value = false;
+  }
+}
+
+async function startWeixinLogin() {
+  channelBusy.value = true;
+  try {
+    weixinChannel.value = (await requestFromBun("startWeixinChannelLogin")) as ChannelLoginStatus;
+    await refreshWeixinChannelLogs();
+  } finally {
+    channelBusy.value = false;
+  }
+}
+
+async function stopWeixinLogin() {
+  channelBusy.value = true;
+  try {
+    weixinChannel.value = (await requestFromBun("stopWeixinChannelLogin")) as ChannelLoginStatus;
+    await refreshWeixinChannelLogs();
+  } finally {
+    channelBusy.value = false;
   }
 }
 
@@ -207,6 +240,10 @@ function openContact() {
 
 function openDtSite() {
   requestFromBun("openUrl", { url: "https://digiteam.cn/" });
+}
+
+function openWeixinDocs() {
+  requestFromBun("openUrl", { url: "https://www.npmjs.com/package/@tencent-weixin/openclaw-weixin" });
 }
 
 function openService(service: ServiceStatus) {
@@ -253,6 +290,20 @@ function statusClass(service: ServiceStatus) {
 function statusLabel(service: ServiceStatus) {
   if (service.status === "placeholder-started") return "placeholder";
   return service.status || "unknown";
+}
+
+function channelStatusLabel(status?: string) {
+  if (status === "missing-plugin") return "插件缺失";
+  if (status === "running") return "登录中";
+  if (status === "started") return "已启动";
+  if (status === "stopped") return "待登录";
+  return "未知";
+}
+
+function channelStatusClass(status?: string) {
+  if (status === "missing-plugin") return "warning";
+  if (status === "running" || status === "started") return "ready";
+  return "stopped";
 }
 
 function serviceTitle(service: ServiceStatus) {
@@ -378,11 +429,14 @@ onMounted(async () => {
   const data = (await requestFromBun("getBootstrap")) as BootstrapPayload;
   bootstrap.root = data.root;
   bootstrap.controlUrl = data.controlUrl;
-  await Promise.all([refresh(), refreshLogs(), loadModelConfig()]);
+  await Promise.all([refresh(), refreshLogs(), loadModelConfig(), refreshWeixinChannel(), refreshWeixinChannelLogs()]);
   timer = window.setInterval(refresh, 1500);
 });
 
 watch(activeTab, async (tab) => {
+  if (tab === "channels") {
+    await Promise.all([refreshWeixinChannel(), refreshWeixinChannelLogs()]);
+  }
   if (tab !== "services") {
     stopServiceParticles();
     return;
@@ -530,6 +584,62 @@ onBeforeUnmount(() => {
           <button v-if="selectedProvider().keyUrl" class="ghost key-link" type="button" @click="openProviderKeyPage">获取 API Key</button>
           <button class="primary" :disabled="busy">保存模型</button>
         </form>
+      </section>
+
+      <section v-if="activeTab === 'channels'" class="channels-page">
+        <div class="panel channel-intro">
+          <div>
+            <p class="eyebrow">OpenClaw Channels</p>
+            <h3>渠道接入</h3>
+            <p>保持和 vh-claw 一致：微信提供专属扫码登录入口，其它渠道通过 OpenClaw 终端命令接入。</p>
+          </div>
+          <button class="ghost" type="button" :disabled="channelBusy" @click="refreshWeixinChannelLogs">刷新日志</button>
+        </div>
+
+        <article class="channel-card featured">
+          <div class="channel-head">
+            <span class="channel-icon color-icon emerald">
+              <IconGlyph name="bot" />
+            </span>
+            <div>
+              <strong>微信（官方插件）</strong>
+              <span>插件安装后可扫码登录，无需 AppID/Secret。</span>
+            </div>
+            <span class="pill" :class="channelStatusClass(weixinChannel.status)">
+              {{ channelStatusLabel(weixinChannel.status) }}
+            </span>
+          </div>
+          <div class="channel-steps">
+            <span>1. 确认 OpenClaw payload 中存在 @tencent-weixin/openclaw-weixin</span>
+            <span>2. 点击扫码登录，查看下方日志中的二维码输出</span>
+            <span>3. 手机扫码授权后重启 OpenClaw，微信渠道即可上线</span>
+          </div>
+          <div class="channel-actions">
+            <button class="primary" type="button" :disabled="channelBusy || weixinChannel.status === 'missing-plugin'" @click="startWeixinLogin">微信扫码登录</button>
+            <button class="danger" type="button" :disabled="channelBusy || weixinChannel.status !== 'running'" @click="stopWeixinLogin">停止登录</button>
+            <button class="ghost" type="button" @click="openWeixinDocs">插件文档</button>
+          </div>
+          <p v-for="message in weixinChannel.messages || []" :key="message" class="channel-message">{{ message }}</p>
+        </article>
+
+        <div class="channel-grid">
+          <article v-for="channel in ['QQ Bot', 'Telegram', '飞书', 'Slack']" :key="channel" class="channel-mini-card">
+            <span class="channel-mini-icon color-icon" :class="providerTone(channel)">
+              <IconGlyph name="plug" />
+            </span>
+            <strong>{{ channel }}</strong>
+            <p>与 vh-claw 保持一致，先通过 OpenClaw CLI 配置。</p>
+            <code>openclaw channels setup</code>
+          </article>
+        </div>
+
+        <section class="panel channel-log">
+          <div class="panel-head">
+            <h3>微信登录日志</h3>
+            <button class="ghost" type="button" :disabled="channelBusy" @click="refreshWeixinChannelLogs">刷新</button>
+          </div>
+          <pre>{{ channelLogs.join("\n") || "暂无微信登录日志。点击微信扫码登录后，这里会显示 OpenClaw 输出。" }}</pre>
+        </section>
       </section>
 
       <section v-if="activeTab === 'services'" class="services-page">

@@ -11,6 +11,42 @@ Update it whenever a milestone is completed, changed, blocked, or deferred.
 - `Blocked`: Waiting on external information or action.
 - `Deferred`: Intentionally postponed.
 
+## 2026-05-07
+
+### Electrobun Channel Entry Matching vh-claw Depth
+
+Status: `Done`
+
+Summary:
+
+- Added an Electrobun `渠道接入` page that matches the current `vh-claw` channel depth.
+- WeChat is exposed as the first-class GUI entry and calls the OpenClaw `channels login --channel openclaw-weixin` flow through the local control server.
+- The WeChat login output is written to `data/logs/channel-weixin.log` and shown in the UI.
+- The WeChat login process can be stopped from the UI and is also stopped during Electrobun close cleanup.
+- QQ Bot, Telegram, Feishu, and Slack are shown as CLI-guided cards using `openclaw channels setup`, because `vh-claw` does not implement GUI forms for them.
+- The UI reports a missing plugin instead of pretending WeChat login is available when `apps/openclaw/node_modules/@tencent-weixin/openclaw-weixin` is not present.
+
+Changed areas:
+
+- `core/node/src/channels.ts`
+- `core/node/src/control-server.ts`
+- `launcher/electrobun/src/bun/index.ts`
+- `launcher/electrobun/src/mainview/App.vue`
+- `launcher/electrobun/src/mainview/style.css`
+- `launcher/electrobun/src/shared/types.ts`
+- `docs/electrobun-control-shell.zh-CN.md`
+- `tests/test_windows_core.py`
+
+Validation performed:
+
+- `npm run build`
+- `bun run typecheck`
+
+Next steps:
+
+- Verify the WeChat QR flow with a payload that includes `@tencent-weixin/openclaw-weixin`.
+- If QQ Bot, Telegram, Feishu, or Slack need GUI setup, design those forms separately from the current vh-claw parity scope.
+
 ## 2026-05-06
 
 ### PyQt-Only USB Release With Bundled Windows Runtimes

@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { BrowserView, BrowserWindow, Utils } from "electrobun/bun";
-import type { BootstrapPayload, ModelConfig, StatusPayload } from "../shared/types";
+import type { BootstrapPayload, ChannelLoginStatus, ModelConfig, StatusPayload } from "../shared/types";
 
 type ControlServerMetadata = {
   url: string;
@@ -23,6 +23,10 @@ const rpc = BrowserView.defineRPC({
       getBootstrap: (): BootstrapPayload => ({ root, controlUrl }),
       getStatus: () => requestJson("/api/status"),
       getLogs: () => requestJson("/api/logs?service=launcher&lines=140"),
+      getWeixinChannelStatus: () => requestJson("/api/channels/weixin") as Promise<ChannelLoginStatus>,
+      getWeixinChannelLogs: () => requestJson("/api/channels/weixin/logs?lines=160"),
+      startWeixinChannelLogin: () => requestJson("/api/channels/weixin/login", { method: "POST", body: {} }) as Promise<ChannelLoginStatus>,
+      stopWeixinChannelLogin: () => requestJson("/api/channels/weixin/stop", { method: "POST", body: {} }) as Promise<ChannelLoginStatus>,
       getModelConfig: () => requestJson("/api/model-config"),
       startAll: () => requestJson("/api/services/start", { method: "POST", body: {} }),
       stopAll: () => requestJson("/api/services/stop", { method: "POST", body: {} }),
@@ -116,6 +120,11 @@ async function requestJson(path: string, options: { method?: string; body?: unkn
 }
 
 async function cleanupBeforeExit(): Promise<void> {
+  try {
+    await requestJson("/api/channels/weixin/stop", { method: "POST", body: {} });
+  } catch {
+    // Channel login may not have been started in this build.
+  }
   try {
     await requestJson("/api/services/stop", { method: "POST", body: {} });
     await waitForServicesStopped();

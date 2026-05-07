@@ -14,6 +14,7 @@ const lifecycle_1 = require("./lifecycle");
 const portable_1 = require("./portable");
 const status_1 = require("./status");
 const diagnostics_2 = require("./diagnostics");
+const channels_1 = require("./channels");
 function startControlServer(usbRoot, options) {
     const root = (0, portable_1.getRoot)(usbRoot);
     const existing = readControlServerMetadata(root);
@@ -192,6 +193,23 @@ async function routeRequest(root, request, response) {
         const service = requestUrl.searchParams.get("service") || "launcher";
         const lines = Number(requestUrl.searchParams.get("lines") || "80");
         sendJson(response, 200, (0, diagnostics_1.readLogTail)(root, service, Number.isFinite(lines) ? lines : 80));
+        return;
+    }
+    if (request.method === "GET" && pathname === "/api/channels/weixin") {
+        sendJson(response, 200, (0, channels_1.getWeixinChannelStatus)(root));
+        return;
+    }
+    if (request.method === "GET" && pathname === "/api/channels/weixin/logs") {
+        const lines = Number(requestUrl.searchParams.get("lines") || "120");
+        sendJson(response, 200, (0, channels_1.readWeixinChannelLog)(root, Number.isFinite(lines) ? lines : 120));
+        return;
+    }
+    if (request.method === "POST" && pathname === "/api/channels/weixin/login") {
+        sendJson(response, 200, (0, channels_1.startWeixinChannelLogin)(root));
+        return;
+    }
+    if (request.method === "POST" && pathname === "/api/channels/weixin/stop") {
+        sendJson(response, 200, (0, channels_1.stopWeixinChannelLogin)(root));
         return;
     }
     if (request.method === "POST" && pathname === "/api/services/start") {

@@ -22,10 +22,24 @@ export type ModelConfig = {
 };
 
 export type LogPayload = {
+  exists?: boolean;
+  path?: string;
+  target?: string;
   lines?: string[];
 };
 
 export type BootstrapPayload = {
   root: string;
   controlUrl: string;
+};
+
+export type ChannelLoginStatus = {
+  root?: string;
+  channel?: string;
+  displayName?: string;
+  status?: "missing-plugin" | "running" | "started" | "stopped";
+  processId?: number;
+  command?: string;
+  logFile?: string;
+  messages?: string[];
 };

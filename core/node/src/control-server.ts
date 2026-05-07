@@ -10,6 +10,7 @@ import { killProcessTree } from "./lifecycle";
 import { getRoot } from "./portable";
 import { processExists } from "./status";
 import { setupDiagnostics } from "./diagnostics";
+import { getWeixinChannelStatus, readWeixinChannelLog, startWeixinChannelLogin, stopWeixinChannelLogin } from "./channels";
 
 type ControlServerMetadata = {
   serviceId: "control-server";
@@ -214,6 +215,23 @@ async function routeRequest(root: string, request: IncomingMessage, response: Se
     const service = requestUrl.searchParams.get("service") || "launcher";
     const lines = Number(requestUrl.searchParams.get("lines") || "80");
     sendJson(response, 200, readLogTail(root, service, Number.isFinite(lines) ? lines : 80));
+    return;
+  }
+  if (request.method === "GET" && pathname === "/api/channels/weixin") {
+    sendJson(response, 200, getWeixinChannelStatus(root));
+    return;
+  }
+  if (request.method === "GET" && pathname === "/api/channels/weixin/logs") {
+    const lines = Number(requestUrl.searchParams.get("lines") || "120");
+    sendJson(response, 200, readWeixinChannelLog(root, Number.isFinite(lines) ? lines : 120));
+    return;
+  }
+  if (request.method === "POST" && pathname === "/api/channels/weixin/login") {
+    sendJson(response, 200, startWeixinChannelLogin(root));
+    return;
+  }
+  if (request.method === "POST" && pathname === "/api/channels/weixin/stop") {
+    sendJson(response, 200, stopWeixinChannelLogin(root));
     return;
   }
   if (request.method === "POST" && pathname === "/api/services/start") {
