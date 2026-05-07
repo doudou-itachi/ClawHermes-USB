@@ -259,7 +259,9 @@ async function closeWindow() {
   if (closing.value) return;
   closing.value = true;
   busy.value = true;
-  await requestFromBun("closeWindow");
+  requestFromBun("closeWindow").catch((error) => {
+    console.error("close window failed", error);
+  });
 }
 
 async function shutdown() {

@@ -70,7 +70,7 @@ U 盘交付目录根部应优先开放 `ClawHermes-Control-Electrobun.exe`。它
 ## 本次界面与关闭行为改动
 
 - 主窗口改为 Electrobun 的隐藏原生标题栏，并在页面内绘制类似 macOS 的关闭、最小化、最大化按钮。
-- 关闭按钮不会直接退出窗口；它会先调用 control-server 的 `/api/services/stop` 停止 OpenClaw、Hermes Agent、Hermes Web UI 和 Portal，再调用 `/api/shutdown` 关闭本地控制服务，尽量释放 U 盘目录占用。
+- 关闭按钮会让窗口立即消失，避免用户感觉点击无效；Electrobun Bun 进程会在后台继续调用 control-server 的 `/api/services/stop` 停止 OpenClaw、Hermes Agent、Hermes Web UI 和 Portal，再调用 `/api/shutdown` 关闭本地控制服务，完成后退出自身，尽量释放 U 盘目录占用。
 - 顶部启动、停止、刷新按钮改为横向图标胶囊按钮，避免中文按钮文字竖排和拥挤。
 - 左侧导航、服务卡片、模型供应商卡片和统计卡片增加彩色图标块，整体视觉方向参考 `vh-claw` 的深色控制台风格。
 - 服务状态徽标使用短标签显示，完整状态保留在悬停标题里，避免 `placeholder-started` 这类长状态和服务名重叠。
