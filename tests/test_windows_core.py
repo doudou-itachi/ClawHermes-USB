@@ -1068,6 +1068,7 @@ class WindowsCoreTests(unittest.TestCase):
         bun_entry = (shell_root / "src" / "bun" / "index.ts").read_text(encoding="utf-8")
         vue_app = (shell_root / "src" / "mainview" / "App.vue").read_text(encoding="utf-8")
         styles = (shell_root / "src" / "mainview" / "style.css").read_text(encoding="utf-8")
+        service_asset = shell_root / "src" / "mainview" / "assets" / "product12.png"
 
         self.assertEqual(package_json["type"], "module")
         self.assertIn("electrobun", package_json["dependencies"])
@@ -1114,6 +1115,14 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertIn("closing", vue_app)
         self.assertIn('requestFromBun("closeWindow").catch', vue_app)
         self.assertIn("action-button", vue_app)
+        self.assertIn('id: "services"', vue_app)
+        self.assertIn("服务", vue_app)
+        self.assertIn("product12Image", vue_app)
+        self.assertIn("serviceParticles", vue_app)
+        self.assertIn("initServiceParticles", vue_app)
+        self.assertIn("DTClaw 即插即用", vue_app)
+        self.assertIn("赠送100万Tokens", vue_app)
+        self.assertIn("useNow", vue_app)
         self.assertIn("statusLabel", vue_app)
         self.assertIn("placeholder", vue_app)
         self.assertIn("providerPresets", vue_app)
@@ -1139,7 +1148,14 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertIn(".provider-card.active", styles)
         self.assertIn(".provider-tags", styles)
         self.assertIn(".selected-provider", styles)
+        self.assertIn(".services-page", styles)
+        self.assertIn(".service-hero", styles)
+        self.assertIn(".service-particles", styles)
+        self.assertIn(".service-product-wrap", styles)
+        self.assertIn(".service-info-grid", styles)
         self.assertIn("text-overflow: ellipsis", styles)
+        self.assertTrue(service_asset.exists())
+        self.assertGreater(service_asset.stat().st_size, 900_000)
 
     def test_gui_control_theme_preference_and_docs_are_user_facing(self):
         text = (ROOT / "launcher" / "windows" / "ClawHermes-Control.ps1").read_text(encoding="utf-8")

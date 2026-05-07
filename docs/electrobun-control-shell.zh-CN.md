@@ -76,6 +76,7 @@ U 盘交付目录根部应优先开放 `ClawHermes-Control-Electrobun.exe`。它
 - 服务状态徽标使用短标签显示，完整状态保留在悬停标题里，避免 `placeholder-started` 这类长状态和服务名重叠。
 - 服务卡片固定展示 `OpenClaw`、`Hermes Agent`、`Hermes Web UI`、`Portal` 的完整名称，并增加二级说明，避免 Hermes Agent 与 Hermes Web UI 在窄卡片里都被截断成 `Herme...`。
 - 模型服务商卡片参考 `vh-claw` 的 preset 流程：点击服务商不会立即写配置，而是填入对应 Base URL 和默认模型；用户确认 API Key 后点击“保存模型”，再通过现有 control-server 写入 OpenClaw 与 Hermes 的共享模型配置。
+- 左侧新增 `服务` 页面，参考 `D:\project\uclaw\src\mainview\components\HomePage.vue` 的导航栏、蓝色英雄区、粒子背景和 `product12.png` 主图。该页面以内嵌方式呈现，`立即使用` 会切回控制台并触发启动流程，`联系我们` 和 `DT 官网` 使用系统浏览器打开外链。
 
 ## 本地测试包
 
