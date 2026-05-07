@@ -3407,6 +3407,34 @@ Next steps:
 
 - Continue real Hermes Agent and OpenClaw WSL2 payload validation when a prepared distro is available.
 
+### Electrobun WeChat Login Fetch Compatibility
+
+Status: `Done`
+
+Summary:
+
+- Investigated the WeChat scan-login failure where the channel process exited before printing a QR code.
+- Confirmed the bundled WeChat plugin was installed and registered, and traced the remaining failure to Node/Undici rejecting the plugin's manual `Content-Length` header while running under the OpenClaw/plugin fetch dispatcher.
+- Added a small Node preload used only by the OpenClaw WeChat login subprocess; it routes WeChat iLink API calls through a clean isolated Node fetch process and removes the risky `Content-Length` header at the boundary.
+- Kept the fix outside `apps/openclaw` so future OpenClaw payload refreshes do not drop the compatibility layer.
+
+Changed areas:
+
+- `core/node/src/channels.ts`
+- `core/node/src/weixin-fetch-preload.ts`
+- `core/node/dist/`
+- `tests/test_windows_core.py`
+- `docs/PROGRESS.md`
+
+Validation performed:
+
+- `npm run build`
+- Standalone WeChat plugin login smoke test with the preload enabled; the process printed the terminal QR code and fallback `liteapp.weixin.qq.com/q/...` URL before being stopped.
+
+Next steps:
+
+- Rebuild the USB package and verify the channel log prints the WeChat QR code/link from the Electrobun channel page.
+
 ### Portable Model Configuration Repair
 
 Status: `Done`

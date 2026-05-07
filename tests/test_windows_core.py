@@ -1187,6 +1187,7 @@ class WindowsCoreTests(unittest.TestCase):
     def test_openclaw_channel_routes_match_vh_claw_depth(self):
         control_server = (ROOT / "core" / "node" / "src" / "control-server.ts").read_text(encoding="utf-8")
         channels = (ROOT / "core" / "node" / "src" / "channels.ts").read_text(encoding="utf-8")
+        fetch_preload = (ROOT / "core" / "node" / "src" / "weixin-fetch-preload.ts").read_text(encoding="utf-8")
 
         self.assertIn("/api/channels/weixin", control_server)
         self.assertIn("/api/channels/weixin/logs", control_server)
@@ -1200,11 +1201,18 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertIn("install", channels)
         self.assertIn("--link", channels)
         self.assertIn("ensureWeixinPluginRegistered", channels)
+        self.assertIn("withWeixinFetchCompatibility", channels)
+        self.assertIn("weixin-fetch-preload.js", channels)
+        self.assertIn("NODE_OPTIONS", channels)
+        self.assertIn("spawnSync", fetch_preload)
+        self.assertIn("ilinkai.weixin.qq.com", fetch_preload)
         self.assertIn("mkdirSync(dirname(weixinMetadataPath(root))", channels)
         self.assertIn("stopWeixinChannelLogin", channels)
         self.assertIn("killProcessTree", channels)
         self.assertIn("windowsHide: true", channels)
         self.assertIn("channel-weixin.log", channels)
+        self.assertIn('headers.delete("content-length")', fetch_preload)
+        self.assertIn("isolatedWeixinFetch", fetch_preload)
 
     def test_windows_service_lifecycle_hides_console_subprocesses(self):
         lifecycle = (ROOT / "core" / "node" / "src" / "lifecycle.ts").read_text(encoding="utf-8")
