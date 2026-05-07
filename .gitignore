@@ -43,6 +43,10 @@ data/home/AppData/
 /build/
 /launcher/pyqt/build/
 /launcher/pyqt/dist/
+/launcher/electrobun/artifacts/
+/launcher/electrobun/build/
+/launcher/electrobun/dist/
+/launcher/electrobun/node_modules/
 /dist-usb/
 
 # OS/editor
