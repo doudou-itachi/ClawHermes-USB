@@ -69,7 +69,31 @@ const tabs: Array<{ id: string; label: string; icon: IconName; tone: string }> =
   { id: "settings", label: "设置", icon: "service", tone: "amber" },
 ];
 
-const providers = ["DeepSeek", "MiniMax", "Kimi", "通义千问", "豆包", "硅基流动", "智谱", "OpenAI", "Claude", "Groq", "自定义"];
+type ProviderPreset = {
+  id: string;
+  label: string;
+  short: string;
+  tone: string;
+  tags: string[];
+  baseUrl: string;
+  model: string;
+  keyUrl?: string;
+};
+
+const providerPresets: ProviderPreset[] = [
+  { id: "deepseek", label: "DeepSeek", short: "D", tone: "blue", tags: ["国内", "OpenAI 兼容"], baseUrl: "https://api.deepseek.com/v1", model: "deepseek-chat", keyUrl: "https://platform.deepseek.com/" },
+  { id: "minimax", label: "MiniMax", short: "M", tone: "amber", tags: ["国内", "推荐"], baseUrl: "https://api.minimax.chat/v1", model: "MiniMax-Text-01", keyUrl: "https://platform.minimaxi.com/" },
+  { id: "kimi", label: "Kimi", short: "K", tone: "emerald", tags: ["国内", "Moonshot"], baseUrl: "https://api.moonshot.cn/v1", model: "moonshot-v1-auto", keyUrl: "https://platform.moonshot.cn/" },
+  { id: "qwen", label: "通义千问", short: "通", tone: "rose", tags: ["国内", "阿里云"], baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1", model: "qwen-turbo", keyUrl: "https://dashscope.console.aliyun.com/" },
+  { id: "doubao", label: "豆包", short: "豆", tone: "orange", tags: ["国内", "火山方舟"], baseUrl: "https://ark.cn-beijing.volces.com/api/v3", model: "doubao-1.5-pro-32k", keyUrl: "https://console.volcengine.com/ark" },
+  { id: "siliconflow", label: "硅基流动", short: "硅", tone: "cyan", tags: ["国内", "低成本"], baseUrl: "https://api.siliconflow.cn/v1", model: "Qwen/Qwen2.5-72B-Instruct", keyUrl: "https://cloud.siliconflow.cn/" },
+  { id: "zhipu", label: "智谱 GLM", short: "智", tone: "orange", tags: ["国内", "GLM"], baseUrl: "https://open.bigmodel.cn/api/paas/v4", model: "glm-4-plus", keyUrl: "https://open.bigmodel.cn/" },
+  { id: "openai", label: "OpenAI", short: "O", tone: "rose", tags: ["海外", "OpenAI"], baseUrl: "https://api.openai.com/v1", model: "gpt-4o", keyUrl: "https://platform.openai.com/" },
+  { id: "anthropic", label: "Claude", short: "C", tone: "blue", tags: ["海外", "Anthropic"], baseUrl: "https://api.anthropic.com/v1", model: "claude-sonnet-4-20250514", keyUrl: "https://console.anthropic.com/" },
+  { id: "groq", label: "Groq", short: "G", tone: "violet", tags: ["海外", "高速"], baseUrl: "https://api.groq.com/openai/v1", model: "llama-3.3-70b-versatile", keyUrl: "https://console.groq.com/" },
+  { id: "custom", label: "自定义", short: "自", tone: "cyan", tags: ["兼容", "手动填写"], baseUrl: "", model: "" },
+];
+
 const activeTab = ref("console");
 const services = ref<ServiceStatus[]>([]);
 const logs = ref<string[]>([]);
@@ -77,6 +101,7 @@ const busy = ref(false);
 const closing = ref(false);
 const bootstrap = reactive<BootstrapPayload>({ root: "", controlUrl: "" });
 const model = reactive<ModelConfig>({ apiUrl: "", model: "", apiKey: "" });
+const selectedProviderId = ref("custom");
 let timer: number | undefined;
 
 function requestFromBun(name: string, payload: unknown = {}) {
@@ -111,6 +136,7 @@ async function loadModelConfig() {
   const payload = (await requestFromBun("getModelConfig")) as { config?: ModelConfig };
   model.apiUrl = payload.config?.apiUrl ?? "";
   model.model = payload.config?.model ?? "";
+  syncSelectedProvider();
 }
 
 async function runAction(action: "startAll" | "stopAll") {
@@ -133,6 +159,28 @@ async function saveModel() {
   } finally {
     busy.value = false;
   }
+}
+
+function selectProvider(provider: ProviderPreset) {
+  selectedProviderId.value = provider.id;
+  if (provider.id !== "custom") {
+    model.apiUrl = provider.baseUrl;
+    model.model = provider.model;
+  }
+}
+
+function syncSelectedProvider() {
+  const matched = providerPresets.find((provider) => provider.baseUrl && provider.baseUrl === model.apiUrl);
+  selectedProviderId.value = matched?.id ?? "custom";
+}
+
+function selectedProvider() {
+  return providerPresets.find((provider) => provider.id === selectedProviderId.value) ?? providerPresets[providerPresets.length - 1];
+}
+
+function openProviderKeyPage() {
+  const url = selectedProvider().keyUrl;
+  if (url) requestFromBun("openUrl", { url });
 }
 
 function openService(service: ServiceStatus) {
@@ -179,6 +227,24 @@ function statusClass(service: ServiceStatus) {
 function statusLabel(service: ServiceStatus) {
   if (service.status === "placeholder-started") return "placeholder";
   return service.status || "unknown";
+}
+
+function serviceTitle(service: ServiceStatus) {
+  const id = (service.id || service.displayName || "").toLowerCase();
+  if (id.includes("hermes-agent") || id.includes("hermes agent") || id.includes("agent")) return "Hermes Agent";
+  if (id.includes("hermes-web-ui") || id.includes("hermes web ui") || id.includes("web")) return "Hermes Web UI";
+  if (id.includes("openclaw")) return "OpenClaw";
+  if (id.includes("portal")) return "Portal";
+  return service.displayName || service.id || "Service";
+}
+
+function serviceSubtitle(service: ServiceStatus) {
+  const id = (service.id || "").toLowerCase();
+  if (id.includes("agent")) return "Hermes 后端代理";
+  if (id.includes("web")) return "Hermes Web 界面";
+  if (id.includes("openclaw")) return "OpenClaw Gateway";
+  if (id.includes("portal")) return "本地入口 Portal";
+  return service.id || "";
 }
 
 async function minimizeWindow() {
@@ -299,7 +365,8 @@ onBeforeUnmount(() => {
                 <IconGlyph :name="serviceIcon(service)" />
               </span>
               <div>
-                <strong>{{ service.displayName || service.id }}</strong>
+                <strong class="service-name">{{ serviceTitle(service) }}</strong>
+                <span class="service-subtitle">{{ serviceSubtitle(service) }}</span>
                 <p>{{ healthLabel(service) }}</p>
               </div>
             </div>
@@ -313,17 +380,36 @@ onBeforeUnmount(() => {
         <div class="panel">
           <h3>模型服务商</h3>
           <div class="provider-grid">
-            <button v-for="provider in providers" :key="provider" class="provider-card" :class="providerTone(provider)">
-              <span class="provider-icon">{{ provider.slice(0, 1) }}</span>
-              <strong>{{ provider }}</strong>
+            <button
+              v-for="provider in providerPresets"
+              :key="provider.id"
+              type="button"
+              class="provider-card"
+              :class="[provider.tone, { active: selectedProviderId === provider.id }]"
+              @click="selectProvider(provider)"
+            >
+              <span class="provider-icon">{{ provider.short }}</span>
+              <strong>{{ provider.label }}</strong>
+              <span class="provider-model">{{ provider.model || "手动填写" }}</span>
+              <span class="provider-tags">
+                <span v-for="tag in provider.tags" :key="tag">{{ tag }}</span>
+              </span>
             </button>
           </div>
         </div>
         <form class="panel config-form" @submit.prevent="saveModel">
           <h3>当前配置</h3>
+          <div class="selected-provider">
+            <span class="provider-icon" :class="selectedProvider().tone">{{ selectedProvider().short }}</span>
+            <div>
+              <strong>{{ selectedProvider().label }}</strong>
+              <span>选择服务商会填入默认 Base URL 和模型，保存后写入 OpenClaw 与 Hermes 配置。</span>
+            </div>
+          </div>
           <input v-model="model.apiUrl" placeholder="API URL / Base URL" />
           <input v-model="model.model" placeholder="Model" />
           <input v-model="model.apiKey" placeholder="API Key" type="password" />
+          <button v-if="selectedProvider().keyUrl" class="ghost key-link" type="button" @click="openProviderKeyPage">获取 API Key</button>
           <button class="primary" :disabled="busy">保存模型</button>
         </form>
       </section>

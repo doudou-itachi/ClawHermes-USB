@@ -74,6 +74,8 @@ U 盘交付目录根部应优先开放 `ClawHermes-Control-Electrobun.exe`。它
 - 顶部启动、停止、刷新按钮改为横向图标胶囊按钮，避免中文按钮文字竖排和拥挤。
 - 左侧导航、服务卡片、模型供应商卡片和统计卡片增加彩色图标块，整体视觉方向参考 `vh-claw` 的深色控制台风格。
 - 服务状态徽标使用短标签显示，完整状态保留在悬停标题里，避免 `placeholder-started` 这类长状态和服务名重叠。
+- 服务卡片固定展示 `OpenClaw`、`Hermes Agent`、`Hermes Web UI`、`Portal` 的完整名称，并增加二级说明，避免 Hermes Agent 与 Hermes Web UI 在窄卡片里都被截断成 `Herme...`。
+- 模型服务商卡片参考 `vh-claw` 的 preset 流程：点击服务商不会立即写配置，而是填入对应 Base URL 和默认模型；用户确认 API Key 后点击“保存模型”，再通过现有 control-server 写入 OpenClaw 与 Hermes 的共享模型配置。
 
 ## 本地测试包
 
