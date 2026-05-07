@@ -797,9 +797,7 @@ button:disabled {
   color: #0b3d91;
 }
 
-.service-nav-cta,
 .dt-primary,
-.dt-secondary,
 .dt-outline {
   border: 0;
   border-radius: 12px;
@@ -810,14 +808,9 @@ button:disabled {
   letter-spacing: 0;
 }
 
-.service-nav-cta,
 .dt-primary {
   background: #ff7a00;
   box-shadow: 0 14px 28px rgba(255, 122, 0, 0.24);
-}
-
-.service-nav-cta {
-  padding: 11px 20px;
 }
 
 .service-hero {
@@ -885,16 +878,10 @@ button:disabled {
 }
 
 .dt-primary,
-.dt-secondary,
 .dt-outline {
   min-width: 124px;
   padding: 14px 24px;
   font-size: 16px;
-}
-
-.dt-secondary {
-  background: #0b3d91;
-  box-shadow: 0 14px 28px rgba(11, 61, 145, 0.24);
 }
 
 .dt-outline {
@@ -903,9 +890,7 @@ button:disabled {
 }
 
 .dt-primary:hover,
-.dt-secondary:hover,
-.dt-outline:hover,
-.service-nav-cta:hover {
+.dt-outline:hover {
   transform: translateY(-1px);
 }
 

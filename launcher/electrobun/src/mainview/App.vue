@@ -155,11 +155,6 @@ async function runAction(action: "startAll" | "stopAll") {
   }
 }
 
-async function useNow() {
-  activeTab.value = "console";
-  await runAction("startAll");
-}
-
 async function saveModel() {
   busy.value = true;
   try {
@@ -536,7 +531,6 @@ onBeforeUnmount(() => {
             <a href="#service-setup">快速启动</a>
             <a href="#service-faq">常见问题</a>
           </div>
-          <button class="service-nav-cta" type="button" @click="useNow">立即使用</button>
         </nav>
 
         <section class="service-hero">
@@ -546,7 +540,6 @@ onBeforeUnmount(() => {
             <p>内置 OpenClaw 技能调优中文版和 Hermes 爱马仕智能体中文版，插入 U 盘即可从本地控制台启动、配置和管理。</p>
             <div class="service-hero-actions">
               <button class="dt-primary" type="button" @click="openContact">联系我们</button>
-              <button class="dt-secondary" type="button" @click="useNow">立即使用</button>
               <button class="dt-outline" type="button" @click="openDtSite">DT 官网</button>
             </div>
             <div class="service-token-line">

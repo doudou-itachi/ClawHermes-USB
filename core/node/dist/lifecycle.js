@@ -411,7 +411,7 @@ function runWslStopHook(root, adapter) {
 }
 function killProcessTree(pid) {
     if (process.platform === "win32") {
-        (0, node_child_process_1.execFileSync)("taskkill", ["/PID", String(pid), "/T", "/F"], { stdio: "ignore" });
+        (0, node_child_process_1.execFileSync)("taskkill", ["/PID", String(pid), "/T", "/F"], { stdio: "ignore", windowsHide: true });
         waitForProcessExit(pid);
     }
     else {

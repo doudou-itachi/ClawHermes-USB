@@ -1122,7 +1122,8 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertIn("initServiceParticles", vue_app)
         self.assertIn("DTClaw 即插即用", vue_app)
         self.assertIn("赠送100万Tokens", vue_app)
-        self.assertIn("useNow", vue_app)
+        self.assertNotIn("立即使用", vue_app)
+        self.assertNotIn("useNow", vue_app)
         self.assertIn("statusLabel", vue_app)
         self.assertIn("placeholder", vue_app)
         self.assertIn("providerPresets", vue_app)
@@ -1156,6 +1157,15 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertIn("text-overflow: ellipsis", styles)
         self.assertTrue(service_asset.exists())
         self.assertGreater(service_asset.stat().st_size, 900_000)
+
+    def test_windows_service_lifecycle_hides_console_subprocesses(self):
+        lifecycle = (ROOT / "core" / "node" / "src" / "lifecycle.ts").read_text(encoding="utf-8")
+        runtimes = (ROOT / "core" / "node" / "src" / "runtimes.ts").read_text(encoding="utf-8")
+
+        self.assertIn('execFileSync("taskkill"', lifecycle)
+        self.assertIn("windowsHide: true", lifecycle)
+        self.assertIn('execFileSync(executablePath, ["--version"]', runtimes)
+        self.assertIn("windowsHide: true", runtimes)
 
     def test_gui_control_theme_preference_and_docs_are_user_facing(self):
         text = (ROOT / "launcher" / "windows" / "ClawHermes-Control.ps1").read_text(encoding="utf-8")

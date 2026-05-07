@@ -169,7 +169,7 @@ function sha256File(file: string): string {
 
 function runtimeVersion(executablePath: string): string | null {
   try {
-    const output = execFileSync(executablePath, ["--version"], { encoding: "utf8", timeout: 5000 }).trim();
+    const output = execFileSync(executablePath, ["--version"], { encoding: "utf8", timeout: 5000, windowsHide: true }).trim();
     return output.replace(/^v/i, "");
   } catch {
     return null;
