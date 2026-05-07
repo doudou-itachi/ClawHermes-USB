@@ -113,6 +113,7 @@ function startWeixinChannelLogin(usbRoot) {
         processId: child.pid,
         messages: ["WeChat login command started. Scan the QR code shown in the channel log."],
     };
+    (0, node_fs_1.mkdirSync)((0, node_path_1.dirname)(weixinMetadataPath(root)), { recursive: true });
     (0, node_fs_1.writeFileSync)(weixinMetadataPath(root), `${JSON.stringify(status, null, 2)}\n`, "utf8");
     return status;
 }

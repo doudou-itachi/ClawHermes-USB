@@ -1200,6 +1200,7 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertIn("install", channels)
         self.assertIn("--link", channels)
         self.assertIn("ensureWeixinPluginRegistered", channels)
+        self.assertIn("mkdirSync(dirname(weixinMetadataPath(root))", channels)
         self.assertIn("stopWeixinChannelLogin", channels)
         self.assertIn("killProcessTree", channels)
         self.assertIn("windowsHide: true", channels)
