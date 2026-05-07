@@ -101,6 +101,7 @@ const services = ref<ServiceStatus[]>([]);
 const logs = ref<string[]>([]);
 const busy = ref(false);
 const closing = ref(false);
+const workspaceRef = ref<HTMLElement | null>(null);
 const bootstrap = reactive<BootstrapPayload>({ root: "", controlUrl: "" });
 const model = reactive<ModelConfig>({ apiUrl: "", model: "", apiKey: "" });
 const selectedProviderId = ref("custom");
@@ -172,6 +173,18 @@ function selectProvider(provider: ProviderPreset) {
     model.apiUrl = provider.baseUrl;
     model.model = provider.model;
   }
+}
+
+function scrollServiceSection(sectionId: string) {
+  const target = document.getElementById(sectionId);
+  if (!target) return;
+  const scroller = workspaceRef.value;
+  if (!scroller) {
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
+  const top = target.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop - 96;
+  scroller.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
 }
 
 function syncSelectedProvider() {
@@ -429,7 +442,7 @@ onBeforeUnmount(() => {
       </div>
     </aside>
 
-    <section class="workspace">
+    <section ref="workspaceRef" class="workspace">
       <header class="topbar">
         <div>
           <p class="eyebrow">OpenClaw · Hermes · Web UI</p>
@@ -526,10 +539,10 @@ onBeforeUnmount(() => {
             <span>双核版</span>
           </div>
           <div class="service-nav-links">
-            <a href="#service-overview">产品概述</a>
-            <a href="#service-core">核心功能</a>
-            <a href="#service-setup">快速启动</a>
-            <a href="#service-faq">常见问题</a>
+            <button type="button" @click="scrollServiceSection('service-overview')">产品概述</button>
+            <button type="button" @click="scrollServiceSection('service-core')">核心功能</button>
+            <button type="button" @click="scrollServiceSection('service-setup')">快速启动</button>
+            <button type="button" @click="scrollServiceSection('service-faq')">常见问题</button>
           </div>
         </nav>
 

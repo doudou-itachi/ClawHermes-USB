@@ -34,7 +34,9 @@ button {
   display: grid;
   grid-template-columns: 260px 1fr;
   grid-template-rows: 46px 1fr;
+  height: 100vh;
   min-height: 100vh;
+  overflow: hidden;
 }
 
 .window-bar {
@@ -131,6 +133,7 @@ button {
 .sidebar {
   display: flex;
   flex-direction: column;
+  min-height: 0;
   padding: 22px 16px;
   background: rgba(9, 14, 25, 0.9);
   border-right: 1px solid rgba(148, 163, 184, 0.16);
@@ -371,8 +374,10 @@ button {
 }
 
 .workspace {
+  min-height: 0;
   padding: 26px;
   overflow: auto;
+  scroll-behavior: smooth;
 }
 
 .topbar {
@@ -785,15 +790,19 @@ button:disabled {
   gap: 22px;
 }
 
-.service-nav-links a {
+.service-nav-links button {
+  border: 0;
+  padding: 0;
   color: #334155;
+  background: transparent;
   font-size: 14px;
   font-weight: 800;
   text-decoration: none;
   white-space: nowrap;
+  cursor: pointer;
 }
 
-.service-nav-links a:hover {
+.service-nav-links button:hover {
   color: #0b3d91;
 }
 
