@@ -25,11 +25,13 @@ Summary:
 - The WeChat login process can be stopped from the UI and is also stopped during Electrobun close cleanup.
 - Removed QQ Bot, Telegram, Feishu, and Slack from the UI because the upstream `vh-claw` repository does not implement GUI channel forms for them.
 - The release script now verifies `apps/openclaw/node_modules/@tencent-weixin/openclaw-weixin` before copying payloads, installs it with `pnpm --config.minimum-release-age=0 add -w @tencent-weixin/openclaw-weixin` when missing, and records the result in `release-manifest.json` under `channelPluginPolicy.weixin`.
+- Before starting QR login, the control service now registers the bundled WeChat plugin with OpenClaw using the current USB path via `openclaw plugins install <local plugin path> --link` when the OpenClaw plugin ledger/config is missing or stale. This avoids the interactive `Install Weixin plugin?` prompt after copying the release directory to another path.
 - The UI no longer shows a user-facing “plugin missing” prompt for WeChat in the normal delivery path.
 
 Changed areas:
 
 - `core/node/src/channels.ts`
+- `core/node/dist/channels.js`
 - `core/node/src/control-server.ts`
 - `launcher/electrobun/src/bun/index.ts`
 - `launcher/electrobun/src/mainview/App.vue`

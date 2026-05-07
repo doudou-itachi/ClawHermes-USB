@@ -1,6 +1,6 @@
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { delimiter, dirname, join } from "node:path";
+import { delimiter, dirname, join, resolve } from "node:path";
 import { resolveServiceEnvironment } from "./environment";
 import { killProcessTree } from "./lifecycle";
 import { getRoot } from "./portable";
@@ -18,6 +18,7 @@ export type ChannelLoginStatus = {
 };
 
 const WEIXIN_PACKAGE_PATH = join("node_modules", "@tencent-weixin", "openclaw-weixin");
+const WEIXIN_PLUGIN_ID = "openclaw-weixin";
 
 export function getWeixinChannelStatus(usbRoot: string): ChannelLoginStatus {
   const root = getRoot(usbRoot);
@@ -94,6 +95,18 @@ export function startWeixinChannelLogin(usbRoot: string): ChannelLoginStatus {
     ...serviceEnv.env,
     PATH: patchedPath(root),
   };
+  const registration = ensureWeixinPluginRegistered(root, env);
+  if (registration.output) {
+    writeFileSync(logFile, `${registration.output.trimEnd()}\n\n`, { flag: "a" });
+  }
+  if (!registration.ok) {
+    return {
+      ...existing,
+      status: "stopped",
+      messages: registration.messages,
+    };
+  }
+
   const child = spawn(weixinCommand(root)[0], weixinCommand(root).slice(1), {
     cwd: appDir,
     env,
@@ -156,6 +169,99 @@ function weixinPluginInstalled(root: string): boolean {
   return existsSync(join(openclawAppDir(root), WEIXIN_PACKAGE_PATH));
 }
 
+function ensureWeixinPluginRegistered(root: string, env: Record<string, string>): { ok: boolean; messages: string[]; output?: string } {
+  const pluginPath = weixinPluginPath(root);
+  if (!existsSync(pluginPath)) {
+    return {
+      ok: false,
+      messages: [`WeChat channel plugin directory is missing: ${pluginPath}`],
+    };
+  }
+
+  if (weixinPluginRegistered(root, env, pluginPath)) {
+    return {
+      ok: true,
+      messages: ["WeChat channel plugin is registered."],
+    };
+  }
+
+  const command = [
+    nodeCommand(root),
+    openclawEntry(root),
+    "plugins",
+    "install",
+    pluginPath,
+    "--link",
+  ];
+  const result = spawnSync(command[0], command.slice(1), {
+    cwd: openclawAppDir(root),
+    env,
+    shell: false,
+    windowsHide: true,
+    encoding: "utf8",
+    timeout: 90_000,
+  });
+  const output = [result.stdout, result.stderr].filter(Boolean).join("\n");
+
+  if (result.error) {
+    return {
+      ok: false,
+      output,
+      messages: [`Failed to register WeChat channel plugin: ${result.error.message}`],
+    };
+  }
+  if (result.status !== 0) {
+    return {
+      ok: false,
+      output,
+      messages: [`Failed to register WeChat channel plugin. Exit code: ${result.status ?? "unknown"}.`],
+    };
+  }
+
+  if (!weixinPluginRegistered(root, env, pluginPath)) {
+    return {
+      ok: false,
+      output,
+      messages: ["WeChat channel plugin registration command completed, but OpenClaw config still does not reference the plugin."],
+    };
+  }
+
+  return {
+    ok: true,
+    output,
+    messages: ["WeChat channel plugin was registered from the local payload."],
+  };
+}
+
+function weixinPluginRegistered(root: string, env: Record<string, string>, pluginPath: string): boolean {
+  const expectedPath = normalizePathForCompare(pluginPath);
+  const config = readJsonObject(env.OPENCLAW_CONFIG_PATH || join(root, "data", "openclaw", "openclaw.json"));
+  const loadPaths = Array.isArray(config?.plugins?.load?.paths) ? config.plugins.load.paths : [];
+  const configHasPath = loadPaths.some((item: unknown) => typeof item === "string" && normalizePathForCompare(item) === expectedPath);
+  const configEnablesPlugin = config?.plugins?.entries?.[WEIXIN_PLUGIN_ID]?.enabled === true;
+
+  const stateDir = env.OPENCLAW_STATE_DIR || join(root, "data", "openclaw");
+  const installs = readJsonObject(join(stateDir, "plugins", "installs.json"));
+  const record = installs?.installRecords?.[WEIXIN_PLUGIN_ID];
+  const recordPath = typeof record?.installPath === "string" ? record.installPath : typeof record?.sourcePath === "string" ? record.sourcePath : "";
+  const recordHasPath = normalizePathForCompare(recordPath) === expectedPath;
+
+  return configHasPath && configEnablesPlugin && recordHasPath;
+}
+
+function readJsonObject(filePath: string): any {
+  try {
+    const parsed = JSON.parse(readFileSync(filePath, "utf8"));
+    return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function normalizePathForCompare(value: string): string {
+  return resolve(value).replaceAll("/", "\\").toLowerCase();
+}
+
 function readWeixinMetadata(root: string): ChannelLoginStatus | null {
   try {
     return JSON.parse(readFileSync(weixinMetadataPath(root), "utf8")) as ChannelLoginStatus;
@@ -194,6 +300,10 @@ function openclawAppDir(root: string): string {
 
 function openclawEntry(root: string): string {
   return join(openclawAppDir(root), "openclaw.mjs");
+}
+
+function weixinPluginPath(root: string): string {
+  return join(openclawAppDir(root), WEIXIN_PACKAGE_PATH);
 }
 
 function weixinLogPath(root: string): string {
