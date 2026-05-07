@@ -276,6 +276,76 @@ function Invoke-ReleaseBuilds {
     }
 }
 
+function Ensure-WeixinChannelPluginPayload {
+    if ($NoPayloads) {
+        return
+    }
+
+    $policy = $script:ChannelPluginPolicy.weixin
+    $openclawRoot = Join-Path $script:SourceRoot "apps\openclaw"
+    if (-not (Test-Path -LiteralPath $openclawRoot -PathType Container)) {
+        $policy.included = $false
+        $policy.reason = "OpenClaw payload is not present."
+        return
+    }
+
+    $pluginPath = Join-Path $openclawRoot "node_modules\@tencent-weixin\openclaw-weixin"
+    if (Test-Path -LiteralPath $pluginPath -PathType Container) {
+        $policy.included = $true
+        $policy.source = $pluginPath
+        return
+    }
+
+    $packageJson = Join-Path $openclawRoot "package.json"
+    if (-not (Test-Path -LiteralPath $packageJson -PathType Leaf)) {
+        throw "OpenClaw WeChat channel plugin is missing, and apps\openclaw\package.json was not found. Rebuild or repair the OpenClaw payload before creating the USB release."
+    }
+
+    $pnpmCommand = Get-Command pnpm -ErrorAction SilentlyContinue
+    if ($null -eq $pnpmCommand) {
+        throw "OpenClaw WeChat channel plugin is missing: apps\openclaw\node_modules\@tencent-weixin\openclaw-weixin. Install pnpm or add the plugin to the OpenClaw payload before creating the USB release."
+    }
+
+    $storeArguments = Get-ExistingPnpmStoreArguments -ProjectRoot $openclawRoot
+    $installArguments = @("--config.minimum-release-age=0") + $storeArguments + @("add", "-w", "@tencent-weixin/openclaw-weixin")
+    $policy.installAttempted = $true
+    $policy.installCommand = "pnpm $($installArguments -join ' ')"
+    Invoke-ReleaseCommand -Title "Install OpenClaw WeChat channel plugin" -FilePath "pnpm" -Arguments $installArguments -WorkingDirectory $openclawRoot
+
+    if (-not (Test-Path -LiteralPath $pluginPath -PathType Container)) {
+        throw "OpenClaw WeChat channel plugin install completed, but the plugin directory is still missing: $pluginPath"
+    }
+
+    $policy.included = $true
+    $policy.source = $pluginPath
+}
+
+function Get-ExistingPnpmStoreArguments {
+    param([Parameter(Mandatory = $true)][string] $ProjectRoot)
+
+    $modulesManifest = Join-Path $ProjectRoot "node_modules\.modules.yaml"
+    if (-not (Test-Path -LiteralPath $modulesManifest -PathType Leaf)) {
+        return @()
+    }
+
+    $raw = Get-Content -LiteralPath $modulesManifest -Raw
+    $storeDir = $null
+    try {
+        $parsed = $raw | ConvertFrom-Json
+        $storeDir = [string] $parsed.storeDir
+    } catch {
+        if ($raw -match 'storeDir["'':\s]+(?<quote>["'']?)(?<value>[^"'',\r\n]+)\k<quote>') {
+            $storeDir = $Matches.value
+        }
+    }
+
+    if ([string]::IsNullOrWhiteSpace($storeDir)) {
+        return @()
+    }
+
+    return @("--store-dir", $storeDir)
+}
+
 function Copy-HostRuntimesIfMissing {
     if (-not (Test-Path -LiteralPath (Join-Path $script:TargetRoot "runtimes\windows\node\node.exe") -PathType Leaf)) {
         Copy-HostNodeRuntime
@@ -351,6 +421,17 @@ $script:CopiedPaths = @()
 $script:AppPayloads = @()
 $script:Warnings = @()
 $script:SkippedReparsePoints = @()
+$script:ChannelPluginPolicy = [ordered]@{
+    weixin = [ordered]@{
+        package = "@tencent-weixin/openclaw-weixin"
+        relativePath = "apps/openclaw/node_modules/@tencent-weixin/openclaw-weixin"
+        included = $false
+        installAttempted = $false
+        installCommand = $null
+        source = $null
+        reason = $null
+    }
+}
 
 if (-not (Test-Path -LiteralPath $script:SourceRoot -PathType Container)) {
     throw "UsbRoot does not exist or is not a directory: $script:SourceRoot"
@@ -465,6 +546,8 @@ $appExcludedFileNames = @(
     "security.md"
 )
 
+Ensure-WeixinChannelPluginPayload
+
 if (-not $NoPayloads) {
     $appsRoot = Join-Path $script:SourceRoot "apps"
     if (Test-Path -LiteralPath $appsRoot -PathType Container) {
@@ -522,6 +605,7 @@ $manifest = [ordered]@{
         excludedFileNames = $appExcludedFileNames
         note = "Some upstream projects may still require source-like runtime directories. The manifest lists any retained candidates for release review."
     }
+    channelPluginPolicy = $script:ChannelPluginPolicy
     copiedPaths = $script:CopiedPaths
     appPayloads = $script:AppPayloads
     skippedReparsePoints = $script:SkippedReparsePoints

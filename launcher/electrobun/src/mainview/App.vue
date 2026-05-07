@@ -293,7 +293,7 @@ function statusLabel(service: ServiceStatus) {
 }
 
 function channelStatusLabel(status?: string) {
-  if (status === "missing-plugin") return "插件缺失";
+  if (status === "missing-plugin") return "准备中";
   if (status === "running") return "登录中";
   if (status === "started") return "已启动";
   if (status === "stopped") return "待登录";
@@ -591,7 +591,7 @@ onBeforeUnmount(() => {
           <div>
             <p class="eyebrow">OpenClaw Channels</p>
             <h3>渠道接入</h3>
-            <p>保持和 vh-claw 一致：微信提供专属扫码登录入口，其它渠道通过 OpenClaw 终端命令接入。</p>
+            <p>微信官方插件已随交付包内置，用户只需要扫码登录即可接入微信，无需额外配置 AppID/Secret。</p>
           </div>
           <button class="ghost" type="button" :disabled="channelBusy" @click="refreshWeixinChannelLogs">刷新日志</button>
         </div>
@@ -603,35 +603,24 @@ onBeforeUnmount(() => {
             </span>
             <div>
               <strong>微信（官方插件）</strong>
-              <span>插件安装后可扫码登录，无需 AppID/Secret。</span>
+              <span>交付包内置微信官方插件，扫码登录即可接入微信。</span>
             </div>
             <span class="pill" :class="channelStatusClass(weixinChannel.status)">
               {{ channelStatusLabel(weixinChannel.status) }}
             </span>
           </div>
           <div class="channel-steps">
-            <span>1. 确认 OpenClaw payload 中存在 @tencent-weixin/openclaw-weixin</span>
-            <span>2. 点击扫码登录，查看下方日志中的二维码输出</span>
-            <span>3. 手机扫码授权后重启 OpenClaw，微信渠道即可上线</span>
+            <span>1. 点击扫码登录，查看下方日志中的二维码输出</span>
+            <span>2. 手机扫码授权后重启 OpenClaw</span>
+            <span>3. 微信渠道上线后即可接收消息</span>
           </div>
           <div class="channel-actions">
             <button class="primary" type="button" :disabled="channelBusy || weixinChannel.status === 'missing-plugin'" @click="startWeixinLogin">微信扫码登录</button>
             <button class="danger" type="button" :disabled="channelBusy || weixinChannel.status !== 'running'" @click="stopWeixinLogin">停止登录</button>
             <button class="ghost" type="button" @click="openWeixinDocs">插件文档</button>
           </div>
-          <p v-for="message in weixinChannel.messages || []" :key="message" class="channel-message">{{ message }}</p>
+          <p v-for="message in weixinChannel.status === 'missing-plugin' ? [] : (weixinChannel.messages || [])" :key="message" class="channel-message">{{ message }}</p>
         </article>
-
-        <div class="channel-grid">
-          <article v-for="channel in ['QQ Bot', 'Telegram', '飞书', 'Slack']" :key="channel" class="channel-mini-card">
-            <span class="channel-mini-icon color-icon" :class="providerTone(channel)">
-              <IconGlyph name="plug" />
-            </span>
-            <strong>{{ channel }}</strong>
-            <p>与 vh-claw 保持一致，先通过 OpenClaw CLI 配置。</p>
-            <code>openclaw channels setup</code>
-          </article>
-        </div>
 
         <section class="panel channel-log">
           <div class="panel-head">

@@ -1126,7 +1126,11 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertIn("渠道接入", vue_app)
         self.assertIn("微信扫码登录", vue_app)
         self.assertIn("停止登录", vue_app)
-        self.assertIn("openclaw channels setup", vue_app)
+        self.assertNotIn("插件缺失", vue_app)
+        self.assertNotIn("openclaw channels setup", vue_app)
+        self.assertNotIn("QQ Bot", vue_app)
+        self.assertNotIn("Telegram", vue_app)
+        self.assertNotIn("Slack", vue_app)
         self.assertIn("startWeixinLogin", vue_app)
         self.assertIn("stopWeixinLogin", vue_app)
         self.assertIn("channelStatusLabel", vue_app)
@@ -1168,7 +1172,7 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertIn(".services-page", styles)
         self.assertIn(".channels-page", styles)
         self.assertIn(".channel-card", styles)
-        self.assertIn(".channel-mini-card", styles)
+        self.assertNotIn(".channel-mini-card", styles)
         self.assertIn(".service-hero", styles)
         self.assertIn(".service-particles", styles)
         self.assertIn(".service-product-wrap", styles)
@@ -4053,6 +4057,7 @@ class WindowsCoreTests(unittest.TestCase):
                 "apps/openclaw/tests",
                 "apps/openclaw/docs",
                 "apps/openclaw/docs/reference/templates",
+                "apps/openclaw/node_modules/@tencent-weixin/openclaw-weixin",
                 "apps/openclaw/venv/bin",
                 "docs",
             ]:
@@ -4093,6 +4098,10 @@ class WindowsCoreTests(unittest.TestCase):
             (source_root / "apps" / "openclaw" / "docs" / "readme.md").write_text("docs\n", encoding="utf-8")
             (source_root / "apps" / "openclaw" / "docs" / "reference" / "templates" / "AGENTS.md").write_text(
                 "runtime template\n",
+                encoding="utf-8",
+            )
+            (source_root / "apps" / "openclaw" / "node_modules" / "@tencent-weixin" / "openclaw-weixin" / "package.json").write_text(
+                '{"name":"@tencent-weixin/openclaw-weixin"}\n',
                 encoding="utf-8",
             )
             (source_root / "apps" / "openclaw" / ".git" / "config").write_text("git\n", encoding="utf-8")
@@ -4139,6 +4148,17 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertFalse((output_root / "apps" / "openclaw" / "tests").exists())
             self.assertTrue((output_root / "apps" / "openclaw" / "docs" / "readme.md").exists())
             self.assertTrue((output_root / "apps" / "openclaw" / "docs" / "reference" / "templates" / "AGENTS.md").exists())
+            self.assertTrue(
+                (
+                    output_root
+                    / "apps"
+                    / "openclaw"
+                    / "node_modules"
+                    / "@tencent-weixin"
+                    / "openclaw-weixin"
+                    / "package.json"
+                ).exists()
+            )
             self.assertFalse((output_root / "apps" / "openclaw" / "venv" / "bin" / "python").exists())
 
             manifest = json.loads((output_root / "release-manifest.json").read_text(encoding="utf-8"))
@@ -4148,6 +4168,8 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertIn("PyQt", manifest["rootEntrypointPolicy"])
             self.assertIn(".git", manifest["appPayloadPolicy"]["excludedDirectoryNames"])
             self.assertNotIn("src", manifest["appPayloadPolicy"]["excludedDirectoryNames"])
+            self.assertEqual(manifest["channelPluginPolicy"]["weixin"]["package"], "@tencent-weixin/openclaw-weixin")
+            self.assertTrue(manifest["channelPluginPolicy"]["weixin"]["included"])
             self.assertEqual([item["serviceId"] for item in manifest["appPayloads"]], ["openclaw"])
             self.assertIn(
                 str(Path("apps") / "openclaw" / "venv" / "bin" / "python"),
@@ -4230,6 +4252,90 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertEqual(manifest["entryPoint"], "ClawHermes-Control.exe")
             self.assertIn("PyQt", manifest["rootEntrypointPolicy"])
             self.assertTrue(manifest["build"]["skipped"])
+        finally:
+            temp_dir.cleanup()
+            output_dir.cleanup()
+
+    def test_usb_release_script_records_weixin_channel_plugin_payload(self):
+        release_script = ROOT / "scripts" / "release" / "Build-UsbRelease.ps1"
+        temp_dir = tempfile.TemporaryDirectory()
+        output_dir = tempfile.TemporaryDirectory()
+        try:
+            source_root = Path(temp_dir.name)
+            output_root = Path(output_dir.name) / "ClawHermes"
+            for relative_dir in [
+                "launcher/pyqt/dist/ClawHermes-Control",
+                "core/node/dist",
+                "adapters/openclaw",
+                "config/defaults",
+                "portal",
+                "runtimes/windows/node",
+                "runtimes/windows/python",
+                "apps/openclaw/node_modules/@tencent-weixin/openclaw-weixin",
+                "docs",
+            ]:
+                (source_root / relative_dir).mkdir(parents=True, exist_ok=True)
+
+            (source_root / "launcher" / "pyqt" / "dist" / "ClawHermes-Control" / "ClawHermes-Control.exe").write_text(
+                "pyqt exe\n",
+                encoding="utf-8",
+            )
+            (source_root / "core" / "node" / "dist" / "clawhermes.js").write_text(
+                "console.log('core')\n",
+                encoding="utf-8",
+            )
+            (source_root / "adapters" / "openclaw" / "adapter.json").write_text(
+                '{"id":"openclaw"}\n',
+                encoding="utf-8",
+            )
+            (source_root / "apps" / "openclaw" / "package.json").write_text(
+                '{"name":"openclaw"}\n',
+                encoding="utf-8",
+            )
+            (source_root / "apps" / "openclaw" / "node_modules" / "@tencent-weixin" / "openclaw-weixin" / "package.json").write_text(
+                '{"name":"@tencent-weixin/openclaw-weixin"}\n',
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    "powershell",
+                    "-NoProfile",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(release_script),
+                    "-UsbRoot",
+                    str(source_root),
+                    "-OutputRoot",
+                    str(output_root),
+                    "-Clean",
+                    "-SkipBuild",
+                    "-NoStop",
+                    "-NoBundleHostRuntimes",
+                ],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(
+                (
+                    output_root
+                    / "apps"
+                    / "openclaw"
+                    / "node_modules"
+                    / "@tencent-weixin"
+                    / "openclaw-weixin"
+                    / "package.json"
+                ).exists()
+            )
+
+            manifest = json.loads((output_root / "release-manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual(manifest["channelPluginPolicy"]["weixin"]["package"], "@tencent-weixin/openclaw-weixin")
+            self.assertTrue(manifest["channelPluginPolicy"]["weixin"]["included"])
         finally:
             temp_dir.cleanup()
             output_dir.cleanup()

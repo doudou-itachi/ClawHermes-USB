@@ -19,12 +19,13 @@ Status: `Done`
 
 Summary:
 
-- Added an Electrobun `渠道接入` page that matches the current `vh-claw` channel depth.
+- Added an Electrobun `渠道接入` page scoped to the WeChat channel only.
 - WeChat is exposed as the first-class GUI entry and calls the OpenClaw `channels login --channel openclaw-weixin` flow through the local control server.
 - The WeChat login output is written to `data/logs/channel-weixin.log` and shown in the UI.
 - The WeChat login process can be stopped from the UI and is also stopped during Electrobun close cleanup.
-- QQ Bot, Telegram, Feishu, and Slack are shown as CLI-guided cards using `openclaw channels setup`, because `vh-claw` does not implement GUI forms for them.
-- The UI reports a missing plugin instead of pretending WeChat login is available when `apps/openclaw/node_modules/@tencent-weixin/openclaw-weixin` is not present.
+- Removed QQ Bot, Telegram, Feishu, and Slack from the UI because the upstream `vh-claw` repository does not implement GUI channel forms for them.
+- The release script now verifies `apps/openclaw/node_modules/@tencent-weixin/openclaw-weixin` before copying payloads, installs it with `pnpm --config.minimum-release-age=0 add -w @tencent-weixin/openclaw-weixin` when missing, and records the result in `release-manifest.json` under `channelPluginPolicy.weixin`.
+- The UI no longer shows a user-facing “plugin missing” prompt for WeChat in the normal delivery path.
 
 Changed areas:
 
@@ -34,6 +35,7 @@ Changed areas:
 - `launcher/electrobun/src/mainview/App.vue`
 - `launcher/electrobun/src/mainview/style.css`
 - `launcher/electrobun/src/shared/types.ts`
+- `scripts/release/Build-UsbRelease.ps1`
 - `docs/electrobun-control-shell.zh-CN.md`
 - `tests/test_windows_core.py`
 
@@ -41,11 +43,11 @@ Validation performed:
 
 - `npm run build`
 - `bun run typecheck`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_usb_release_script_records_weixin_channel_plugin_payload tests.test_windows_core.WindowsCoreTests.test_electrobun_control_shell_scaffold_matches_vh_claw_style -v`
 
 Next steps:
 
-- Verify the WeChat QR flow with a payload that includes `@tencent-weixin/openclaw-weixin`.
-- If QQ Bot, Telegram, Feishu, or Slack need GUI setup, design those forms separately from the current vh-claw parity scope.
+- Verify the WeChat QR flow from the generated USB package.
 
 ## 2026-05-06
 
