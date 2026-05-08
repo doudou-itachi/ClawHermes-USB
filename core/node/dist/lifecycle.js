@@ -11,6 +11,7 @@ const portable_1 = require("./portable");
 const wsl_adapter_1 = require("./wsl-adapter");
 const wsl_1 = require("./wsl");
 const command_template_1 = require("./command-template");
+const skills_1 = require("./skills");
 function startAdapter(root, adapter, options = {}) {
     const pidFile = (0, portable_1.resolveRelative)(root, adapter.pidFile);
     const logFile = (0, portable_1.resolveRelative)(root, adapter.logFile);
@@ -186,6 +187,9 @@ function prepareOpenClawEnvironment(root, serviceEnv) {
     const existing = readJsonObject(configPath);
     const gateway = objectValue(existing.gateway);
     const logging = objectValue(existing.logging);
+    const skills = objectValue(existing.skills);
+    const skillsLoad = objectValue(skills.load);
+    const portableSkillsDir = (0, skills_1.ensurePortableSkillsDir)(root);
     const token = serviceEnv.env.OPENCLAW_GATEWAY_TOKEN || "clawhermes";
     const runtimeLogPath = (0, wsl_adapter_1.windowsPathToWslPath)((0, portable_1.resolveRelative)(root, "data/logs/openclaw-runtime.log"));
     (0, node_fs_1.writeFileSync)(configPath, `${JSON.stringify({
@@ -204,6 +208,13 @@ function prepareOpenClawEnvironment(root, serviceEnv) {
             ...logging,
             file: runtimeLogPath,
         },
+        skills: {
+            ...skills,
+            load: {
+                ...skillsLoad,
+                extraDirs: appendUniquePathEntry(skillsLoad.extraDirs, portableSkillsDir),
+            },
+        },
     }, null, 2)}\n`, "utf8");
 }
 function readJsonObject(path) {
@@ -216,6 +227,20 @@ function readJsonObject(path) {
 }
 function objectValue(value) {
     return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+function appendUniquePathEntry(value, pathValue) {
+    const entries = Array.isArray(value) ? value.filter((item) => typeof item === "string" && item.trim().length > 0) : [];
+    const normalizedTarget = normalizePathForComparison(pathValue);
+    const hasTarget = entries.some((item) => normalizePathForComparison(item) === normalizedTarget);
+    return hasTarget ? entries : [...entries, pathValue];
+}
+function normalizePathForComparison(pathValue) {
+    try {
+        return (0, node_path_1.resolve)(pathValue).replace(/[\\/]+$/, "").toLowerCase();
+    }
+    catch {
+        return pathValue.replace(/[\\/]+$/, "").toLowerCase();
+    }
 }
 function nativeManagedProcessPlan(command) {
     if (/[&|<>]/.test(command))

@@ -3832,6 +3832,79 @@ class WindowsCoreTests(unittest.TestCase):
             wait_for_no_process_command_line_fragment(temp_root)
             temp_dir.cleanup()
 
+    def test_start_openclaw_registers_portable_skills_dir_once(self):
+        temp_dir, temp_root = make_temp_skeleton_usb_root()
+        process_id = None
+        try:
+            app_dir = temp_root / "apps" / "openclaw"
+            (app_dir / "openclaw.mjs").write_text("console.log('openclaw test payload')\n", encoding="utf-8")
+            skills_dir = temp_root / "skills"
+            (skills_dir / "wecom-msg").mkdir(parents=True)
+            (skills_dir / "wecom-msg" / "SKILL.md").write_text(
+                "---\nname: wecom-msg\ndescription: 企业微信消息技能\n---\n",
+                encoding="utf-8",
+            )
+            config_path = temp_root / "data" / "openclaw" / "openclaw.json"
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "skills": {
+                            "load": {},
+                        },
+                    },
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
+            adapter_path = temp_root / "adapters" / "openclaw" / "adapter.json"
+            adapter = json.loads(adapter_path.read_text(encoding="utf-8"))
+            adapter["health"] = {"type": "process", "timeoutSeconds": 5}
+            adapter_path.write_text(json.dumps(adapter, indent=2), encoding="utf-8")
+            fake_wsl = make_fake_wsl_cmd(temp_root, list_distribution="ClawHermes-Ubuntu")
+
+            start = run_dispatcher_for_root(
+                temp_root,
+                "start-adapter",
+                "openclaw",
+                "--confirm-start",
+                "-Json",
+                env={"CLAWHERMES_WSL_EXE": str(fake_wsl)},
+            )
+
+            self.assertEqual(start.returncode, 0, start.stderr)
+            metadata = json.loads((temp_root / "data" / "tmp" / "pids" / "openclaw.pid").read_text(encoding="utf-8"))
+            process_id = metadata["processId"]
+            refreshed = json.loads(config_path.read_text(encoding="utf-8"))
+            extra_dirs = refreshed["skills"]["load"]["extraDirs"]
+            self.assertEqual(len([item for item in extra_dirs if Path(item).resolve() == skills_dir.resolve()]), 1)
+            self.assertEqual(Path(extra_dirs[-1]).resolve(), skills_dir.resolve())
+
+            stopped = run_dispatcher_for_root(temp_root, "stop", "-Json", env={"CLAWHERMES_WSL_EXE": str(fake_wsl)})
+            self.assertEqual(stopped.returncode, 0, stopped.stderr)
+            wait_for_process_exit(process_id)
+            process_id = None
+
+            restarted = run_dispatcher_for_root(
+                temp_root,
+                "start-adapter",
+                "openclaw",
+                "--confirm-start",
+                "-Json",
+                env={"CLAWHERMES_WSL_EXE": str(fake_wsl)},
+            )
+            self.assertEqual(restarted.returncode, 0, restarted.stderr)
+            metadata = json.loads((temp_root / "data" / "tmp" / "pids" / "openclaw.pid").read_text(encoding="utf-8"))
+            process_id = metadata["processId"]
+            refreshed = json.loads(config_path.read_text(encoding="utf-8"))
+            extra_dirs = refreshed["skills"]["load"]["extraDirs"]
+            self.assertEqual(len([item for item in extra_dirs if Path(item).resolve() == skills_dir.resolve()]), 1)
+        finally:
+            run_dispatcher_for_root(temp_root, "stop", "-Json", env={"CLAWHERMES_WSL_EXE": str(temp_root / "fake-wsl.cmd")})
+            if process_id:
+                wait_for_process_exit(process_id)
+            wait_for_no_process_command_line_fragment(temp_root)
+            temp_dir.cleanup()
+
     def test_status_removes_stale_managed_adapter_pid_file(self):
         temp_dir, temp_root = make_temp_process_usb_root()
         try:
@@ -4072,6 +4145,7 @@ class WindowsCoreTests(unittest.TestCase):
                 "apps/openclaw/docs/reference/templates",
                 "apps/openclaw/node_modules/@tencent-weixin/openclaw-weixin",
                 "apps/openclaw/venv/bin",
+                "skills/wecom-msg",
                 "docs",
             ]:
                 (source_root / relative_dir).mkdir(parents=True, exist_ok=True)
@@ -4115,6 +4189,10 @@ class WindowsCoreTests(unittest.TestCase):
             )
             (source_root / "apps" / "openclaw" / "node_modules" / "@tencent-weixin" / "openclaw-weixin" / "package.json").write_text(
                 '{"name":"@tencent-weixin/openclaw-weixin"}\n',
+                encoding="utf-8",
+            )
+            (source_root / "skills" / "wecom-msg" / "SKILL.md").write_text(
+                "---\nname: wecom-msg\ndescription: 企业微信消息技能\n---\n",
                 encoding="utf-8",
             )
             (source_root / "apps" / "openclaw" / ".git" / "config").write_text("git\n", encoding="utf-8")
@@ -4172,6 +4250,7 @@ class WindowsCoreTests(unittest.TestCase):
                     / "package.json"
                 ).exists()
             )
+            self.assertTrue((output_root / "skills" / "wecom-msg" / "SKILL.md").exists())
             self.assertFalse((output_root / "apps" / "openclaw" / "venv" / "bin" / "python").exists())
 
             manifest = json.loads((output_root / "release-manifest.json").read_text(encoding="utf-8"))
@@ -4184,6 +4263,9 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertEqual(manifest["channelPluginPolicy"]["weixin"]["package"], "@tencent-weixin/openclaw-weixin")
             self.assertTrue(manifest["channelPluginPolicy"]["weixin"]["included"])
             self.assertEqual([item["serviceId"] for item in manifest["appPayloads"]], ["openclaw"])
+            self.assertEqual(manifest["skillsPayload"]["source"], str(source_root / "skills"))
+            self.assertEqual(manifest["skillsPayload"]["target"], str(output_root / "skills"))
+            self.assertEqual(manifest["skillsPayload"]["skillCount"], 1)
             self.assertIn(
                 str(Path("apps") / "openclaw" / "venv" / "bin" / "python"),
                 manifest["skippedReparsePoints"],
@@ -4349,6 +4431,86 @@ class WindowsCoreTests(unittest.TestCase):
             manifest = json.loads((output_root / "release-manifest.json").read_text(encoding="utf-8"))
             self.assertEqual(manifest["channelPluginPolicy"]["weixin"]["package"], "@tencent-weixin/openclaw-weixin")
             self.assertTrue(manifest["channelPluginPolicy"]["weixin"]["included"])
+        finally:
+            temp_dir.cleanup()
+            output_dir.cleanup()
+
+    def test_usb_release_script_copies_portable_skills_payload(self):
+        release_script = ROOT / "scripts" / "release" / "Build-UsbRelease.ps1"
+        temp_dir = tempfile.TemporaryDirectory()
+        output_dir = tempfile.TemporaryDirectory()
+        try:
+            source_root = Path(temp_dir.name)
+            output_root = Path(output_dir.name) / "ClawHermes"
+            for relative_dir in [
+                "launcher/pyqt/dist/ClawHermes-Control",
+                "core/node/dist",
+                "adapters/openclaw",
+                "config/defaults",
+                "portal",
+                "runtimes/windows/node",
+                "runtimes/windows/python",
+                "apps/openclaw/node_modules/@tencent-weixin/openclaw-weixin",
+                "skills/wecom-msg",
+                "docs",
+            ]:
+                (source_root / relative_dir).mkdir(parents=True, exist_ok=True)
+
+            (source_root / "launcher" / "pyqt" / "dist" / "ClawHermes-Control" / "ClawHermes-Control.exe").write_text(
+                "pyqt exe\n",
+                encoding="utf-8",
+            )
+            (source_root / "core" / "node" / "dist" / "clawhermes.js").write_text(
+                "console.log('core')\n",
+                encoding="utf-8",
+            )
+            (source_root / "adapters" / "openclaw" / "adapter.json").write_text(
+                '{"id":"openclaw"}\n',
+                encoding="utf-8",
+            )
+            (source_root / "apps" / "openclaw" / "package.json").write_text(
+                '{"name":"openclaw"}\n',
+                encoding="utf-8",
+            )
+            (source_root / "apps" / "openclaw" / "node_modules" / "@tencent-weixin" / "openclaw-weixin" / "package.json").write_text(
+                '{"name":"@tencent-weixin/openclaw-weixin"}\n',
+                encoding="utf-8",
+            )
+            (source_root / "skills" / "wecom-msg" / "SKILL.md").write_text(
+                "---\nname: wecom-msg\ndescription: 企业微信消息技能\n---\n",
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    "powershell",
+                    "-NoProfile",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(release_script),
+                    "-UsbRoot",
+                    str(source_root),
+                    "-OutputRoot",
+                    str(output_root),
+                    "-Clean",
+                    "-SkipBuild",
+                    "-NoStop",
+                    "-NoBundleHostRuntimes",
+                ],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue((output_root / "skills" / "wecom-msg" / "SKILL.md").exists())
+            self.assertFalse((output_root / "apps" / "openclaw" / "skills" / "wecom-msg" / "SKILL.md").exists())
+            manifest = json.loads((output_root / "release-manifest.json").read_text(encoding="utf-8"))
+            self.assertTrue(manifest["skillsPayload"]["included"])
+            self.assertEqual(manifest["skillsPayload"]["skillCount"], 1)
+            self.assertIn("outside apps/openclaw", manifest["skillsPayload"]["policy"])
         finally:
             temp_dir.cleanup()
             output_dir.cleanup()
@@ -4691,6 +4853,45 @@ class WindowsCoreTests(unittest.TestCase):
 
             stop_services = post_json(f"{base}/api/services/stop", timeout=20)
             self.assertIn("fake-service", stop_services["stopped"])
+        finally:
+            try:
+                post_json(f"http://127.0.0.1:{port}/api/shutdown", timeout=5)
+            except Exception:
+                pass
+            run_dispatcher_for_root(temp_root, "stop", "-Json")
+            temp_dir.cleanup()
+
+    def test_control_server_lists_portable_skills_once_by_name(self):
+        temp_dir, temp_root = make_temp_process_usb_root()
+        port = free_tcp_port()
+        try:
+            skills_dir = temp_root / "skills"
+            for relative in ("wecom-msg", "nested/wecom-msg-copy", "feishu-create-doc"):
+                (skills_dir / relative).mkdir(parents=True, exist_ok=True)
+            (skills_dir / "wecom-msg" / "SKILL.md").write_text(
+                "---\nname: wecom-msg\ndescription: 企业微信消息技能\n---\n",
+                encoding="utf-8",
+            )
+            (skills_dir / "nested" / "wecom-msg-copy" / "SKILL.md").write_text(
+                "---\nname: wecom-msg\ndescription: 重复的企业微信消息技能\n---\n",
+                encoding="utf-8",
+            )
+            (skills_dir / "feishu-create-doc" / "SKILL.md").write_text(
+                "---\nname: feishu-create-doc\ndescription: |\n  创建飞书云文档。\n---\n",
+                encoding="utf-8",
+            )
+
+            start = run_dispatcher_for_root(temp_root, "control-server", "--port", str(port), "-Json")
+            self.assertEqual(start.returncode, 0, start.stderr)
+            base = f"http://127.0.0.1:{port}"
+
+            payload = fetch_json(f"{base}/api/skills", timeout=5)
+
+            self.assertEqual(Path(payload["skillsDir"]).resolve(), skills_dir.resolve())
+            self.assertEqual(payload["total"], 2)
+            self.assertEqual([skill["name"] for skill in payload["skills"]], ["feishu-create-doc", "wecom-msg"])
+            self.assertEqual(payload["skills"][0]["description"], "创建飞书云文档。")
+            self.assertTrue(payload["deduplicated"])
         finally:
             try:
                 post_json(f"http://127.0.0.1:{port}/api/shutdown", timeout=5)

@@ -1,12 +1,13 @@
 import { execFileSync, spawn, spawnSync, type StdioOptions } from "node:child_process";
 import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import type { AdapterDescriptor, ServiceEnvironment } from "./types";
 import { resolveServiceEnvironment } from "./environment";
 import { resolveRelative, writeLog } from "./portable";
 import { windowsPathToWslPath, wslAdapterCommandPlan } from "./wsl-adapter";
 import { wslExecutableInvocation } from "./wsl";
 import { expandCommandTemplate } from "./command-template";
+import { ensurePortableSkillsDir } from "./skills";
 
 export type ManagedProcessPlan = {
   runner?: string;
@@ -196,6 +197,9 @@ function prepareOpenClawEnvironment(root: string, serviceEnv: ServiceEnvironment
   const existing = readJsonObject(configPath);
   const gateway = objectValue(existing.gateway);
   const logging = objectValue(existing.logging);
+  const skills = objectValue(existing.skills);
+  const skillsLoad = objectValue(skills.load);
+  const portableSkillsDir = ensurePortableSkillsDir(root);
   const token = serviceEnv.env.OPENCLAW_GATEWAY_TOKEN || "clawhermes";
   const runtimeLogPath = windowsPathToWslPath(resolveRelative(root, "data/logs/openclaw-runtime.log"));
   writeFileSync(
@@ -217,6 +221,13 @@ function prepareOpenClawEnvironment(root: string, serviceEnv: ServiceEnvironment
           ...logging,
           file: runtimeLogPath,
         },
+        skills: {
+          ...skills,
+          load: {
+            ...skillsLoad,
+            extraDirs: appendUniquePathEntry(skillsLoad.extraDirs, portableSkillsDir),
+          },
+        },
       },
       null,
       2,
@@ -235,6 +246,21 @@ function readJsonObject(path: string): Record<string, unknown> {
 
 function objectValue(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function appendUniquePathEntry(value: unknown, pathValue: string): string[] {
+  const entries = Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0) : [];
+  const normalizedTarget = normalizePathForComparison(pathValue);
+  const hasTarget = entries.some((item) => normalizePathForComparison(item) === normalizedTarget);
+  return hasTarget ? entries : [...entries, pathValue];
+}
+
+function normalizePathForComparison(pathValue: string): string {
+  try {
+    return resolve(pathValue).replace(/[\\/]+$/, "").toLowerCase();
+  } catch {
+    return pathValue.replace(/[\\/]+$/, "").toLowerCase();
+  }
 }
 
 function nativeManagedProcessPlan(command: string): { executablePath: string; args: string[] } | null {

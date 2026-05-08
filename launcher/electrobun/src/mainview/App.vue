@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, h, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { Electroview } from "electrobun/view";
-import type { BootstrapPayload, ChannelLoginStatus, LogPayload, ModelConfig, ServiceStatus, StatusPayload } from "../shared/types";
+import type { BootstrapPayload, ChannelLoginStatus, LogPayload, ModelConfig, PortableSkill, ServiceStatus, SkillsPayload, StatusPayload } from "../shared/types";
 import product12Image from "./assets/product12.png";
 
 type IconName =
@@ -22,7 +22,8 @@ type IconName =
   | "play"
   | "stop"
   | "refresh"
-  | "maximize";
+  | "maximize"
+  | "spark";
 
 const rpc = Electroview.defineRPC({ handlers: { requests: {}, messages: {} } });
 const electrobun = new Electroview({ rpc });
@@ -46,6 +47,7 @@ const icons: Record<IconName, string> = {
   stop: "M7 7h10v10H7V7Z",
   refresh: "M20 6v5h-5M4 18v-5h5m9.2-4.8A7 7 0 0 0 6.6 7.6L4 11m16 2-2.6 3.4A7 7 0 0 1 5.8 15.8",
   maximize: "M8 4H4v4m12-4h4v4M4 16v4h4m12-4v4h-4",
+  spark: "M12 3.2 13.7 9l5.8 1.7-5.8 1.7L12 18.2l-1.7-5.8-5.8-1.7 5.8-1.7L12 3.2Zm6.2 11.4.7 2.4 2.4.7-2.4.7-.7 2.4-.7-2.4-2.4-.7 2.4-.7.7-2.4Z",
 };
 
 const IconGlyph = (props: { name: IconName }) =>
@@ -67,6 +69,7 @@ const tabs: Array<{ id: string; label: string; icon: IconName; tone: string }> =
   { id: "console", label: "控制台", icon: "home", tone: "sky" },
   { id: "models", label: "模型配置", icon: "bot", tone: "violet" },
   { id: "channels", label: "渠道接入", icon: "target", tone: "rose" },
+  { id: "skills", label: "技能中心", icon: "spark", tone: "cyan" },
   { id: "services", label: "服务", icon: "plug", tone: "blue" },
   { id: "logs", label: "运行日志", icon: "terminal", tone: "emerald" },
   { id: "settings", label: "设置", icon: "service", tone: "amber" },
@@ -99,6 +102,7 @@ const providerPresets: ProviderPreset[] = [
 
 const activeTab = ref("console");
 const services = ref<ServiceStatus[]>([]);
+const skillsPayload = ref<SkillsPayload>({ root: "", skillsDir: "", exists: false, total: 0, deduplicated: false, skills: [] });
 const logs = ref<string[]>([]);
 const channelLogs = ref<string[]>([]);
 const weixinChannel = ref<ChannelLoginStatus>({});
@@ -140,6 +144,10 @@ async function refresh() {
 async function refreshLogs() {
   const payload = (await requestFromBun("getLogs")) as LogPayload;
   logs.value = payload.lines ?? [];
+}
+
+async function refreshSkills() {
+  skillsPayload.value = (await requestFromBun("getSkills")) as SkillsPayload;
 }
 
 async function refreshWeixinChannel() {
@@ -292,6 +300,14 @@ function statusLabel(service: ServiceStatus) {
   return service.status || "unknown";
 }
 
+function skillTone(skill: PortableSkill): string {
+  return providerTone(skill.name);
+}
+
+function skillInitial(skill: PortableSkill): string {
+  return (skill.name || "S").slice(0, 1).toUpperCase();
+}
+
 function channelStatusLabel(status?: string) {
   if (status === "missing-plugin") return "准备中";
   if (status === "running") return "登录中";
@@ -429,13 +445,16 @@ onMounted(async () => {
   const data = (await requestFromBun("getBootstrap")) as BootstrapPayload;
   bootstrap.root = data.root;
   bootstrap.controlUrl = data.controlUrl;
-  await Promise.all([refresh(), refreshLogs(), loadModelConfig(), refreshWeixinChannel(), refreshWeixinChannelLogs()]);
+  await Promise.all([refresh(), refreshSkills(), refreshLogs(), loadModelConfig(), refreshWeixinChannel(), refreshWeixinChannelLogs()]);
   timer = window.setInterval(refresh, 1500);
 });
 
 watch(activeTab, async (tab) => {
   if (tab === "channels") {
     await Promise.all([refreshWeixinChannel(), refreshWeixinChannelLogs()]);
+  }
+  if (tab === "skills") {
+    await refreshSkills();
   }
   if (tab !== "services") {
     stopServiceParticles();
@@ -629,6 +648,64 @@ onBeforeUnmount(() => {
           </div>
           <pre>{{ channelLogs.join("\n") || "暂无微信登录日志。点击微信扫码登录后，这里会显示 OpenClaw 输出。" }}</pre>
         </section>
+      </section>
+
+      <section v-if="activeTab === 'skills'" class="skills-page">
+        <div class="panel skills-hero">
+          <div>
+            <p class="eyebrow">OpenClaw Skills</p>
+            <h3>技能中心</h3>
+            <p>技能包独立存放在交付目录的 skills 文件夹，OpenClaw 启动时会自动加载该目录，后续替换 OpenClaw payload 不会覆盖这里。</p>
+            <code>{{ skillsPayload.skillsDir || bootstrap.root + "\\skills" }}</code>
+          </div>
+          <button class="ghost" type="button" @click="refreshSkills">刷新技能</button>
+        </div>
+
+        <div class="skill-stats">
+          <article class="metric-card cyan">
+            <span class="metric-icon color-icon cyan">
+              <IconGlyph name="spark" />
+            </span>
+            <div>
+              <span>已加载技能</span>
+              <strong>{{ skillsPayload.total }}</strong>
+            </div>
+          </article>
+          <article class="metric-card emerald">
+            <span class="metric-icon color-icon emerald">
+              <IconGlyph name="check" />
+            </span>
+            <div>
+              <span>去重状态</span>
+              <strong>{{ skillsPayload.deduplicated ? "已去重" : "正常" }}</strong>
+            </div>
+          </article>
+        </div>
+
+        <div v-if="skillsPayload.skills.length" class="skills-grid">
+          <article v-for="skill in skillsPayload.skills" :key="skill.name" class="skill-card">
+            <div class="skill-card-head">
+              <span class="skill-icon color-icon" :class="skillTone(skill)">{{ skillInitial(skill) }}</span>
+              <div>
+                <strong>{{ skill.name }}</strong>
+                <span>{{ skill.source === "portable" ? "交付技能包" : skill.source }}</span>
+              </div>
+              <span v-if="skill.duplicateCount > 0" class="pill warning">去重 {{ skill.duplicateCount }}</span>
+            </div>
+            <p>{{ skill.description }}</p>
+            <code>{{ skill.relativePath }}</code>
+          </article>
+        </div>
+
+        <div v-else class="panel empty-skills">
+          <span class="empty-icon color-icon cyan">
+            <IconGlyph name="spark" />
+          </span>
+          <div>
+            <h3>暂无技能</h3>
+            <p>把技能包放到交付目录的 skills 文件夹后，点击刷新即可看到；启动 OpenClaw 时会自动加载这个目录。</p>
+          </div>
+        </div>
       </section>
 
       <section v-if="activeTab === 'services'" class="services-page">

@@ -88,6 +88,14 @@ U 盘交付目录根部应优先开放 `ClawHermes-Control-Electrobun.exe`。它
 - 点击“微信扫码登录”时，control-server 会先按当前 U 盘路径检查 OpenClaw 的插件账本和 `openclaw.json`。如果缺失或仍指向旧路径，会自动执行 `openclaw plugins install <本地微信插件路径> --link` 注册本地插件，再启动 `channels login`，避免 OpenClaw 弹出交互式 `Install Weixin plugin?` 选择。
 - 界面不再向用户展示“插件缺失”或其它渠道的终端命令指引。若以后重新替换 OpenClaw payload，只要仍通过 `scripts/release/Build-UsbRelease.ps1` 生成交付包，微信插件就会被重新检查并打进交付物。
 
+## 技能中心与独立技能包
+
+- 左侧导航新增 `技能中心`，通过 control-server 的 `/api/skills` 读取交付目录根部的 `skills/`，并以卡片形式展示 `SKILL.md` 中的技能名称、描述和相对路径。
+- 技能包不放入 `apps/openclaw`。交付目录结构为 `<USB_ROOT>/skills/<skill>/SKILL.md`，便于后续单独维护技能包，也避免替换 OpenClaw payload 时覆盖用户技能。
+- OpenClaw 启动前，ClawHermes 会确保 `data/openclaw/openclaw.json` 中存在 `skills.load.extraDirs = ["<USB_ROOT>/skills"]`。如果该路径已经存在，不会重复追加。
+- 技能中心展示时按 `name` 去重。OpenClaw 自身也会按技能名合并，因此重复技能不会在模型可用技能列表中反复出现。
+- 发布脚本会把仓库根部 `skills/` 复制到交付包根部 `skills/`，并在 `release-manifest.json` 的 `skillsPayload` 中记录来源、目标、是否包含和 `SKILL.md` 数量。
+
 ## 本地测试包
 
 本地测试包会放到 `dist-usb` 下的一个独立目录中，入口文件是：

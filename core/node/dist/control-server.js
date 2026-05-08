@@ -15,6 +15,7 @@ const portable_1 = require("./portable");
 const status_1 = require("./status");
 const diagnostics_2 = require("./diagnostics");
 const channels_1 = require("./channels");
+const skills_1 = require("./skills");
 function startControlServer(usbRoot, options) {
     const root = (0, portable_1.getRoot)(usbRoot);
     const existing = readControlServerMetadata(root);
@@ -171,6 +172,10 @@ async function routeRequest(root, request, response) {
     }
     if (request.method === "GET" && pathname === "/api/install/status") {
         sendJson(response, 200, (0, diagnostics_2.setupDiagnostics)(root));
+        return;
+    }
+    if (request.method === "GET" && pathname === "/api/skills") {
+        sendJson(response, 200, (0, skills_1.listPortableSkills)(root));
         return;
     }
     if (request.method === "GET" && pathname === "/api/model-config") {

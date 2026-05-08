@@ -171,6 +171,40 @@ function Copy-ReleasePath {
     }
 }
 
+function Copy-SkillsPayload {
+    $source = Join-Path $script:SourceRoot "skills"
+    $target = Join-Path $script:TargetRoot "skills"
+    $policy = "Portable skills are stored outside apps/openclaw and loaded through OpenClaw skills.load.extraDirs."
+
+    if (Test-Path -LiteralPath $source -PathType Container) {
+        Copy-Tree -Source $source -Destination $target -ExcludedDirectoryNames @(".git", ".github", ".vscode", "node_modules", "__pycache__") -ExcludedFileNames @(".gitignore", ".dockerignore")
+        $skillCount = @(Get-ChildItem -LiteralPath $target -Recurse -File -Filter "SKILL.md" -ErrorAction SilentlyContinue).Count
+        $script:SkillsPayload = [ordered]@{
+            source = $source
+            target = $target
+            included = $true
+            skillCount = $skillCount
+            policy = $policy
+        }
+        $script:CopiedPaths += [ordered]@{
+            path = "skills"
+            source = $source
+            target = $target
+        }
+        return
+    }
+
+    New-Item -ItemType Directory -Force -Path $target | Out-Null
+    $script:SkillsPayload = [ordered]@{
+        source = $source
+        target = $target
+        included = $false
+        skillCount = 0
+        policy = $policy
+    }
+    $script:Warnings += "No skills directory found under source root; release includes an empty portable skills directory."
+}
+
 function Copy-PyQtControlToRoot {
     param([Parameter(Mandatory = $true)][string] $ReleaseRoot)
 
@@ -419,6 +453,7 @@ if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
 $script:TargetRoot = Resolve-FullPath $OutputRoot
 $script:CopiedPaths = @()
 $script:AppPayloads = @()
+$script:SkillsPayload = $null
 $script:Warnings = @()
 $script:SkippedReparsePoints = @()
 $script:ChannelPluginPolicy = [ordered]@{
@@ -581,6 +616,7 @@ if (-not $NoPayloads) {
     }
 }
 
+Copy-SkillsPayload
 Copy-PyQtControlToRoot -ReleaseRoot $script:TargetRoot
 New-QuickStart -ReleaseRoot $script:TargetRoot
 
@@ -606,6 +642,7 @@ $manifest = [ordered]@{
         note = "Some upstream projects may still require source-like runtime directories. The manifest lists any retained candidates for release review."
     }
     channelPluginPolicy = $script:ChannelPluginPolicy
+    skillsPayload = $script:SkillsPayload
     copiedPaths = $script:CopiedPaths
     appPayloads = $script:AppPayloads
     skippedReparsePoints = $script:SkippedReparsePoints

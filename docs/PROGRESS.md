@@ -11,6 +11,47 @@ Update it whenever a milestone is completed, changed, blocked, or deferred.
 - `Blocked`: Waiting on external information or action.
 - `Deferred`: Intentionally postponed.
 
+## 2026-05-08
+
+### Portable OpenClaw Skills Center
+
+Status: `Done`
+
+Summary:
+
+- Added a portable skills payload path at `<USB_ROOT>/skills`, separate from `apps/openclaw`, so custom skills can be maintained independently from upstream OpenClaw payload refreshes.
+- OpenClaw startup now ensures `data/openclaw/openclaw.json` includes the portable skills directory under `skills.load.extraDirs` and does not append the same path repeatedly.
+- Added a control-server `/api/skills` endpoint that scans `SKILL.md` files, parses frontmatter name and description, and deduplicates display results by skill name.
+- Added an Electrobun left-nav `技能中心` page that shows the independent skills payload, loaded skill count, dedupe state, descriptions, and relative paths.
+- Updated the USB release script to copy repository-root `skills/` into the delivery root and record `skillsPayload` in `release-manifest.json`.
+- Seeded the repository-root `skills/` directory from the operator-provided `E:\skills` payload for the current custom delivery branch.
+
+Changed areas:
+
+- `core/node/src/skills.ts`
+- `core/node/src/lifecycle.ts`
+- `core/node/src/control-server.ts`
+- `launcher/electrobun/src/bun/index.ts`
+- `launcher/electrobun/src/mainview/App.vue`
+- `launcher/electrobun/src/mainview/style.css`
+- `launcher/electrobun/src/shared/types.ts`
+- `scripts/release/Build-UsbRelease.ps1`
+- `skills/`
+- `docs/electrobun-control-shell.zh-CN.md`
+- `docs/usb-release-build-runbook.zh-CN.md`
+- `tests/test_windows_core.py`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_start_openclaw_registers_portable_skills_dir_once tests.test_windows_core.WindowsCoreTests.test_control_server_lists_portable_skills_once_by_name tests.test_windows_core.WindowsCoreTests.test_usb_release_script_copies_portable_skills_payload -v`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_chinese_docs_are_readable_utf8 -v`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\launcher\electrobun\build.ps1 -SkipInstall -WebOnly`
+
+Next steps:
+
+- Run a full USB release build and smoke check before handing the generated directory to testers.
+
 ## 2026-05-07
 
 ### Electrobun Channel Entry Matching vh-claw Depth

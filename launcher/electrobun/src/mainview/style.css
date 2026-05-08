@@ -752,6 +752,110 @@ button:disabled {
   gap: 16px;
 }
 
+.skills-page {
+  display: grid;
+  gap: 16px;
+}
+
+.skills-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.skills-hero p {
+  max-width: 760px;
+  margin: 8px 0 12px;
+  color: #94a3b8;
+  line-height: 1.7;
+}
+
+.skills-hero code,
+.skill-card code {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #93c5fd;
+  background: rgba(2, 6, 23, 0.36);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 10px;
+  padding: 7px 9px;
+}
+
+.skill-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.skills-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.skill-card {
+  min-height: 190px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 18px;
+  padding: 18px;
+  background:
+    radial-gradient(circle at 16% 8%, color-mix(in srgb, var(--icon-a), transparent 72%), transparent 34%),
+    rgba(15, 23, 42, 0.74);
+  box-shadow: 0 24px 64px rgba(2, 6, 23, 0.28);
+}
+
+.skill-card-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+}
+
+.skill-card-head strong {
+  display: block;
+  font-size: 18px;
+  color: #f8fafc;
+}
+
+.skill-card-head span:not(.skill-icon):not(.pill) {
+  color: #94a3b8;
+}
+
+.skill-icon,
+.empty-icon {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  font-weight: 900;
+}
+
+.skill-card p {
+  min-height: 54px;
+  margin: 16px 0 14px;
+  color: #b6c5d7;
+  line-height: 1.65;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.empty-skills {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.empty-skills p {
+  color: #94a3b8;
+}
+
 .channel-intro {
   display: flex;
   align-items: center;

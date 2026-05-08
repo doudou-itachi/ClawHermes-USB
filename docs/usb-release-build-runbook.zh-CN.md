@@ -36,6 +36,7 @@ dist-usb/ClawHermes
 - 重新构建 PyQt `ClawHermes-Control.exe`。
 - 把 `ClawHermes-Control.exe` 和 PyInstaller `_internal/` 复制到交付包根目录。
 - 复制 OpenClaw、Hermes Agent、Hermes Web UI payload。
+- 复制仓库根目录 `skills/` 到交付包根目录 `skills/`，并通过 OpenClaw `skills.load.extraDirs` 加载，避免把定制技能写进 `apps/openclaw`。
 - 复制或内置 `runtimes/windows/node/node.exe` 和 `runtimes/windows/python/python.exe`，使目标机器无需全局安装 Node/Python。
 - 写入 `release-manifest.json`，其中 `entryPoint` 应为 `ClawHermes-Control.exe`。
 
@@ -54,6 +55,7 @@ dist-usb/ClawHermes/
   apps/openclaw/
   apps/hermes-agent/
   apps/hermes-web-ui/
+  skills/
   data/
   START_HERE.txt
   release-manifest.json
@@ -97,6 +99,38 @@ dist-usb/ClawHermes/
 后续如果重新准备或替换 `apps/openclaw` payload，不要只复制 OpenClaw 主程序；必须重新确认微信插件仍存在，并重新运行发布脚本或至少检查最终包里的上述两个路径。最终 smoke test 应点击“渠道接入 -> 微信扫码登录”，确认 `data/logs/channel-weixin.log` 中出现终端二维码或 `https://liteapp.weixin.qq.com/q/...` 备用链接，而不是 `Install Weixin plugin` 或 `TypeError: fetch failed`。
 
 推荐使用高速 USB 3.x U 盘或移动 SSD。WSL rootfs、`node_modules`、SQLite、日志和缓存都是大量小文件或频繁读写路径，低速 U 盘会明显拖慢体验。
+
+## 独立技能包目录
+
+当前定制版支持把 OpenClaw 技能作为独立 payload 交付，目录固定为：
+
+```text
+<USB_ROOT>/skills/<skill-name>/SKILL.md
+```
+
+这个目录不属于 `apps/openclaw`，因此后续重新准备或替换 OpenClaw payload 时，不会覆盖定制技能。发布脚本会把仓库根目录 `skills/` 复制到交付包根目录 `skills/`；如果仓库根目录暂时没有 `skills/`，脚本会在交付包里创建空目录并在 manifest 中记录提示。
+
+启动 OpenClaw 前，ClawHermes 会确保 `data/openclaw/openclaw.json` 中存在：
+
+```json
+{
+  "skills": {
+    "load": {
+      "extraDirs": ["<USB_ROOT>\\skills"]
+    }
+  }
+}
+```
+
+如果该路径已经存在，不会重复追加。Electrobun 左侧的“技能中心”通过 control-server 的 `/api/skills` 读取这个目录，按 `name` 去重后展示技能名称、描述和相对路径。
+
+交付人员应在生成 release 前把定制技能复制到仓库根目录 `skills/`，例如：
+
+```powershell
+robocopy E:\skills .\skills /E
+```
+
+交付后复核 `release-manifest.json` 的 `skillsPayload` 字段，确认 `included` 为 `true` 且 `skillCount` 符合预期。最终 smoke test 应打开控制面板的“技能中心”，确认技能卡片可见；再启动 OpenClaw，确认 `data/openclaw/openclaw.json` 中的 `skills.load.extraDirs` 指向当前 U 盘根目录下的 `skills`。
 
 ## 快速流程
 
@@ -518,6 +552,7 @@ D:\release\ClawHermes-USB\release-manifest.json
 - `outputRoot` 是否是交付目录或 U 盘目录。
 - `payloadsIncluded` 是否符合预期。
 - `appPayloads` 是否列出了 `openclaw`、`hermes-agent`、`hermes-web-ui`。
+- `skillsPayload` 是否记录了根目录 `skills/`，以及 `skillCount` 是否符合预期。
 - `warnings` 是否为空，或是否已经人工确认。
 - `retainedSourceLikeDirectories` 中的目录是否确实运行必需。
 
@@ -611,6 +646,7 @@ node core/node/dist/clawhermes.js setup-wizard --json
 - `apps/openclaw` 是可运行 payload。
 - `apps/hermes-agent` 是可运行 payload。
 - `apps/hermes-web-ui` 是可运行 payload。
+- `skills/` 位于交付包根目录，不在 `apps/openclaw` 内；“技能中心”能显示预期技能。
 - `runtimes/windows/node/node.exe` 可执行。
 - `runtimes/windows/python/python.exe` 可执行。
 - 如交付 WSL 路径，`runtimes/wsl/ubuntu-rootfs.tar` 和 `.sha256` 存在；当前 Windows-native 路径不要求 WSL rootfs。

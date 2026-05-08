@@ -33,6 +33,24 @@ export type BootstrapPayload = {
   controlUrl: string;
 };
 
+export type PortableSkill = {
+  name: string;
+  description: string;
+  filePath: string;
+  relativePath: string;
+  source: string;
+  duplicateCount: number;
+};
+
+export type SkillsPayload = {
+  root: string;
+  skillsDir: string;
+  exists: boolean;
+  total: number;
+  deduplicated: boolean;
+  skills: PortableSkill[];
+};
+
 export type ChannelLoginStatus = {
   root?: string;
   channel?: string;

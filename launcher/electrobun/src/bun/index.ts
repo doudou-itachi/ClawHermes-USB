@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { BrowserView, BrowserWindow, Utils } from "electrobun/bun";
-import type { BootstrapPayload, ChannelLoginStatus, ModelConfig, StatusPayload } from "../shared/types";
+import type { BootstrapPayload, ChannelLoginStatus, ModelConfig, SkillsPayload, StatusPayload } from "../shared/types";
 
 type ControlServerMetadata = {
   url: string;
@@ -23,6 +23,7 @@ const rpc = BrowserView.defineRPC({
       getBootstrap: (): BootstrapPayload => ({ root, controlUrl }),
       getStatus: () => requestJson("/api/status"),
       getLogs: () => requestJson("/api/logs?service=launcher&lines=140"),
+      getSkills: () => requestJson("/api/skills") as Promise<SkillsPayload>,
       getWeixinChannelStatus: () => requestJson("/api/channels/weixin") as Promise<ChannelLoginStatus>,
       getWeixinChannelLogs: () => requestJson("/api/channels/weixin/logs?lines=160"),
       startWeixinChannelLogin: () => requestJson("/api/channels/weixin/login", { method: "POST", body: {} }) as Promise<ChannelLoginStatus>,
