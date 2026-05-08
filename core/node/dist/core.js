@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.wslUnregister = exports.wslRootfsGuide = exports.wslImportPlan = exports.wslImport = exports.wslExport = exports.wslDiagnostics = exports.prepareWsl = exports.writeStatusSnapshot = exports.setupWizard = exports.readRuntimePortState = exports.assignRuntimePorts = exports.payloadInventory = exports.payloadExport = exports.sharedModelConfigStatus = exports.configureSharedModel = exports.runtimePreparationPlan = exports.runtimeDiagnostics = exports.loadRuntimeManifest = exports.installRuntimeFromArchive = exports.stopPortalServer = exports.startPortalServer = exports.getPortalStatus = exports.generatePortal = exports.PORTAL_URL = exports.writeSetupSnapshot = exports.setupDiagnostics = exports.readLogTail = exports.portDiagnostics = exports.pathDiagnostics = exports.serviceEnvironmentDiagnostic = exports.resolveServiceEnvironment = exports.initializeEnvFiles = exports.envFileDiagnostics = exports.restorePlan = exports.restoreBackup = exports.createBackup = exports.verifyAdapter = exports.runAdapterSetup = exports.markAdapterReady = exports.probeAppSources = exports.checkoutAppSource = exports.appSourcePlan = exports.adapterSetupPlan = exports.validateAdapter = exports.serviceOrder = exports.loadAdapters = exports.integrationReadiness = exports.portableEnv = exports.getRoot = exports.dataWritable = void 0;
-exports.wslWorkflowPlan = exports.wslUnregisterPlan = void 0;
+exports.wslImportPlan = exports.wslImport = exports.wslExport = exports.wslDiagnostics = exports.prepareWsl = exports.writeStatusSnapshot = exports.setupWizard = exports.readRuntimePortState = exports.assignRuntimePorts = exports.payloadInventory = exports.payloadExport = exports.getDeviceBindingStatus = exports.ensureDeviceBinding = exports.sharedModelConfigStatus = exports.configureSharedModel = exports.runtimePreparationPlan = exports.runtimeDiagnostics = exports.loadRuntimeManifest = exports.installRuntimeFromArchive = exports.stopPortalServer = exports.startPortalServer = exports.getPortalStatus = exports.generatePortal = exports.PORTAL_URL = exports.writeSetupSnapshot = exports.setupDiagnostics = exports.readLogTail = exports.portDiagnostics = exports.pathDiagnostics = exports.serviceEnvironmentDiagnostic = exports.resolveServiceEnvironment = exports.initializeEnvFiles = exports.envFileDiagnostics = exports.restorePlan = exports.restoreBackup = exports.createBackup = exports.verifyAdapter = exports.runAdapterSetup = exports.markAdapterReady = exports.probeAppSources = exports.checkoutAppSource = exports.appSourcePlan = exports.adapterSetupPlan = exports.validateAdapter = exports.serviceOrder = exports.loadAdapters = exports.integrationReadiness = exports.portableEnv = exports.getRoot = exports.dataWritable = void 0;
+exports.wslWorkflowPlan = exports.wslUnregisterPlan = exports.wslUnregister = exports.wslRootfsGuide = void 0;
 exports.startSkeleton = startSkeleton;
 exports.startSingleAdapter = startSingleAdapter;
 exports.stopSingleAdapter = stopSingleAdapter;
@@ -18,6 +18,7 @@ const status_1 = require("./status");
 const wsl_adapter_1 = require("./wsl-adapter");
 const wsl_1 = require("./wsl");
 const ports_runtime_1 = require("./ports-runtime");
+const device_binding_1 = require("./device-binding");
 var portable_2 = require("./portable");
 Object.defineProperty(exports, "dataWritable", { enumerable: true, get: function () { return portable_2.dataWritable; } });
 Object.defineProperty(exports, "getRoot", { enumerable: true, get: function () { return portable_2.getRoot; } });
@@ -67,6 +68,9 @@ Object.defineProperty(exports, "runtimePreparationPlan", { enumerable: true, get
 var model_config_1 = require("./model-config");
 Object.defineProperty(exports, "configureSharedModel", { enumerable: true, get: function () { return model_config_1.configureSharedModel; } });
 Object.defineProperty(exports, "sharedModelConfigStatus", { enumerable: true, get: function () { return model_config_1.sharedModelConfigStatus; } });
+var device_binding_2 = require("./device-binding");
+Object.defineProperty(exports, "ensureDeviceBinding", { enumerable: true, get: function () { return device_binding_2.ensureDeviceBinding; } });
+Object.defineProperty(exports, "getDeviceBindingStatus", { enumerable: true, get: function () { return device_binding_2.getDeviceBindingStatus; } });
 var payload_export_1 = require("./payload-export");
 Object.defineProperty(exports, "payloadExport", { enumerable: true, get: function () { return payload_export_1.payloadExport; } });
 var payloads_1 = require("./payloads");
@@ -92,6 +96,7 @@ var wsl_workflow_1 = require("./wsl-workflow");
 Object.defineProperty(exports, "wslWorkflowPlan", { enumerable: true, get: function () { return wsl_workflow_1.wslWorkflowPlan; } });
 async function startSkeleton(usbRoot, options = {}) {
     const root = (0, portable_1.getRoot)(usbRoot);
+    const deviceBinding = (0, device_binding_1.ensureDeviceBinding)(root);
     const setup = (0, diagnostics_1.setupDiagnostics)(root);
     (0, diagnostics_1.writeSetupSnapshot)(root, setup);
     const started = [];
@@ -114,7 +119,7 @@ async function startSkeleton(usbRoot, options = {}) {
     (0, portal_1.generatePortal)(root, getStatus(root).services);
     const portal = await (0, portal_1.startPortalServer)(root, portState.portal.assignedPort);
     (0, status_1.writeStatusSnapshot)(root, getStatus(root));
-    return { root, started, portal, setupMessages: setup.messages };
+    return { root, started, portal, setupMessages: setup.messages, deviceBinding };
 }
 function adapterHasRunningPid(root, adapter) {
     try {
@@ -165,6 +170,7 @@ function startSingleAdapter(usbRoot, serviceId, options) {
     }
     if (options.dryRun)
         return result;
+    const deviceBinding = (0, device_binding_1.ensureDeviceBinding)(root);
     if (wslPlan) {
         (0, wsl_adapter_1.assertWslReadyForAdapterDistro)(root, serviceId, runtimeAdapter.runtime?.distro);
         const metadata = (0, lifecycle_1.startAdapter)(root, runtimeAdapter, {
@@ -173,10 +179,10 @@ function startSingleAdapter(usbRoot, serviceId, options) {
             serviceEnv,
             attachToParent: options.attachManagedToParent === true,
         });
-        return { ...result, started: true, metadata };
+        return { ...result, started: true, metadata, deviceBinding };
     }
     const metadata = (0, lifecycle_1.startAdapter)(root, runtimeAdapter, { forceManaged: true, serviceEnv, attachToParent: options.attachManagedToParent === true });
-    return { ...result, started: true, metadata };
+    return { ...result, started: true, metadata, deviceBinding };
 }
 function stopSingleAdapter(usbRoot, serviceId) {
     const root = (0, portable_1.getRoot)(usbRoot);

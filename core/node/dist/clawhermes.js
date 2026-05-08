@@ -604,6 +604,32 @@ async function main() {
             }
             return;
         }
+        case "device-binding": {
+            const result = (0, core_1.getDeviceBindingStatus)(root);
+            if (json) {
+                printJson(result);
+            }
+            else {
+                console.log("ClawHermes-USB device binding");
+                console.log(`State: ${result.state}`);
+                for (const message of result.messages)
+                    console.log(`- ${message}`);
+            }
+            return;
+        }
+        case "bind-device": {
+            const result = (0, core_1.ensureDeviceBinding)(root);
+            if (json) {
+                printJson(result);
+            }
+            else {
+                console.log("ClawHermes-USB device binding");
+                console.log(`State: ${result.state}`);
+                for (const message of result.messages)
+                    console.log(`- ${message}`);
+            }
+            return;
+        }
         case "control-server": {
             const result = (0, control_server_1.startControlServer)(root, { port });
             if (json) {

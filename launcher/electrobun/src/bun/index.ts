@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { BrowserView, BrowserWindow, Utils } from "electrobun/bun";
-import type { BootstrapPayload, ChannelLoginStatus, ModelConfig, SkillsPayload, StatusPayload } from "../shared/types";
+import type { BootstrapPayload, ChannelLoginStatus, DeviceBindingStatus, ModelConfig, SkillsPayload, StatusPayload } from "../shared/types";
 
 type ControlServerMetadata = {
   url: string;
@@ -24,6 +24,8 @@ const rpc = BrowserView.defineRPC({
       getStatus: () => requestJson("/api/status"),
       getLogs: () => requestJson("/api/logs?service=launcher&lines=140"),
       getSkills: () => requestJson("/api/skills") as Promise<SkillsPayload>,
+      getDeviceBinding: () => requestJson("/api/device-binding") as Promise<DeviceBindingStatus>,
+      bindDevice: () => requestJson("/api/device-binding/bind", { method: "POST", body: {} }) as Promise<DeviceBindingStatus>,
       getWeixinChannelStatus: () => requestJson("/api/channels/weixin") as Promise<ChannelLoginStatus>,
       getWeixinChannelLogs: () => requestJson("/api/channels/weixin/logs?lines=160"),
       startWeixinChannelLogin: () => requestJson("/api/channels/weixin/login", { method: "POST", body: {} }) as Promise<ChannelLoginStatus>,
@@ -115,7 +117,14 @@ async function requestJson(path: string, options: { method?: string; body?: unkn
     body: options.body ? JSON.stringify(options.body) : undefined,
   });
   if (!response.ok) {
-    throw new Error(`Control API failed: ${response.status} ${response.statusText}`);
+    let detail = `${response.status} ${response.statusText}`;
+    try {
+      const payload = await response.json() as { error?: { message?: string } };
+      if (payload.error?.message) detail = payload.error.message;
+    } catch {
+      // Keep the HTTP status when the response is not JSON.
+    }
+    throw new Error(`Control API failed: ${detail}`);
   }
   return response.json();
 }

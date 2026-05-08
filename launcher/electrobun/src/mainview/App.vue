@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, h, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { Electroview } from "electrobun/view";
-import type { BootstrapPayload, ChannelLoginStatus, LogPayload, ModelConfig, PortableSkill, ServiceStatus, SkillsPayload, StatusPayload } from "../shared/types";
+import type { BootstrapPayload, ChannelLoginStatus, DeviceBindingStatus, LogPayload, ModelConfig, PortableSkill, ServiceStatus, SkillsPayload, StatusPayload } from "../shared/types";
 import product12Image from "./assets/product12.png";
 
 type IconName =
@@ -103,6 +103,7 @@ const providerPresets: ProviderPreset[] = [
 const activeTab = ref("console");
 const services = ref<ServiceStatus[]>([]);
 const skillsPayload = ref<SkillsPayload>({ root: "", skillsDir: "", exists: false, total: 0, deduplicated: false, skills: [] });
+const deviceBinding = ref<DeviceBindingStatus | null>(null);
 const logs = ref<string[]>([]);
 const channelLogs = ref<string[]>([]);
 const weixinChannel = ref<ChannelLoginStatus>({});
@@ -150,6 +151,19 @@ async function refreshSkills() {
   skillsPayload.value = (await requestFromBun("getSkills")) as SkillsPayload;
 }
 
+async function refreshDeviceBinding() {
+  deviceBinding.value = (await requestFromBun("getDeviceBinding")) as DeviceBindingStatus;
+}
+
+async function bindCurrentDevice() {
+  busy.value = true;
+  try {
+    deviceBinding.value = (await requestFromBun("bindDevice")) as DeviceBindingStatus;
+  } finally {
+    busy.value = false;
+  }
+}
+
 async function refreshWeixinChannel() {
   weixinChannel.value = (await requestFromBun("getWeixinChannelStatus")) as ChannelLoginStatus;
 }
@@ -171,6 +185,7 @@ async function runAction(action: "startAll" | "stopAll") {
   try {
     await requestFromBun(action);
     await refresh();
+    await refreshDeviceBinding();
     await refreshLogs();
   } finally {
     busy.value = false;
@@ -306,6 +321,18 @@ function skillTone(skill: PortableSkill): string {
 
 function skillInitial(skill: PortableSkill): string {
   return (skill.name || "S").slice(0, 1).toUpperCase();
+}
+
+function bindingLabel(state: DeviceBindingStatus["state"] | undefined) {
+  if (state === "bound") return "已绑定";
+  if (state === "mismatch") return "绑定异常";
+  return "未绑定";
+}
+
+function bindingTone(state: DeviceBindingStatus["state"] | undefined) {
+  if (state === "bound") return "ready";
+  if (state === "mismatch") return "stopped";
+  return "warning";
 }
 
 function channelStatusLabel(status?: string) {
@@ -445,7 +472,7 @@ onMounted(async () => {
   const data = (await requestFromBun("getBootstrap")) as BootstrapPayload;
   bootstrap.root = data.root;
   bootstrap.controlUrl = data.controlUrl;
-  await Promise.all([refresh(), refreshSkills(), refreshLogs(), loadModelConfig(), refreshWeixinChannel(), refreshWeixinChannelLogs()]);
+  await Promise.all([refresh(), refreshSkills(), refreshDeviceBinding(), refreshLogs(), loadModelConfig(), refreshWeixinChannel(), refreshWeixinChannelLogs()]);
   timer = window.setInterval(refresh, 1500);
 });
 
@@ -455,6 +482,9 @@ watch(activeTab, async (tab) => {
   }
   if (tab === "skills") {
     await refreshSkills();
+  }
+  if (tab === "settings") {
+    await refreshDeviceBinding();
   }
   if (tab !== "services") {
     stopServiceParticles();
@@ -782,6 +812,20 @@ onBeforeUnmount(() => {
         <code>{{ bootstrap.root }}</code>
         <label>Control server</label>
         <code>{{ bootstrap.controlUrl }}</code>
+        <div class="binding-card">
+          <div>
+            <span class="eyebrow">USB Device Binding</span>
+            <h4>U 盘绑定</h4>
+            <p>{{ deviceBinding?.messages?.[0] || "首次启动服务时会自动绑定当前 U 盘。" }}</p>
+          </div>
+          <span class="pill" :class="bindingTone(deviceBinding?.state)">{{ bindingLabel(deviceBinding?.state) }}</span>
+        </div>
+        <label>Binding file</label>
+        <code>{{ deviceBinding?.bindingPath || "data/settings/device-binding.json" }}</code>
+        <label>Current fingerprint</label>
+        <code>{{ deviceBinding?.current?.summary || "等待检测" }}</code>
+        <button class="ghost" :disabled="busy || deviceBinding?.state === 'bound'" @click="bindCurrentDevice">绑定当前 U 盘</button>
+        <button class="ghost" @click="refreshDeviceBinding">刷新绑定状态</button>
         <button class="danger" @click="shutdown">停止并关闭控制服务</button>
       </section>
     </section>

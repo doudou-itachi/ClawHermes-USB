@@ -10,6 +10,7 @@ import { adapterHealth, processExists, writeStatusSnapshot } from "./status";
 import { assertWslReadyForAdapterDistro, wslAdapterCommandPlan } from "./wsl-adapter";
 import { wslExecutableInvocation } from "./wsl";
 import { applyRuntimePortsToAdapter, applyRuntimePortsToEnvironment, assignRuntimePorts, readRuntimePortState, runtimePortsPath } from "./ports-runtime";
+import { ensureDeviceBinding, getDeviceBindingStatus } from "./device-binding";
 
 export { dataWritable, getRoot, portableEnv } from "./portable";
 export { integrationReadiness, loadAdapters, serviceOrder, validateAdapter } from "./adapters";
@@ -23,6 +24,7 @@ export { pathDiagnostics, portDiagnostics, readLogTail, setupDiagnostics, writeS
 export { PORTAL_URL, generatePortal, getPortalStatus, startPortalServer, stopPortalServer } from "./portal";
 export { installRuntimeFromArchive, loadRuntimeManifest, runtimeDiagnostics, runtimePreparationPlan } from "./runtimes";
 export { configureSharedModel, sharedModelConfigStatus } from "./model-config";
+export { ensureDeviceBinding, getDeviceBindingStatus } from "./device-binding";
 export { payloadExport } from "./payload-export";
 export { payloadInventory } from "./payloads";
 export { assignRuntimePorts, readRuntimePortState } from "./ports-runtime";
@@ -34,6 +36,7 @@ export { wslWorkflowPlan } from "./wsl-workflow";
 
 export async function startSkeleton(usbRoot: string, options: { attachManagedToParent?: boolean } = {}) {
   const root = getRoot(usbRoot);
+  const deviceBinding = ensureDeviceBinding(root);
   const setup = setupDiagnostics(root);
   writeSetupSnapshot(root, setup);
   const started: string[] = [];
@@ -56,7 +59,7 @@ export async function startSkeleton(usbRoot: string, options: { attachManagedToP
   generatePortal(root, getStatus(root).services);
   const portal = await startPortalServer(root, portState.portal.assignedPort);
   writeStatusSnapshot(root, getStatus(root));
-  return { root, started, portal, setupMessages: setup.messages };
+  return { root, started, portal, setupMessages: setup.messages, deviceBinding };
 }
 
 function adapterHasRunningPid(root: string, adapter: { pidFile: string }): boolean {
@@ -104,6 +107,7 @@ export function startSingleAdapter(usbRoot: string, serviceId: string | undefine
     throw new Error("start-adapter launches a managed process. Re-run with --confirm-start to proceed.");
   }
   if (options.dryRun) return result;
+  const deviceBinding = ensureDeviceBinding(root);
   if (wslPlan) {
     assertWslReadyForAdapterDistro(root, serviceId, runtimeAdapter.runtime?.distro);
     const metadata = startAdapter(root, runtimeAdapter, {
@@ -112,10 +116,10 @@ export function startSingleAdapter(usbRoot: string, serviceId: string | undefine
       serviceEnv,
       attachToParent: options.attachManagedToParent === true,
     });
-    return { ...result, started: true, metadata };
+    return { ...result, started: true, metadata, deviceBinding };
   }
   const metadata = startAdapter(root, runtimeAdapter, { forceManaged: true, serviceEnv, attachToParent: options.attachManagedToParent === true });
-  return { ...result, started: true, metadata };
+  return { ...result, started: true, metadata, deviceBinding };
 }
 
 export function stopSingleAdapter(usbRoot: string, serviceId: string | undefined) {

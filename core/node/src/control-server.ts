@@ -12,6 +12,7 @@ import { processExists } from "./status";
 import { setupDiagnostics } from "./diagnostics";
 import { getWeixinChannelStatus, readWeixinChannelLog, startWeixinChannelLogin, stopWeixinChannelLogin } from "./channels";
 import { listPortableSkills } from "./skills";
+import { ensureDeviceBinding, getDeviceBindingStatus } from "./device-binding";
 
 type ControlServerMetadata = {
   serviceId: "control-server";
@@ -198,6 +199,14 @@ async function routeRequest(root: string, request: IncomingMessage, response: Se
   }
   if (request.method === "GET" && pathname === "/api/skills") {
     sendJson(response, 200, listPortableSkills(root));
+    return;
+  }
+  if (request.method === "GET" && pathname === "/api/device-binding") {
+    sendJson(response, 200, getDeviceBindingStatus(root));
+    return;
+  }
+  if (request.method === "POST" && pathname === "/api/device-binding/bind") {
+    sendJson(response, 200, ensureDeviceBinding(root));
     return;
   }
   if (request.method === "GET" && pathname === "/api/model-config") {

@@ -3514,6 +3514,69 @@ class WindowsCoreTests(unittest.TestCase):
             run_dispatcher_for_root(temp_root, "stop", "-Json")
             temp_dir.cleanup()
 
+    def test_start_adapter_binds_portable_root_to_current_device_on_first_run(self):
+        temp_dir, temp_root = make_temp_process_usb_root()
+        env = {"CLAWHERMES_DEVICE_BINDING_FINGERPRINT": "usb-device-a"}
+        try:
+            mark_fake_service_candidate(temp_root)
+
+            result = run_dispatcher_for_root(temp_root, "start-adapter", "fake-service", "--confirm-start", "-Json", env=env)
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            binding_path = temp_root / "data" / "settings" / "device-binding.json"
+            self.assertTrue(binding_path.exists())
+            binding = json.loads(binding_path.read_text(encoding="utf-8"))
+            self.assertEqual(binding["schemaVersion"], 1)
+            self.assertEqual(binding["fingerprint"]["source"], "env")
+            self.assertEqual(len(binding["fingerprint"]["hash"]), 64)
+            self.assertNotIn("usb-device-a", json.dumps(binding))
+
+            status = run_dispatcher_for_root(temp_root, "device-binding", "-Json", env=env)
+            self.assertEqual(status.returncode, 0, status.stderr)
+            payload = json.loads(status.stdout)
+            self.assertEqual(payload["state"], "bound")
+            self.assertTrue(payload["allowed"])
+        finally:
+            run_dispatcher_for_root(temp_root, "stop", "-Json")
+            temp_dir.cleanup()
+
+    def test_start_adapter_rejects_device_binding_mismatch(self):
+        temp_dir, temp_root = make_temp_process_usb_root()
+        try:
+            mark_fake_service_candidate(temp_root)
+            first = run_dispatcher_for_root(
+                temp_root,
+                "start-adapter",
+                "fake-service",
+                "--confirm-start",
+                "-Json",
+                env={"CLAWHERMES_DEVICE_BINDING_FINGERPRINT": "usb-device-a"},
+            )
+            self.assertEqual(first.returncode, 0, first.stderr)
+            run_dispatcher_for_root(temp_root, "stop", "-Json", env={"CLAWHERMES_DEVICE_BINDING_FINGERPRINT": "usb-device-a"})
+
+            second = run_dispatcher_for_root(
+                temp_root,
+                "start-adapter",
+                "fake-service",
+                "--confirm-start",
+                "-Json",
+                env={"CLAWHERMES_DEVICE_BINDING_FINGERPRINT": "usb-device-b"},
+            )
+
+            self.assertNotEqual(second.returncode, 0)
+            self.assertIn("bound to another USB device", second.stderr)
+            self.assertFalse((temp_root / "data" / "tmp" / "pids" / "fake-service.pid").exists())
+
+            status = run_dispatcher_for_root(temp_root, "device-binding", "-Json", env={"CLAWHERMES_DEVICE_BINDING_FINGERPRINT": "usb-device-b"})
+            self.assertEqual(status.returncode, 0, status.stderr)
+            payload = json.loads(status.stdout)
+            self.assertEqual(payload["state"], "mismatch")
+            self.assertFalse(payload["allowed"])
+        finally:
+            run_dispatcher_for_root(temp_root, "stop", "-Json", env={"CLAWHERMES_DEVICE_BINDING_FINGERPRINT": "usb-device-a"})
+            temp_dir.cleanup()
+
     def test_start_adapter_confirm_reuses_running_managed_process(self):
         temp_dir, temp_root = make_temp_process_usb_root()
         try:
@@ -4435,6 +4498,69 @@ class WindowsCoreTests(unittest.TestCase):
             temp_dir.cleanup()
             output_dir.cleanup()
 
+    def test_usb_release_script_never_copies_existing_device_binding(self):
+        release_script = ROOT / "scripts" / "release" / "Build-UsbRelease.ps1"
+        temp_dir = tempfile.TemporaryDirectory()
+        output_dir = tempfile.TemporaryDirectory()
+        try:
+            source_root = Path(temp_dir.name)
+            output_root = Path(output_dir.name) / "ClawHermes"
+            for relative_dir in [
+                "launcher/pyqt/dist/ClawHermes-Control",
+                "core/node/dist",
+                "adapters",
+                "config/defaults",
+                "portal",
+                "runtimes/windows/node",
+                "runtimes/windows/python",
+                "data/settings",
+                "docs",
+            ]:
+                (source_root / relative_dir).mkdir(parents=True, exist_ok=True)
+            (source_root / "launcher" / "pyqt" / "dist" / "ClawHermes-Control" / "ClawHermes-Control.exe").write_text(
+                "pyqt exe\n",
+                encoding="utf-8",
+            )
+            (source_root / "core" / "node" / "dist" / "clawhermes.js").write_text("console.log('core')\n", encoding="utf-8")
+            (source_root / "data" / "settings" / "device-binding.json").write_text(
+                json.dumps({"schemaVersion": 1, "fingerprint": {"hash": "old"}}),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    "powershell",
+                    "-NoProfile",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(release_script),
+                    "-UsbRoot",
+                    str(source_root),
+                    "-OutputRoot",
+                    str(output_root),
+                    "-Clean",
+                    "-SkipBuild",
+                    "-NoStop",
+                    "-NoPayloads",
+                    "-NoBundleHostRuntimes",
+                    "-IncludeData",
+                ],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertFalse((output_root / "data" / "settings" / "device-binding.json").exists())
+            manifest = json.loads((output_root / "release-manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual(manifest["deviceBindingPolicy"]["bindingFile"], "data/settings/device-binding.json")
+            self.assertTrue(manifest["deviceBindingPolicy"]["removedFromRelease"])
+        finally:
+            temp_dir.cleanup()
+            output_dir.cleanup()
+
     def test_usb_release_script_copies_portable_skills_payload(self):
         release_script = ROOT / "scripts" / "release" / "Build-UsbRelease.ps1"
         temp_dir = tempfile.TemporaryDirectory()
@@ -4805,7 +4931,8 @@ class WindowsCoreTests(unittest.TestCase):
         temp_dir, temp_root = make_temp_skeleton_usb_root()
         port = free_tcp_port()
         try:
-            start = run_dispatcher_for_root(temp_root, "control-server", "--port", str(port), "-Json")
+            env = {"CLAWHERMES_DEVICE_BINDING_FINGERPRINT": "control-server-device"}
+            start = run_dispatcher_for_root(temp_root, "control-server", "--port", str(port), "-Json", env=env)
 
             self.assertEqual(start.returncode, 0, start.stderr)
             payload = json.loads(start.stdout)
@@ -4826,6 +4953,15 @@ class WindowsCoreTests(unittest.TestCase):
 
             model_status = fetch_json(f"{base}/api/model-config", timeout=5)
             self.assertIn("configured", model_status)
+
+            binding_status = fetch_json(f"{base}/api/device-binding", timeout=5)
+            self.assertEqual(binding_status["state"], "unbound")
+            self.assertTrue(binding_status["allowed"])
+
+            bound_status = post_json(f"{base}/api/device-binding/bind", timeout=5)
+            self.assertEqual(bound_status["state"], "bound")
+            self.assertTrue(bound_status["allowed"])
+            self.assertEqual(len(bound_status["current"]["hash"]), 64)
 
             logs = fetch_json(f"{base}/api/logs?service=launcher&lines=5", timeout=5)
             self.assertEqual(logs["target"], "launcher")

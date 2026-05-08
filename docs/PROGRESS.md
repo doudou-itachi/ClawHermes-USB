@@ -13,6 +13,42 @@ Update it whenever a milestone is completed, changed, blocked, or deferred.
 
 ## 2026-05-08
 
+### USB Device Binding for Delivery Packages
+
+Status: `Done`
+
+Summary:
+
+- Added a first-run USB device binding file at `data/settings/device-binding.json`.
+- New release packages are intentionally unbound; the first managed service start writes a hashed fingerprint for the current USB device.
+- Later service starts reject mismatched USB devices, while the Electrobun settings page can display and refresh binding status.
+- The release script removes any existing binding file even when `-IncludeData` is used, so a master package can be copied to multiple USB drives before first run.
+
+Changed areas:
+
+- `core/node/src/device-binding.ts`
+- `core/node/src/core.ts`
+- `core/node/src/control-server.ts`
+- `core/node/src/clawhermes.ts`
+- `core/windows/clawhermes.ps1`
+- `launcher/electrobun/src/`
+- `scripts/release/Build-UsbRelease.ps1`
+- `docs/portable-data.md`
+- `docs/portable-data.zh-CN.md`
+- `docs/electrobun-control-shell.zh-CN.md`
+- `docs/usb-release-build-runbook.zh-CN.md`
+- `tests/test_windows_core.py`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_start_adapter_binds_portable_root_to_current_device_on_first_run tests.test_windows_core.WindowsCoreTests.test_start_adapter_rejects_device_binding_mismatch tests.test_windows_core.WindowsCoreTests.test_usb_release_script_never_copies_existing_device_binding -v`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\launcher\electrobun\build.ps1 -SkipInstall -WebOnly`
+
+Next steps:
+
+- Rebuild the full USB delivery package when the operator wants a fresh artifact for this binding behavior.
+
 ### Portable OpenClaw Skills Center
 
 Status: `Done`

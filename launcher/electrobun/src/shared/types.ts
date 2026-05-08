@@ -51,6 +51,27 @@ export type SkillsPayload = {
   skills: PortableSkill[];
 };
 
+export type DeviceBindingStatus = {
+  root: string;
+  bindingPath: string;
+  state: "unbound" | "bound" | "mismatch";
+  allowed: boolean;
+  current: {
+    hash: string;
+    source: string;
+    summary: string;
+  };
+  binding: {
+    createdAt?: string;
+    fingerprint?: {
+      hash?: string;
+      source?: string;
+      summary?: string;
+    };
+  } | null;
+  messages: string[];
+};
+
 export type ChannelLoginStatus = {
   root?: string;
   channel?: string;

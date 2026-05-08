@@ -205,6 +205,21 @@ function Copy-SkillsPayload {
     $script:Warnings += "No skills directory found under source root; release includes an empty portable skills directory."
 }
 
+function Clear-ReleaseDeviceBinding {
+    $relativePath = "data/settings/device-binding.json"
+    $target = Join-Path $script:TargetRoot $relativePath
+    $removed = $false
+    if (Test-Path -LiteralPath $target -PathType Leaf) {
+        Remove-Item -LiteralPath $target -Force
+        $removed = $true
+    }
+    $script:DeviceBindingPolicy = [ordered]@{
+        bindingFile = $relativePath
+        removedFromRelease = $removed
+        firstRunBehavior = "The generated release is intentionally unbound. On first service start, ClawHermes writes data/settings/device-binding.json for the current USB device."
+    }
+}
+
 function Copy-PyQtControlToRoot {
     param([Parameter(Mandatory = $true)][string] $ReleaseRoot)
 
@@ -454,6 +469,7 @@ $script:TargetRoot = Resolve-FullPath $OutputRoot
 $script:CopiedPaths = @()
 $script:AppPayloads = @()
 $script:SkillsPayload = $null
+$script:DeviceBindingPolicy = $null
 $script:Warnings = @()
 $script:SkippedReparsePoints = @()
 $script:ChannelPluginPolicy = [ordered]@{
@@ -551,6 +567,7 @@ if ($IncludeData) {
         target = $dataTarget
     }
 }
+Clear-ReleaseDeviceBinding
 
 $appExcludedDirectoryNames = @(
     ".git",
@@ -642,6 +659,7 @@ $manifest = [ordered]@{
         note = "Some upstream projects may still require source-like runtime directories. The manifest lists any retained candidates for release review."
     }
     channelPluginPolicy = $script:ChannelPluginPolicy
+    deviceBindingPolicy = $script:DeviceBindingPolicy
     skillsPayload = $script:SkillsPayload
     copiedPaths = $script:CopiedPaths
     appPayloads = $script:AppPayloads

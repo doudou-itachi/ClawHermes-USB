@@ -1,4 +1,4 @@
-import { adapterSetupPlan, appSourcePlan, checkoutAppSource, configureSharedModel, createBackup, getRoot, getStatus, initializeEnvFiles, installRuntimeFromArchive, markAdapterReady, payloadExport, payloadInventory, portableEnv, prepareWsl, probeAppSources, readLogTail, restoreBackup, restorePlan, runAdapterSetup, runtimePreparationPlan, serviceEnvironmentDiagnostic, setupDiagnostics, setupWizard, sharedModelConfigStatus, startSingleAdapter, startSkeleton, stopSkeleton, verifyAdapter, writeStatusSnapshot, wslDiagnostics, wslExport, wslImport, wslImportPlan, wslRootfsGuide, wslUnregister, wslUnregisterPlan, wslWorkflowPlan } from "./core";
+import { adapterSetupPlan, appSourcePlan, checkoutAppSource, configureSharedModel, createBackup, ensureDeviceBinding, getDeviceBindingStatus, getRoot, getStatus, initializeEnvFiles, installRuntimeFromArchive, markAdapterReady, payloadExport, payloadInventory, portableEnv, prepareWsl, probeAppSources, readLogTail, restoreBackup, restorePlan, runAdapterSetup, runtimePreparationPlan, serviceEnvironmentDiagnostic, setupDiagnostics, setupWizard, sharedModelConfigStatus, startSingleAdapter, startSkeleton, stopSkeleton, verifyAdapter, writeStatusSnapshot, wslDiagnostics, wslExport, wslImport, wslImportPlan, wslRootfsGuide, wslUnregister, wslUnregisterPlan, wslWorkflowPlan } from "./core";
 import type { BackupProfile } from "./backup";
 import { startControlServer, stopControlServer } from "./control-server";
 
@@ -538,6 +538,28 @@ async function main(): Promise<void> {
         console.log("ClawHermes-USB services started:");
         for (const id of result.started) console.log(`- ${id}`);
         console.log(`Portal target: ${result.portal.url}`);
+      }
+      return;
+    }
+    case "device-binding": {
+      const result = getDeviceBindingStatus(root);
+      if (json) {
+        printJson(result);
+      } else {
+        console.log("ClawHermes-USB device binding");
+        console.log(`State: ${result.state}`);
+        for (const message of result.messages) console.log(`- ${message}`);
+      }
+      return;
+    }
+    case "bind-device": {
+      const result = ensureDeviceBinding(root);
+      if (json) {
+        printJson(result);
+      } else {
+        console.log("ClawHermes-USB device binding");
+        console.log(`State: ${result.state}`);
+        for (const message of result.messages) console.log(`- ${message}`);
       }
       return;
     }

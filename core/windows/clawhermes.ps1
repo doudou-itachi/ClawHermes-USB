@@ -1,6 +1,6 @@
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("env-json", "setup", "setup-wizard", "runtimes", "payloads", "payload-export", "wsl", "prepare-wsl", "wsl-rootfs-guide", "wsl-import-plan", "wsl-import", "wsl-export", "wsl-unregister-plan", "wsl-unregister", "wsl-workflow", "install-runtime", "init-env", "service-env", "adapters", "sources", "probe-sources", "checkout-source", "setup-adapter", "verify-adapter", "mark-adapter-ready", "logs", "backup", "restore-plan", "restore", "model-config", "model-config-status", "start", "start-adapter", "status", "stop", "control-server", "control-server-stop")]
+    [ValidateSet("env-json", "setup", "setup-wizard", "device-binding", "bind-device", "runtimes", "payloads", "payload-export", "wsl", "prepare-wsl", "wsl-rootfs-guide", "wsl-import-plan", "wsl-import", "wsl-export", "wsl-unregister-plan", "wsl-unregister", "wsl-workflow", "install-runtime", "init-env", "service-env", "adapters", "sources", "probe-sources", "checkout-source", "setup-adapter", "verify-adapter", "mark-adapter-ready", "logs", "backup", "restore-plan", "restore", "model-config", "model-config-status", "start", "start-adapter", "status", "stop", "control-server", "control-server-stop")]
     [string]$Action = "setup",
 
     [Parameter(ValueFromRemainingArguments = $true)]

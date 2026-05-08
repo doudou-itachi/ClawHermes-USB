@@ -71,3 +71,17 @@ Backs up `config/` and important `data/` directories.
 ### Full Portable Backup
 
 Backs up the entire project, excluding disposable temp files.
+
+## USB Device Binding
+
+ClawHermes can bind a generated delivery package to the first USB device that starts a managed service. The binding file is:
+
+```text
+data/settings/device-binding.json
+```
+
+Release packages are intentionally generated without this file. On the first `start` or `start-adapter --confirm-start`, ClawHermes records a hashed fingerprint for the current USB device. Later starts are allowed only when the current USB fingerprint matches the stored binding.
+
+This binding is meant for normal delivery control and accidental-copy prevention, not for cryptographic licensing. The raw USB serial or test fingerprint is not stored; only a hash and a short source summary are written.
+
+When preparing one master delivery package for multiple USB drives, do not run the services from the master directory before copying it. If a package was accidentally bound during packaging, delete `data/settings/device-binding.json` before copying it to another USB drive, or rebuild the release package.

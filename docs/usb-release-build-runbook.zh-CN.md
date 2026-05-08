@@ -38,6 +38,7 @@ dist-usb/ClawHermes
 - 复制 OpenClaw、Hermes Agent、Hermes Web UI payload。
 - 复制仓库根目录 `skills/` 到交付包根目录 `skills/`，并通过 OpenClaw `skills.load.extraDirs` 加载，避免把定制技能写进 `apps/openclaw`。
 - 复制或内置 `runtimes/windows/node/node.exe` 和 `runtimes/windows/python/python.exe`，使目标机器无需全局安装 Node/Python。
+- 移除 `data/settings/device-binding.json`，确保生成的母包保持未绑定状态；第一次在目标 U 盘启动服务时才写入当前 U 盘绑定。
 - 写入 `release-manifest.json`，其中 `entryPoint` 应为 `ClawHermes-Control.exe`。
 
 当前已验证的本地交付输出：
@@ -528,6 +529,8 @@ powershell -NoProfile -ExecutionPolicy Bypass `
   -IncludeData
 ```
 
+无论是否使用 `-IncludeData`，发布脚本都会从最终产物中移除 `data/settings/device-binding.json`。这样同一份母包可以复制到不同 U 盘，并在每个 U 盘第一次启动服务时分别绑定。如果你在母包目录里提前启动过服务，请在复制到其它 U 盘前删除该绑定文件，或重新生成发布包。
+
 如果只想先生成不带上游 payload 的壳，用于检查文档和 GUI：
 
 ```powershell
@@ -553,6 +556,7 @@ D:\release\ClawHermes-USB\release-manifest.json
 - `payloadsIncluded` 是否符合预期。
 - `appPayloads` 是否列出了 `openclaw`、`hermes-agent`、`hermes-web-ui`。
 - `skillsPayload` 是否记录了根目录 `skills/`，以及 `skillCount` 是否符合预期。
+- `deviceBindingPolicy.bindingFile` 是否为 `data/settings/device-binding.json`，并确认最终产物中不存在该文件。
 - `warnings` 是否为空，或是否已经人工确认。
 - `retainedSourceLikeDirectories` 中的目录是否确实运行必需。
 
@@ -569,13 +573,14 @@ robocopy D:\release\ClawHermes-USB E:\ClawHermes-USB /MIR
 在干净 Windows 机器上验收：
 
 1. 双击 `ClawHermes-Control.exe`。
-2. 打开“安装向导”，确认 WSL、runtime、payload 没有缺项。
-3. 打开“模型配置”，填写 API URL、模型名称和 API Key。
-4. 点击“启动服务”。
-5. 点击“打开界面”，分别检查 OpenClaw 和 Hermes Web UI。
-6. 发送一条测试消息，确认 OpenClaw / Hermes 真实可回复。
-7. 点击“停止服务”。
-8. 点击“备份”，确认 `data/backups/` 有输出。
+2. 打开“设置”页，确认 U 盘绑定状态为未绑定或已绑定当前 U 盘。
+3. 打开“安装向导”，确认 WSL、runtime、payload 没有缺项。
+4. 打开“模型配置”，填写 API URL、模型名称和 API Key。
+5. 点击“启动服务”；第一次启动会生成 `data/settings/device-binding.json` 并绑定当前 U 盘。
+6. 点击“打开界面”，分别检查 OpenClaw 和 Hermes Web UI。
+7. 发送一条测试消息，确认 OpenClaw / Hermes 真实可回复。
+8. 点击“停止服务”。
+9. 点击“备份”，确认 `data/backups/` 有输出。
 
 也可以用命令验证：
 
@@ -651,4 +656,5 @@ node core/node/dist/clawhermes.js setup-wizard --json
 - `runtimes/windows/python/python.exe` 可执行。
 - 如交付 WSL 路径，`runtimes/wsl/ubuntu-rootfs.tar` 和 `.sha256` 存在；当前 Windows-native 路径不要求 WSL rootfs。
 - `release-manifest.json` 已复核。
+- 生成后的母包不包含 `data/settings/device-binding.json`；复制到目标 U 盘后，第一次启动服务才生成绑定文件。
 - 干净 Windows 机器上完成 GUI 启动、模型配置、服务启动、界面打开、真实回复、停止和备份测试。
