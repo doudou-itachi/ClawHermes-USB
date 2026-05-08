@@ -79,6 +79,23 @@ dist-usb/ClawHermes/
 - U 盘交付包可以不包含 `.git`、`tests/`、`core/node/src/` 等开发内容。
 - 交付前必须在一台干净 Windows 机器上做启动、停止、模型配置和备份验证。
 
+## 微信渠道插件与扫码登录兼容层
+
+当前 Electrobun 定制版只开放微信渠道入口。为了让其他人重新构建或替换 payload 后不丢失微信扫码能力，交付时必须同时保留两部分内容：
+
+- `apps/openclaw/node_modules/@tencent-weixin/openclaw-weixin/`
+- `core/node/dist/weixin-fetch-preload.js`
+
+其中 `@tencent-weixin/openclaw-weixin` 是 OpenClaw 微信官方插件；`weixin-fetch-preload.js` 是 ClawHermes 侧的兼容层，只在微信扫码登录子进程里注入。它用于隔离微信 iLink API 请求，避免 OpenClaw/Undici fetch dispatcher 在二维码请求阶段因为 `Content-Length` 兼容问题导致 `TypeError: fetch failed`。
+
+发布脚本 `scripts/release/Build-UsbRelease.ps1` 会在复制 `apps/openclaw` 前检查微信插件：
+
+- 如果插件已经存在，会随 `apps/openclaw` payload 一起复制。
+- 如果插件缺失，脚本会尝试安装 `@tencent-weixin/openclaw-weixin`。
+- 生成的 `release-manifest.json` 会记录 `channelPluginPolicy.weixin`，交付人员应检查 `included` 为 `true`。
+
+后续如果重新准备或替换 `apps/openclaw` payload，不要只复制 OpenClaw 主程序；必须重新确认微信插件仍存在，并重新运行发布脚本或至少检查最终包里的上述两个路径。最终 smoke test 应点击“渠道接入 -> 微信扫码登录”，确认 `data/logs/channel-weixin.log` 中出现终端二维码或 `https://liteapp.weixin.qq.com/q/...` 备用链接，而不是 `Install Weixin plugin` 或 `TypeError: fetch failed`。
+
 推荐使用高速 USB 3.x U 盘或移动 SSD。WSL rootfs、`node_modules`、SQLite、日志和缓存都是大量小文件或频繁读写路径，低速 U 盘会明显拖慢体验。
 
 ## 快速流程
