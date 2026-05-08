@@ -97,24 +97,23 @@ function windowsDeviceFingerprint(root) {
     const driveLetter = /^([A-Za-z]):/.exec((0, node_path_1.parse)(root).root)?.[1];
     if (!driveLetter)
         return null;
-    const components = {
-        vol: readVolSerial(driveLetter),
-        volume: readWindowsVolume(driveLetter),
-        disk: readWindowsDisk(driveLetter),
-    };
-    if (!components.volume && !components.disk && !components.vol)
+    const logicalDisk = readWindowsLogicalDisk(driveLetter);
+    const volumeSerialNumber = normalizeVolumeSerial(logicalDisk?.VolumeSerialNumber) ?? readVolSerial(driveLetter);
+    if (!volumeSerialNumber)
         return null;
+    const components = {
+        volumeSerialNumber,
+        fileSystem: normalizeString(logicalDisk?.FileSystem),
+    };
     return {
-        hash: sha256(stableStringify(components)),
+        hash: sha256(`windows-volume:${stableStringify(components)}`),
         source: "windows",
-        summary: `Windows USB fingerprint for drive ${driveLetter.toUpperCase()}:`,
+        summary: `Windows volume serial fingerprint for drive ${driveLetter.toUpperCase()}:`,
     };
 }
-function readWindowsVolume(driveLetter) {
-    return runPowerShellJson(`$v = Get-Volume -DriveLetter '${driveLetter}' -ErrorAction Stop | Select-Object DriveLetter,FileSystemLabel,FileSystem,DriveType,UniqueId,SerialNumber; $v | ConvertTo-Json -Depth 4`);
-}
-function readWindowsDisk(driveLetter) {
-    return runPowerShellJson(`$p = Get-Partition -DriveLetter '${driveLetter}' -ErrorAction Stop; $d = $p | Get-Disk -ErrorAction Stop | Select-Object Number,FriendlyName,SerialNumber,UniqueId,BusType; $d | ConvertTo-Json -Depth 4`);
+function readWindowsLogicalDisk(driveLetter) {
+    const escapedDrive = `${driveLetter.toUpperCase()}:`.replace(/'/g, "''");
+    return runPowerShellJson(`$d = Get-CimInstance Win32_LogicalDisk -Filter "DeviceID='${escapedDrive}'" -ErrorAction Stop | Select-Object VolumeSerialNumber,FileSystem; $d | ConvertTo-Json -Depth 3`);
 }
 function runPowerShellJson(script) {
     try {
@@ -132,15 +131,26 @@ function runPowerShellJson(script) {
 }
 function readVolSerial(driveLetter) {
     try {
-        return (0, node_child_process_1.execFileSync)("cmd.exe", ["/c", "vol", `${driveLetter}:`], {
+        const stdout = (0, node_child_process_1.execFileSync)("cmd.exe", ["/c", "vol", `${driveLetter}:`], {
             encoding: "utf8",
             windowsHide: true,
             timeout: 1500,
         }).trim();
+        return normalizeVolumeSerial(stdout.match(/[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}/)?.[0]);
     }
     catch {
         return null;
     }
+}
+function normalizeVolumeSerial(value) {
+    const normalized = normalizeString(value)?.replace(/[^0-9A-Fa-f]/g, "").toUpperCase();
+    return normalized ? normalized : null;
+}
+function normalizeString(value) {
+    if (typeof value !== "string")
+        return null;
+    const trimmed = value.trim();
+    return trimmed ? trimmed : null;
 }
 function stableStringify(value) {
     if (Array.isArray(value)) {

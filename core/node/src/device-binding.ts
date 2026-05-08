@@ -116,29 +116,30 @@ function currentDeviceFingerprint(root: string): DeviceFingerprint {
 function windowsDeviceFingerprint(root: string): DeviceFingerprint | null {
   const driveLetter = /^([A-Za-z]):/.exec(parse(root).root)?.[1];
   if (!driveLetter) return null;
+  const logicalDisk = readWindowsLogicalDisk(driveLetter);
+  const volumeSerialNumber = normalizeVolumeSerial(logicalDisk?.VolumeSerialNumber) ?? readVolSerial(driveLetter);
+  if (!volumeSerialNumber) return null;
   const components = {
-    vol: readVolSerial(driveLetter),
-    volume: readWindowsVolume(driveLetter),
-    disk: readWindowsDisk(driveLetter),
+    volumeSerialNumber,
+    fileSystem: normalizeString(logicalDisk?.FileSystem),
   };
-  if (!components.volume && !components.disk && !components.vol) return null;
   return {
-    hash: sha256(stableStringify(components)),
+    hash: sha256(`windows-volume:${stableStringify(components)}`),
     source: "windows",
-    summary: `Windows USB fingerprint for drive ${driveLetter.toUpperCase()}:`,
+    summary: `Windows volume serial fingerprint for drive ${driveLetter.toUpperCase()}:`,
   };
 }
 
-function readWindowsVolume(driveLetter: string): unknown {
-  return runPowerShellJson(
-    `$v = Get-Volume -DriveLetter '${driveLetter}' -ErrorAction Stop | Select-Object DriveLetter,FileSystemLabel,FileSystem,DriveType,UniqueId,SerialNumber; $v | ConvertTo-Json -Depth 4`,
-  );
-}
+type WindowsLogicalDisk = {
+  VolumeSerialNumber?: unknown;
+  FileSystem?: unknown;
+};
 
-function readWindowsDisk(driveLetter: string): unknown {
+function readWindowsLogicalDisk(driveLetter: string): WindowsLogicalDisk | null {
+  const escapedDrive = `${driveLetter.toUpperCase()}:`.replace(/'/g, "''");
   return runPowerShellJson(
-    `$p = Get-Partition -DriveLetter '${driveLetter}' -ErrorAction Stop; $d = $p | Get-Disk -ErrorAction Stop | Select-Object Number,FriendlyName,SerialNumber,UniqueId,BusType; $d | ConvertTo-Json -Depth 4`,
-  );
+    `$d = Get-CimInstance Win32_LogicalDisk -Filter "DeviceID='${escapedDrive}'" -ErrorAction Stop | Select-Object VolumeSerialNumber,FileSystem; $d | ConvertTo-Json -Depth 3`,
+  ) as WindowsLogicalDisk | null;
 }
 
 function runPowerShellJson(script: string): unknown {
@@ -157,14 +158,26 @@ function runPowerShellJson(script: string): unknown {
 
 function readVolSerial(driveLetter: string): string | null {
   try {
-    return execFileSync("cmd.exe", ["/c", "vol", `${driveLetter}:`], {
+    const stdout = execFileSync("cmd.exe", ["/c", "vol", `${driveLetter}:`], {
       encoding: "utf8",
       windowsHide: true,
       timeout: 1500,
     }).trim();
+    return normalizeVolumeSerial(stdout.match(/[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}/)?.[0]);
   } catch {
     return null;
   }
+}
+
+function normalizeVolumeSerial(value: unknown): string | null {
+  const normalized = normalizeString(value)?.replace(/[^0-9A-Fa-f]/g, "").toUpperCase();
+  return normalized ? normalized : null;
+}
+
+function normalizeString(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
 }
 
 function stableStringify(value: unknown): string {

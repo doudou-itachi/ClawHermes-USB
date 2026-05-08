@@ -3577,6 +3577,15 @@ class WindowsCoreTests(unittest.TestCase):
             run_dispatcher_for_root(temp_root, "stop", "-Json", env={"CLAWHERMES_DEVICE_BINDING_FINGERPRINT": "usb-device-a"})
             temp_dir.cleanup()
 
+    def test_windows_device_binding_uses_stable_volume_serial_not_disk_metadata(self):
+        source = (ROOT / "core" / "node" / "src" / "device-binding.ts").read_text(encoding="utf-8")
+
+        self.assertIn("Win32_LogicalDisk", source)
+        self.assertIn("VolumeSerialNumber", source)
+        self.assertNotIn("Get-Volume", source)
+        self.assertNotIn("Get-Disk", source)
+        self.assertNotIn("FriendlyName", source)
+
     def test_start_adapter_confirm_reuses_running_managed_process(self):
         temp_dir, temp_root = make_temp_process_usb_root()
         try:
