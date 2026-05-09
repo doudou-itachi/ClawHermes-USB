@@ -8,6 +8,7 @@ const node_fs_1 = require("node:fs");
 const node_path_1 = require("node:path");
 const adapters_1 = require("./adapters");
 const portable_1 = require("./portable");
+const weixin_compat_1 = require("./weixin-compat");
 function envFileDiagnostics(usbRoot, adapters) {
     const root = (0, portable_1.getRoot)(usbRoot);
     const diagnostics = [];
@@ -112,6 +113,9 @@ function resolveServiceEnvironment(usbRoot, serviceId) {
     }
     for (const [name, value] of Object.entries(adapter.env?.variables ?? {})) {
         env[name] = expandEnvTemplate(value, env);
+    }
+    if (adapter.id === "openclaw") {
+        return { root, serviceId: adapter.id, env: (0, weixin_compat_1.withWeixinFetchCompatibility)(root, env), files, messages };
     }
     return { root, serviceId: adapter.id, env, files, messages };
 }

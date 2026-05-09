@@ -88,8 +88,11 @@ dist-usb/ClawHermes/
 
 - `apps/openclaw/node_modules/@tencent-weixin/openclaw-weixin/`
 - `core/node/dist/weixin-fetch-preload.js`
+- `core/node/dist/weixin-compat.js`
 
-其中 `@tencent-weixin/openclaw-weixin` 是 OpenClaw 微信官方插件；`weixin-fetch-preload.js` 是 ClawHermes 侧的兼容层，只在微信扫码登录子进程里注入。它用于隔离微信 iLink API 请求，避免 OpenClaw/Undici fetch dispatcher 在二维码请求阶段因为 `Content-Length` 兼容问题导致 `TypeError: fetch failed`。
+`weixin-compat.js` 负责把兼容层注入到需要的 Node 进程；`weixin-fetch-preload.js` 是实际的 iLink 请求兼容层。两者都应随 `core/node/dist/` 一起进入交付包，不能只复制其中一个。
+
+其中 `@tencent-weixin/openclaw-weixin` 是 OpenClaw 微信官方插件；`weixin-fetch-preload.js` 是 ClawHermes 侧的兼容层，会注入到微信扫码登录子进程以及 OpenClaw Gateway 服务进程。它用于隔离微信 iLink API 请求，避免 OpenClaw/Undici fetch dispatcher 在二维码请求、`notifyStart` 和 `getUpdates` 长轮询阶段因为 `Content-Length` 兼容问题导致 `TypeError: fetch failed`。
 
 发布脚本 `scripts/release/Build-UsbRelease.ps1` 会在复制 `apps/openclaw` 前检查微信插件：
 
@@ -97,7 +100,9 @@ dist-usb/ClawHermes/
 - 如果插件缺失，脚本会尝试安装 `@tencent-weixin/openclaw-weixin`。
 - 生成的 `release-manifest.json` 会记录 `channelPluginPolicy.weixin`，交付人员应检查 `included` 为 `true`。
 
-后续如果重新准备或替换 `apps/openclaw` payload，不要只复制 OpenClaw 主程序；必须重新确认微信插件仍存在，并重新运行发布脚本或至少检查最终包里的上述两个路径。最终 smoke test 应点击“渠道接入 -> 微信扫码登录”，确认 `data/logs/channel-weixin.log` 中出现终端二维码或 `https://liteapp.weixin.qq.com/q/...` 备用链接，而不是 `Install Weixin plugin` 或 `TypeError: fetch failed`。
+后续如果重新准备或替换 `apps/openclaw` payload，不要只复制 OpenClaw 主程序；必须重新确认微信插件仍存在，并重新运行发布脚本或至少检查最终包里的上述两个路径。最终 smoke test 应点击“渠道接入 -> 微信扫码登录”，确认 `data/logs/channel-weixin.log` 中出现终端二维码或 `https://liteapp.weixin.qq.com/q/...` 备用链接；扫码授权并启动 OpenClaw 后，还应检查 `data/tmp/openclaw/openclaw-*.log` 中没有连续的 `notifyStart failed` 或 `getUpdates error: TypeError: fetch failed`。
+
+交付包从一块 U 盘复制到另一块 U 盘，或在不同电脑上盘符发生变化时，`data/openclaw/openclaw.json` 里可能还保留旧盘符的 `plugins.load.paths`、`skills.load.extraDirs` 或日志路径。ClawHermes 在启动 OpenClaw 前会按当前 `<USB_ROOT>` 刷新这些路径：微信插件路径只保留当前包内的 `apps/openclaw/node_modules/@tencent-weixin/openclaw-weixin`，技能路径只保留当前包内的 `skills/`，OpenClaw runtime log 写到当前包的 `data/logs/openclaw-runtime.log`。如果手动修改过 `openclaw.json`，交付复核时也要确认这些路径没有指向上一台电脑或旧 U 盘。
 
 推荐使用高速 USB 3.x U 盘或移动 SSD。WSL rootfs、`node_modules`、SQLite、日志和缓存都是大量小文件或频繁读写路径，低速 U 盘会明显拖慢体验。
 

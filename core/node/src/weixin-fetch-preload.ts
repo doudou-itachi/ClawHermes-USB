@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 
 const originalFetch = globalThis.fetch;
 const WEIXIN_API_HOST = "ilinkai.weixin.qq.com";
@@ -39,35 +39,60 @@ function isolatedWeixinFetch(url: URL, init?: Parameters<typeof fetch>[1]): Prom
     headers: Object.fromEntries(headers.entries()),
     body: body?.toString("base64") ?? null,
   })).toString("base64url");
-  const result = spawnSync(process.execPath, ["--input-type=module", "-e", isolatedFetchScript(), payload], {
-    encoding: "utf8",
-    env: isolatedFetchEnv(),
-    timeout: ISOLATED_FETCH_TIMEOUT_MS,
-    windowsHide: true,
+  return new Promise<Response>((resolve, reject) => {
+    const child = spawn(process.execPath, ["--input-type=module", "-e", isolatedFetchScript(), payload], {
+      env: isolatedFetchEnv(),
+      stdio: ["ignore", "pipe", "pipe"],
+      windowsHide: true,
+    });
+
+    const stdout: Buffer[] = [];
+    const stderr: Buffer[] = [];
+    let settled = false;
+    const timer = setTimeout(() => {
+      settle(() => reject(new Error(`Isolated WeChat fetch timed out after ${ISOLATED_FETCH_TIMEOUT_MS}ms.`)));
+      child.kill();
+    }, ISOLATED_FETCH_TIMEOUT_MS);
+
+    child.stdout?.on("data", (chunk) => stdout.push(Buffer.from(chunk)));
+    child.stderr?.on("data", (chunk) => stderr.push(Buffer.from(chunk)));
+    child.on("error", (error) => settle(() => reject(error)));
+    child.on("exit", (code) => {
+      settle(() => {
+        const out = Buffer.concat(stdout).toString("utf8");
+        const err = Buffer.concat(stderr).toString("utf8");
+        if (code !== 0) {
+          reject(new Error((err || out || `Isolated WeChat fetch exited with ${code ?? "unknown"}`).trim()));
+          return;
+        }
+
+        try {
+          const parsed = JSON.parse(out.trim()) as {
+            status: number;
+            statusText: string;
+            headers: [string, string][];
+            body: string;
+          };
+          resolve(
+            new Response(Buffer.from(parsed.body, "base64"), {
+              status: parsed.status,
+              statusText: parsed.statusText,
+              headers: new Headers(parsed.headers),
+            }),
+          );
+        } catch (error) {
+          reject(error);
+        }
+      });
+    });
+
+    function settle(callback: () => void): void {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      callback();
+    }
   });
-
-  if (result.error) return Promise.reject(result.error);
-  if (result.status !== 0) {
-    return Promise.reject(new Error((result.stderr || result.stdout || `Isolated WeChat fetch exited with ${result.status}`).trim()));
-  }
-
-  try {
-    const parsed = JSON.parse(result.stdout.trim()) as {
-      status: number;
-      statusText: string;
-      headers: [string, string][];
-      body: string;
-    };
-    return Promise.resolve(
-      new Response(Buffer.from(parsed.body, "base64"), {
-        status: parsed.status,
-        statusText: parsed.statusText,
-        headers: new Headers(parsed.headers),
-      }),
-    );
-  } catch (error) {
-    return Promise.reject(error);
-  }
 }
 
 function requestBody(body: BodyInit | null | undefined): Buffer | null {

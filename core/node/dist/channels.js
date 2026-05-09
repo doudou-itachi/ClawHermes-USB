@@ -7,11 +7,11 @@ exports.readWeixinChannelLog = readWeixinChannelLog;
 const node_child_process_1 = require("node:child_process");
 const node_fs_1 = require("node:fs");
 const node_path_1 = require("node:path");
-const node_url_1 = require("node:url");
 const environment_1 = require("./environment");
 const lifecycle_1 = require("./lifecycle");
 const portable_1 = require("./portable");
 const status_1 = require("./status");
+const weixin_compat_1 = require("./weixin-compat");
 const WEIXIN_PACKAGE_PATH = (0, node_path_1.join)("node_modules", "@tencent-weixin", "openclaw-weixin");
 const WEIXIN_PLUGIN_ID = "openclaw-weixin";
 function getWeixinChannelStatus(usbRoot) {
@@ -74,7 +74,7 @@ function startWeixinChannelLogin(usbRoot) {
     (0, node_fs_1.mkdirSync)((0, node_path_1.dirname)(logFile), { recursive: true });
     (0, node_fs_1.writeFileSync)(logFile, `${new Date().toISOString()} Starting openclaw-weixin login.\n${existing.command}\n\n`, "utf8");
     const serviceEnv = (0, environment_1.resolveServiceEnvironment)(root, "openclaw");
-    const env = withWeixinFetchCompatibility(root, {
+    const env = (0, weixin_compat_1.withWeixinFetchCompatibility)(root, {
         ...process.env,
         ...serviceEnv.env,
         PATH: patchedPath(root),
@@ -251,16 +251,6 @@ function weixinCommand(root) {
 function nodeCommand(root) {
     const portableNode = (0, node_path_1.join)(root, "runtimes", "windows", "node", "node.exe");
     return (0, node_fs_1.existsSync)(portableNode) ? portableNode : "node";
-}
-function withWeixinFetchCompatibility(root, env) {
-    const next = Object.fromEntries(Object.entries(env).filter((entry) => typeof entry[1] === "string"));
-    const preloadPath = (0, node_path_1.join)(root, "core", "node", "dist", "weixin-fetch-preload.js");
-    if (!(0, node_fs_1.existsSync)(preloadPath))
-        return next;
-    const importOption = `--import ${(0, node_url_1.pathToFileURL)(preloadPath).href}`;
-    const existing = next.NODE_OPTIONS?.trim() ?? "";
-    next.NODE_OPTIONS = existing.includes(importOption) ? existing : [importOption, existing].filter(Boolean).join(" ");
-    return next;
 }
 function patchedPath(root) {
     return [

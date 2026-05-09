@@ -1187,6 +1187,8 @@ class WindowsCoreTests(unittest.TestCase):
     def test_openclaw_channel_routes_match_vh_claw_depth(self):
         control_server = (ROOT / "core" / "node" / "src" / "control-server.ts").read_text(encoding="utf-8")
         channels = (ROOT / "core" / "node" / "src" / "channels.ts").read_text(encoding="utf-8")
+        environment = (ROOT / "core" / "node" / "src" / "environment.ts").read_text(encoding="utf-8")
+        weixin_compat = (ROOT / "core" / "node" / "src" / "weixin-compat.ts").read_text(encoding="utf-8")
         fetch_preload = (ROOT / "core" / "node" / "src" / "weixin-fetch-preload.ts").read_text(encoding="utf-8")
 
         self.assertIn("/api/channels/weixin", control_server)
@@ -1202,9 +1204,12 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertIn("--link", channels)
         self.assertIn("ensureWeixinPluginRegistered", channels)
         self.assertIn("withWeixinFetchCompatibility", channels)
-        self.assertIn("weixin-fetch-preload.js", channels)
-        self.assertIn("NODE_OPTIONS", channels)
-        self.assertIn("spawnSync", fetch_preload)
+        self.assertIn("withWeixinFetchCompatibility", environment)
+        self.assertIn('adapter.id === "openclaw"', environment)
+        self.assertIn("weixin-fetch-preload.js", weixin_compat)
+        self.assertIn("NODE_OPTIONS", weixin_compat)
+        self.assertIn("spawn", fetch_preload)
+        self.assertNotIn("spawnSync", fetch_preload)
         self.assertIn("ilinkai.weixin.qq.com", fetch_preload)
         self.assertIn("mkdirSync(dirname(weixinMetadataPath(root))", channels)
         self.assertIn("stopWeixinChannelLogin", channels)
@@ -1213,6 +1218,36 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertIn("channel-weixin.log", channels)
         self.assertIn('headers.delete("content-length")', fetch_preload)
         self.assertIn("isolatedWeixinFetch", fetch_preload)
+
+    def test_openclaw_service_environment_injects_weixin_fetch_preload(self):
+        temp_dir, temp_root = make_temp_skeleton_usb_root()
+        try:
+            script = (
+                "const { resolveServiceEnvironment } = require('./core/node/dist/core.js');"
+                "const root = process.argv[1];"
+                "const openclaw = resolveServiceEnvironment(root, 'openclaw').env;"
+                "const hermes = resolveServiceEnvironment(root, 'hermes-agent').env;"
+                "process.stdout.write(JSON.stringify({"
+                "openclawNodeOptions: openclaw.NODE_OPTIONS ?? null,"
+                "hermesNodeOptions: hermes.NODE_OPTIONS ?? null"
+                "}));"
+            )
+            resolved = subprocess.run(
+                ["node", "-e", script, str(temp_root)],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+                env={**os.environ, "PYTHONUTF8": "1"},
+            )
+
+            self.assertEqual(resolved.returncode, 0, resolved.stderr)
+            payload = json.loads(resolved.stdout)
+            self.assertIn("--import", payload["openclawNodeOptions"])
+            self.assertIn("weixin-fetch-preload.js", payload["openclawNodeOptions"])
+            self.assertIsNone(payload["hermesNodeOptions"])
+        finally:
+            temp_dir.cleanup()
 
     def test_windows_service_lifecycle_hides_console_subprocesses(self):
         lifecycle = (ROOT / "core" / "node" / "src" / "lifecycle.ts").read_text(encoding="utf-8")
@@ -3972,6 +4007,68 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertEqual(len([item for item in extra_dirs if Path(item).resolve() == skills_dir.resolve()]), 1)
         finally:
             run_dispatcher_for_root(temp_root, "stop", "-Json", env={"CLAWHERMES_WSL_EXE": str(temp_root / "fake-wsl.cmd")})
+            if process_id:
+                wait_for_process_exit(process_id)
+            wait_for_no_process_command_line_fragment(temp_root)
+            temp_dir.cleanup()
+
+    def test_start_openclaw_refreshes_portable_weixin_plugin_path_for_current_root(self):
+        temp_dir, temp_root = make_temp_skeleton_usb_root()
+        process_id = None
+        try:
+            app_dir = temp_root / "apps" / "openclaw"
+            (app_dir / "openclaw.mjs").write_text("setTimeout(() => {}, 60000)\n", encoding="utf-8")
+            plugin_dir = app_dir / "node_modules" / "@tencent-weixin" / "openclaw-weixin"
+            plugin_dir.mkdir(parents=True)
+            (plugin_dir / "package.json").write_text('{"name":"@tencent-weixin/openclaw-weixin"}\n', encoding="utf-8")
+            skills_dir = temp_root / "skills"
+            skills_dir.mkdir(parents=True, exist_ok=True)
+            old_root = Path("Z:/OldClawHermes")
+            config_path = temp_root / "data" / "openclaw" / "openclaw.json"
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "logging": {"file": "/mnt/z/OldClawHermes/data/logs/openclaw-runtime.log"},
+                        "skills": {
+                            "load": {
+                                "extraDirs": [
+                                    str(old_root / "skills"),
+                                ],
+                            },
+                        },
+                        "plugins": {
+                            "load": {
+                                "paths": [
+                                    str(old_root / "apps" / "openclaw" / "node_modules" / "@tencent-weixin" / "openclaw-weixin"),
+                                ],
+                            },
+                            "entries": {
+                                "openclaw-weixin": {"enabled": True},
+                            },
+                        },
+                    },
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
+            adapter_path = temp_root / "adapters" / "openclaw" / "adapter.json"
+            adapter = json.loads(adapter_path.read_text(encoding="utf-8"))
+            adapter["health"] = {"type": "process", "timeoutSeconds": 5}
+            adapter_path.write_text(json.dumps(adapter, indent=2), encoding="utf-8")
+
+            start = run_dispatcher_for_root(temp_root, "start-adapter", "openclaw", "--confirm-start", "-Json")
+
+            self.assertEqual(start.returncode, 0, start.stderr)
+            metadata = json.loads((temp_root / "data" / "tmp" / "pids" / "openclaw.pid").read_text(encoding="utf-8"))
+            process_id = metadata["processId"]
+            refreshed = json.loads(config_path.read_text(encoding="utf-8"))
+            self.assertEqual(refreshed["logging"]["file"], str(temp_root / "data" / "logs" / "openclaw-runtime.log"))
+            self.assertEqual(refreshed["plugins"]["load"]["paths"], [str(plugin_dir)])
+            self.assertEqual(refreshed["plugins"]["entries"]["openclaw-weixin"]["enabled"], True)
+            self.assertEqual(refreshed["skills"]["load"]["extraDirs"], [str(skills_dir)])
+            self.assertNotIn("Z:", json.dumps(refreshed))
+        finally:
+            run_dispatcher_for_root(temp_root, "stop", "-Json")
             if process_id:
                 wait_for_process_exit(process_id)
             wait_for_no_process_command_line_fragment(temp_root)

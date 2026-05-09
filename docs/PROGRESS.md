@@ -11,6 +11,35 @@ Update it whenever a milestone is completed, changed, blocked, or deferred.
 - `Blocked`: Waiting on external information or action.
 - `Deferred`: Intentionally postponed.
 
+## 2026-05-09
+
+### Cross-Drive OpenClaw Path Refresh Documentation
+
+Status: `Done`
+
+Summary:
+
+- Reviewed recent commits and the current WeChat/OpenClaw path refresh changes against the project docs.
+- Documented that `weixin-compat.js` must be shipped together with `weixin-fetch-preload.js`, because it injects the compatibility preload into both the QR login subprocess and the OpenClaw Gateway service process.
+- Documented the cross-drive startup behavior: before launching OpenClaw, ClawHermes refreshes stale `plugins.load.paths`, `skills.load.extraDirs`, and runtime log paths in `data/openclaw/openclaw.json` to the current USB root.
+- Recorded the latest rebuilt full USB package at `dist-usb/ClawHermes-electrobun-device-binding-20260508-175215` for local handoff testing.
+
+Changed areas:
+
+- `docs/PROGRESS.md`
+- `docs/electrobun-control-shell.zh-CN.md`
+- `docs/usb-release-build-runbook.zh-CN.md`
+
+Validation performed:
+
+- `git log --oneline --decorate -n 12`
+- `git diff --stat`
+- `git diff -- docs/PROGRESS.md docs/electrobun-control-shell.zh-CN.md docs/usb-release-build-runbook.zh-CN.md`
+
+Next steps:
+
+- Commit the WeChat/OpenClaw path refresh code, tests, and documentation together after final verification.
+
 ## 2026-05-08
 
 ### USB Device Binding for Delivery Packages
@@ -3483,6 +3512,41 @@ Validation performed:
 Next steps:
 
 - Continue real Hermes Agent and OpenClaw WSL2 payload validation when a prepared distro is available.
+
+### WeChat Gateway Fetch Compatibility
+
+Status: `Done`
+
+Summary:
+
+- Compared the local `D:\project\uclaw` implementation and the bundled `@tencent-weixin/openclaw-weixin` README. The plugin expects `openclaw channels login --channel openclaw-weixin` followed by a gateway restart.
+- Traced the USB test package logs: QR login could be confirmed, but the long-running OpenClaw Gateway WeChat monitor failed on `notifyStart` and `getUpdates` with `TypeError: fetch failed`, leaving the phone side unable to connect to OpenClaw.
+- Moved the WeChat fetch preload injection into a shared helper and applied it to the OpenClaw service environment, so both the QR login subprocess and the Gateway process use the same iLink request compatibility layer.
+- Updated the compatibility preload to isolate WeChat iLink fetches asynchronously. The previous synchronous child-process bridge could keep OpenClaw listening on `18789` while blocking `/healthz` and the Web UI during WeChat `getUpdates` long polling.
+- Traced cross-machine USB startup failures to stale absolute paths in `data/openclaw/openclaw.json`: the WeChat plugin path could still point at the previous drive letter, causing OpenClaw Gateway startup to fail with `plugins.load.paths: plugin path not found`. OpenClaw startup now rewrites the WeChat plugin path and portable skills path to the current USB root before launching.
+
+Changed areas:
+
+- `core/node/src/weixin-compat.ts`
+- `core/node/src/weixin-fetch-preload.ts`
+- `core/node/src/channels.ts`
+- `core/node/src/environment.ts`
+- `core/node/src/lifecycle.ts`
+- `docs/electrobun-control-shell.zh-CN.md`
+- `docs/usb-release-build-runbook.zh-CN.md`
+- `tests/test_windows_core.py`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_openclaw_channel_routes_match_vh_claw_depth tests.test_windows_core.WindowsCoreTests.test_openclaw_service_environment_injects_weixin_fetch_preload tests.test_windows_core.WindowsCoreTests.test_default_gateway_tokens_are_unified_without_service_env_value_leakage -v`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_start_openclaw_registers_portable_skills_dir_once tests.test_windows_core.WindowsCoreTests.test_start_openclaw_refreshes_portable_weixin_plugin_path_for_current_root tests.test_windows_core.WindowsCoreTests.test_openclaw_channel_routes_match_vh_claw_depth -v`
+- Hot-patched the current `G:\ClawHermes-electrobun-device-binding-20260508-121031` test package and verified `http://127.0.0.1:18789/` plus `/healthz` return `200` after OpenClaw finishes the WeChat monitor startup window.
+- Hot-patched `core/node/dist/lifecycle.js` in the current `G:\ClawHermes-electrobun-device-binding-20260508-121031` package so the next OpenClaw start refreshes stale plugin paths to the current drive letter.
+
+Next steps:
+
+- Use the rebuilt `dist-usb/ClawHermes-electrobun-device-binding-20260508-175215` package for the next cross-machine USB smoke test.
 
 ### Electrobun WeChat Login Fetch Compatibility
 

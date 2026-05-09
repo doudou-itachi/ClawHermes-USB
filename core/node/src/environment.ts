@@ -3,6 +3,7 @@ import { dirname } from "node:path";
 import type { AdapterDescriptor, EnvFileDiagnostic, EnvInitResult, ServiceEnvironment, ServiceEnvironmentDiagnostic, ServiceEnvFileResult } from "./types";
 import { loadAdapters } from "./adapters";
 import { getRoot, portableEnv, resolveRelative } from "./portable";
+import { withWeixinFetchCompatibility } from "./weixin-compat";
 
 export function envFileDiagnostics(usbRoot: string, adapters: AdapterDescriptor[]): EnvFileDiagnostic[] {
   const root = getRoot(usbRoot);
@@ -117,6 +118,10 @@ export function resolveServiceEnvironment(usbRoot: string, serviceId: string): S
 
   for (const [name, value] of Object.entries(adapter.env?.variables ?? {})) {
     env[name] = expandEnvTemplate(value, env);
+  }
+
+  if (adapter.id === "openclaw") {
+    return { root, serviceId: adapter.id, env: withWeixinFetchCompatibility(root, env), files, messages };
   }
 
   return { root, serviceId: adapter.id, env, files, messages };

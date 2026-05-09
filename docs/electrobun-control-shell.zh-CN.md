@@ -93,6 +93,8 @@ U 盘交付目录根部应优先开放 `ClawHermes-Control-Electrobun.exe`。它
 - 微信登录进程支持在界面中停止；关闭 Electrobun 控制面板时也会先请求 `/api/channels/weixin/stop`，避免扫码登录进程继续占用 U 盘目录。
 - 发布脚本会在复制 `apps/openclaw` 前检查 `apps/openclaw/node_modules/@tencent-weixin/openclaw-weixin`。如果插件缺失，会使用 payload 自带的 `package.json` 执行 `pnpm --config.minimum-release-age=0 add -w @tencent-weixin/openclaw-weixin` 补齐；最终结果会写入 `release-manifest.json` 的 `channelPluginPolicy.weixin`。
 - 点击“微信扫码登录”时，control-server 会先按当前 U 盘路径检查 OpenClaw 的插件账本和 `openclaw.json`。如果缺失或仍指向旧路径，会自动执行 `openclaw plugins install <本地微信插件路径> --link` 注册本地插件，再启动 `channels login`，避免 OpenClaw 弹出交互式 `Install Weixin plugin?` 选择。
+- 微信 iLink 请求兼容层 `core/node/dist/weixin-fetch-preload.js` 会同时注入到扫码登录子进程和 OpenClaw Gateway 服务进程。前者负责二维码和扫码授权，后者负责登录后的 `notifyStart` 与 `getUpdates` 长轮询；如果只注入扫码进程，手机端可能显示“暂无法连接 OpenClaw”。
+- OpenClaw 启动前还会刷新 `data/openclaw/openclaw.json` 中的微信插件路径、独立技能路径和 runtime log 路径，避免交付包从 `E:` 复制到 `G:` 或换电脑后仍引用旧盘符，导致 OpenClaw 报 `plugins.load.paths: plugin path not found` 并自动退出。
 - 界面不再向用户展示“插件缺失”或其它渠道的终端命令指引。若以后重新替换 OpenClaw payload，只要仍通过 `scripts/release/Build-UsbRelease.ps1` 生成交付包，微信插件就会被重新检查并打进交付物。
 
 ## 技能中心与独立技能包

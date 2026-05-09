@@ -1,11 +1,11 @@
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { delimiter, dirname, join, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
 import { resolveServiceEnvironment } from "./environment";
 import { killProcessTree } from "./lifecycle";
 import { getRoot } from "./portable";
 import { processExists } from "./status";
+import { withWeixinFetchCompatibility } from "./weixin-compat";
 
 export type ChannelLoginStatus = {
   root: string;
@@ -286,17 +286,6 @@ function weixinCommand(root: string): string[] {
 function nodeCommand(root: string): string {
   const portableNode = join(root, "runtimes", "windows", "node", "node.exe");
   return existsSync(portableNode) ? portableNode : "node";
-}
-
-function withWeixinFetchCompatibility(root: string, env: Record<string, string | undefined>): Record<string, string> {
-  const next = Object.fromEntries(Object.entries(env).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
-  const preloadPath = join(root, "core", "node", "dist", "weixin-fetch-preload.js");
-  if (!existsSync(preloadPath)) return next;
-
-  const importOption = `--import ${pathToFileURL(preloadPath).href}`;
-  const existing = next.NODE_OPTIONS?.trim() ?? "";
-  next.NODE_OPTIONS = existing.includes(importOption) ? existing : [importOption, existing].filter(Boolean).join(" ");
-  return next;
 }
 
 function patchedPath(root: string): string {

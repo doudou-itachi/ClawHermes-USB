@@ -4,10 +4,13 @@ import { dirname, join, resolve } from "node:path";
 import type { AdapterDescriptor, ServiceEnvironment } from "./types";
 import { resolveServiceEnvironment } from "./environment";
 import { resolveRelative, writeLog } from "./portable";
-import { windowsPathToWslPath, wslAdapterCommandPlan } from "./wsl-adapter";
+import { wslAdapterCommandPlan } from "./wsl-adapter";
 import { wslExecutableInvocation } from "./wsl";
 import { expandCommandTemplate } from "./command-template";
 import { ensurePortableSkillsDir } from "./skills";
+
+const WEIXIN_PLUGIN_RELATIVE_DIR = join("apps", "openclaw", "node_modules", "@tencent-weixin", "openclaw-weixin");
+const WEIXIN_PLUGIN_ID = "openclaw-weixin";
 
 export type ManagedProcessPlan = {
   runner?: string;
@@ -199,9 +202,17 @@ function prepareOpenClawEnvironment(root: string, serviceEnv: ServiceEnvironment
   const logging = objectValue(existing.logging);
   const skills = objectValue(existing.skills);
   const skillsLoad = objectValue(skills.load);
+  const plugins = objectValue(existing.plugins);
+  const pluginsLoad = objectValue(plugins.load);
+  const pluginsEntries = objectValue(plugins.entries);
   const portableSkillsDir = ensurePortableSkillsDir(root);
   const token = serviceEnv.env.OPENCLAW_GATEWAY_TOKEN || "clawhermes";
-  const runtimeLogPath = windowsPathToWslPath(resolveRelative(root, "data/logs/openclaw-runtime.log"));
+  const runtimeLogPath = resolveRelative(root, "data/logs/openclaw-runtime.log");
+  const weixinPluginPath = resolveRelative(root, WEIXIN_PLUGIN_RELATIVE_DIR);
+  const weixinPluginExists = existsSync(weixinPluginPath);
+  const pluginPaths = weixinPluginExists
+    ? appendUniquePathEntry(removeMatchingPathEntries(pluginsLoad.paths, isWeixinPluginPath), weixinPluginPath)
+    : removeMatchingPathEntries(pluginsLoad.paths, isWeixinPluginPath);
   writeFileSync(
     configPath,
     `${JSON.stringify(
@@ -225,7 +236,25 @@ function prepareOpenClawEnvironment(root: string, serviceEnv: ServiceEnvironment
           ...skills,
           load: {
             ...skillsLoad,
-            extraDirs: appendUniquePathEntry(skillsLoad.extraDirs, portableSkillsDir),
+            extraDirs: appendUniquePathEntry(existingPathEntries(skillsLoad.extraDirs), portableSkillsDir),
+          },
+        },
+        plugins: {
+          ...plugins,
+          load: {
+            ...pluginsLoad,
+            paths: pluginPaths,
+          },
+          entries: {
+            ...pluginsEntries,
+            ...(weixinPluginExists
+              ? {
+                [WEIXIN_PLUGIN_ID]: {
+                  ...objectValue(pluginsEntries[WEIXIN_PLUGIN_ID]),
+                  enabled: true,
+                },
+              }
+              : {}),
           },
         },
       },
@@ -253,6 +282,26 @@ function appendUniquePathEntry(value: unknown, pathValue: string): string[] {
   const normalizedTarget = normalizePathForComparison(pathValue);
   const hasTarget = entries.some((item) => normalizePathForComparison(item) === normalizedTarget);
   return hasTarget ? entries : [...entries, pathValue];
+}
+
+function existingPathEntries(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0 && existsSync(item))
+    : [];
+}
+
+function removeMatchingPathEntries(value: unknown, predicate: (pathValue: string) => boolean): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0 && !predicate(item))
+    : [];
+}
+
+function isWeixinPluginPath(pathValue: string): boolean {
+  return normalizePathForComparison(pathValue).endsWith(pathSuffixForComparison(WEIXIN_PLUGIN_RELATIVE_DIR));
+}
+
+function pathSuffixForComparison(pathValue: string): string {
+  return `${pathValue.replace(/[\\/]+/g, "\\").replace(/[\\/]+$/, "").toLowerCase()}`;
 }
 
 function normalizePathForComparison(pathValue: string): string {
