@@ -13,6 +13,42 @@ Update it whenever a milestone is completed, changed, blocked, or deferred.
 
 ## 2026-05-09
 
+### DTclaw Branding and MixedCloud Model Presets
+
+Status: `Done`
+
+Summary:
+
+- Updated the Electrobun control shell's user-facing brand from ClawHermes to DTclaw while keeping existing executable names, package roots, and app identifier stable for USB delivery compatibility.
+- Replaced the generic ClawHermes mark with the DTclaw logo asset from `D:/project/uclaw/dist/assets/LOGO-B8MKFK7O.png`.
+- Simplified model provider presets to `融云API` and `自定义`; `融云API` pre-fills `https://models.mixedcloud.cn/v1`, while model name and API key remain blank for the operator.
+- Updated the service page hero CTA area to a vertical layout with customer-support and enterprise-upgrade copy, plus a red note explaining that product appearance may vary by batch.
+
+Changed areas:
+
+- `launcher/electrobun/src/mainview/App.vue`
+- `launcher/electrobun/src/mainview/style.css`
+- `launcher/electrobun/src/mainview/assets/dtclaw-logo.png`
+- `launcher/electrobun/src/bun/index.ts`
+- `launcher/electrobun/index.html`
+- `launcher/electrobun/electrobun.config.ts`
+- `launcher/electrobun/portable-wrapper/ClawHermesControlLauncher.cs`
+- `tests/test_windows_core.py`
+- `docs/electrobun-control-shell.zh-CN.md`
+- `docs/PROGRESS.md`
+
+Validation performed:
+
+- `npm run build`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_chinese_docs_are_readable_utf8 -v`
+- `git diff --check`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\launcher\electrobun\build.ps1 -SkipInstall -WebOnly`
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_electrobun_control_shell_scaffold_matches_vh_claw_style -v`
+
+Next steps:
+
+- Rebuild the full USB delivery package when the operator wants a fresh DTclaw-branded artifact.
+
 ### Cross-Drive OpenClaw Path Refresh Documentation
 
 Status: `Done`

@@ -283,6 +283,6 @@ internal static class ClawHermesControlLauncher
 
     private static void ShowError(string message)
     {
-        MessageBox.Show(message, "ClawHermes Control", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        MessageBox.Show(message, "DTclaw Control", MessageBoxButtons.OK, MessageBoxIcon.Error);
     }
 }

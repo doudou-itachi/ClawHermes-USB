@@ -2,7 +2,7 @@ import type { ElectrobunConfig } from "electrobun";
 
 export default {
   app: {
-    name: "ClawHermes Control",
+    name: "DTclaw Control",
     identifier: "dev.clawhermes.control",
     version: "0.1.0",
   },

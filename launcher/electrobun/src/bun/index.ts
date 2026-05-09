@@ -77,7 +77,7 @@ const rpc = BrowserView.defineRPC({
 });
 
 mainWindow = new BrowserWindow({
-  title: "ClawHermes Control",
+  title: "DTclaw Control",
   url: "views://mainview/index.html",
   frame: {
     width: 1120,

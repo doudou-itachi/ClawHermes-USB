@@ -2,6 +2,7 @@
 import { computed, h, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { Electroview } from "electrobun/view";
 import type { BootstrapPayload, ChannelLoginStatus, DeviceBindingStatus, LogPayload, ModelConfig, PortableSkill, ServiceStatus, SkillsPayload, StatusPayload } from "../shared/types";
+import dtclawLogo from "./assets/dtclaw-logo.png";
 import product12Image from "./assets/product12.png";
 
 type IconName =
@@ -87,17 +88,8 @@ type ProviderPreset = {
 };
 
 const providerPresets: ProviderPreset[] = [
-  { id: "deepseek", label: "DeepSeek", short: "D", tone: "blue", tags: ["国内", "OpenAI 兼容"], baseUrl: "https://api.deepseek.com/v1", model: "deepseek-chat", keyUrl: "https://platform.deepseek.com/" },
-  { id: "minimax", label: "MiniMax", short: "M", tone: "amber", tags: ["国内", "推荐"], baseUrl: "https://api.minimax.chat/v1", model: "MiniMax-Text-01", keyUrl: "https://platform.minimaxi.com/" },
-  { id: "kimi", label: "Kimi", short: "K", tone: "emerald", tags: ["国内", "Moonshot"], baseUrl: "https://api.moonshot.cn/v1", model: "moonshot-v1-auto", keyUrl: "https://platform.moonshot.cn/" },
-  { id: "qwen", label: "通义千问", short: "通", tone: "rose", tags: ["国内", "阿里云"], baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1", model: "qwen-turbo", keyUrl: "https://dashscope.console.aliyun.com/" },
-  { id: "doubao", label: "豆包", short: "豆", tone: "orange", tags: ["国内", "火山方舟"], baseUrl: "https://ark.cn-beijing.volces.com/api/v3", model: "doubao-1.5-pro-32k", keyUrl: "https://console.volcengine.com/ark" },
-  { id: "siliconflow", label: "硅基流动", short: "硅", tone: "cyan", tags: ["国内", "低成本"], baseUrl: "https://api.siliconflow.cn/v1", model: "Qwen/Qwen2.5-72B-Instruct", keyUrl: "https://cloud.siliconflow.cn/" },
-  { id: "zhipu", label: "智谱 GLM", short: "智", tone: "orange", tags: ["国内", "GLM"], baseUrl: "https://open.bigmodel.cn/api/paas/v4", model: "glm-4-plus", keyUrl: "https://open.bigmodel.cn/" },
-  { id: "openai", label: "OpenAI", short: "O", tone: "rose", tags: ["海外", "OpenAI"], baseUrl: "https://api.openai.com/v1", model: "gpt-4o", keyUrl: "https://platform.openai.com/" },
-  { id: "anthropic", label: "Claude", short: "C", tone: "blue", tags: ["海外", "Anthropic"], baseUrl: "https://api.anthropic.com/v1", model: "claude-sonnet-4-20250514", keyUrl: "https://console.anthropic.com/" },
-  { id: "groq", label: "Groq", short: "G", tone: "violet", tags: ["海外", "高速"], baseUrl: "https://api.groq.com/openai/v1", model: "llama-3.3-70b-versatile", keyUrl: "https://console.groq.com/" },
-  { id: "custom", label: "自定义", short: "自", tone: "cyan", tags: ["兼容", "手动填写"], baseUrl: "", model: "" },
+  { id: "mixedcloud", label: "融云API", short: "融", tone: "cyan", tags: ["官网", "OpenAI 兼容"], baseUrl: "https://models.mixedcloud.cn/v1", model: "", keyUrl: "https://models.mixedcloud.cn" },
+  { id: "custom", label: "自定义", short: "自", tone: "violet", tags: ["兼容", "手动填写"], baseUrl: "", model: "" },
 ];
 
 const activeTab = ref("console");
@@ -225,10 +217,8 @@ async function stopWeixinLogin() {
 
 function selectProvider(provider: ProviderPreset) {
   selectedProviderId.value = provider.id;
-  if (provider.id !== "custom") {
-    model.apiUrl = provider.baseUrl;
-    model.model = provider.model;
-  }
+  model.apiUrl = provider.baseUrl;
+  model.model = provider.model;
 }
 
 function scrollServiceSection(sectionId: string) {
@@ -510,17 +500,17 @@ onBeforeUnmount(() => {
       </div>
       <div class="window-title">
         <span class="title-orb" />
-        <span>ClawHermes Control</span>
+        <span>DTclaw Control</span>
       </div>
     </header>
 
     <aside class="sidebar">
       <div class="brand">
         <div class="brand-mark">
-          <IconGlyph name="service" />
+          <img :src="dtclawLogo" alt="DTclaw" />
         </div>
         <div>
-          <h1>ClawHermes</h1>
+          <h1>DTclaw</h1>
           <span>Portable Control</span>
         </div>
       </div>
@@ -624,7 +614,7 @@ onBeforeUnmount(() => {
             <span class="provider-icon" :class="selectedProvider().tone">{{ selectedProvider().short }}</span>
             <div>
               <strong>{{ selectedProvider().label }}</strong>
-              <span>选择服务商会填入默认 Base URL 和模型，保存后写入 OpenClaw 与 Hermes 配置。</span>
+              <span>选择融云API会填入官方 Base URL；模型名称和 API Key 由使用者自行配置，保存后写入 OpenClaw 与 Hermes 配置。</span>
             </div>
           </div>
           <input v-model="model.apiUrl" placeholder="API URL / Base URL" />
@@ -758,9 +748,10 @@ onBeforeUnmount(() => {
             <h3>DTClaw 即插即用<br />龙虾双核版</h3>
             <p>内置 OpenClaw 技能调优中文版和 Hermes 爱马仕智能体中文版，插入 U 盘即可从本地控制台启动、配置和管理。</p>
             <div class="service-hero-actions">
-              <button class="dt-primary" type="button" @click="openContact">联系我们</button>
-              <button class="dt-outline" type="button" @click="openDtSite">DT 官网</button>
+              <button class="dt-primary" type="button" @click="openContact">联系客服获取更多支持</button>
+              <button class="dt-outline" type="button" @click="openDtSite">进入官网即可立即升级企业级数字员工</button>
             </div>
+            <p class="service-hero-note">注：此图片为参考图收到的产品批次不同款式不同</p>
             <div class="service-token-line">
               <span>100万</span>
               <span>免费</span>

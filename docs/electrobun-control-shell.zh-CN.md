@@ -80,10 +80,11 @@ U 盘交付目录根部应优先开放 `ClawHermes-Control-Electrobun.exe`。它
 - 关闭按钮会让窗口立即消失，避免用户感觉点击无效；Electrobun Bun 进程会在后台继续调用 control-server 的 `/api/services/stop` 停止 OpenClaw、Hermes Agent、Hermes Web UI 和 Portal，再调用 `/api/shutdown` 关闭本地控制服务，完成后退出自身，尽量释放 U 盘目录占用。
 - 顶部启动、停止、刷新按钮改为横向图标胶囊按钮，避免中文按钮文字竖排和拥挤。
 - 左侧导航、服务卡片、模型供应商卡片和统计卡片增加彩色图标块，整体视觉方向参考 `vh-claw` 的深色控制台风格。
+- 左上角品牌展示改为 DTclaw，并使用 `launcher/electrobun/src/mainview/assets/dtclaw-logo.png` 作为控制面板 Logo；底层目录名、可执行文件名和 app identifier 暂不改名，避免破坏现有 U 盘启动与安装更新链路。
 - 服务状态徽标使用短标签显示，完整状态保留在悬停标题里，避免 `placeholder-started` 这类长状态和服务名重叠。
 - 服务卡片固定展示 `OpenClaw`、`Hermes Agent`、`Hermes Web UI`、`Portal` 的完整名称，并增加二级说明，避免 Hermes Agent 与 Hermes Web UI 在窄卡片里都被截断成 `Herme...`。
-- 模型服务商卡片参考 `vh-claw` 的 preset 流程：点击服务商不会立即写配置，而是填入对应 Base URL 和默认模型；用户确认 API Key 后点击“保存模型”，再通过现有 control-server 写入 OpenClaw 与 Hermes 的共享模型配置。
-- 左侧新增 `服务` 页面，参考 `D:\project\uclaw\src\mainview\components\HomePage.vue` 的导航栏、蓝色英雄区、粒子背景和 `product12.png` 主图。该页面以内嵌方式呈现，并去掉 `立即使用` 按钮，避免和根目录 `ClawHermes-Control-Electrobun.exe` 入口重复；`联系我们` 和 `DT 官网` 使用系统浏览器打开外链。
+- 模型服务商卡片参考 `vh-claw` 的 preset 流程：点击服务商不会立即写配置，而是填入对应 Base URL；用户确认模型名称和 API Key 后点击“保存模型”，再通过现有 control-server 写入 OpenClaw 与 Hermes 的共享模型配置。当前只保留 `融云API` 与 `自定义` 两个入口，其中 `融云API` 预填 `https://models.mixedcloud.cn/v1`，模型和 API Key 留给使用者自行配置。
+- 左侧新增 `服务` 页面，参考 `D:\project\uclaw\src\mainview\components\HomePage.vue` 的导航栏、蓝色英雄区、粒子背景和 `product12.png` 主图。该页面以内嵌方式呈现，并去掉 `立即使用` 按钮，避免和根目录 `ClawHermes-Control-Electrobun.exe` 入口重复；英雄区 CTA 改为竖排展示的“联系客服获取更多支持”和“进入官网即可立即升级企业级数字员工”，并增加产品图片批次差异说明。
 
 ## 渠道接入边界
 
