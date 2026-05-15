@@ -130,6 +130,8 @@ dist-usb/ClawHermes/
 
 如果该路径已经存在，不会重复追加。Electrobun 左侧的“技能中心”通过 control-server 的 `/api/skills` 读取这个目录，按 `name` 去重后展示技能名称、描述和相对路径。
 
+技能中心还会展示 ClawHub 镜像站入口：`https://cn.clawhub-mirror.com/`。该入口用于告诉用户可在线浏览和获取 `6万+ Agent Skill`，但不会把远端技能库整体复制进交付包；交付包启动时只加载当前 U 盘根目录下的 `skills/`。
+
 交付人员应在生成 release 前把定制技能复制到仓库根目录 `skills/`，例如：
 
 ```powershell

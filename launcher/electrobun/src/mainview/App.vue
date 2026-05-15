@@ -92,6 +92,61 @@ const providerPresets: ProviderPreset[] = [
   { id: "custom", label: "自定义", short: "自", tone: "violet", tags: ["兼容", "手动填写"], baseUrl: "", model: "" },
 ];
 
+const serviceFeatureCards = [
+  {
+    title: "OpenClaw 中文技能调优版",
+    subtitle: "全能技能库，高效搞定各类场景",
+    tone: "sky",
+    icon: "zap" as IconName,
+    points: ["收录优质中文技能，覆盖搜索、文档处理、数据分析等高频领域", "多引擎一键搜索，适配国内外信息获取场景", "低配机可按需加载轻量技能，减少资源占用"],
+  },
+  {
+    title: "Hermes Agent 中文调优版",
+    subtitle: "自我进化的数字同事，越用越聪明",
+    tone: "violet",
+    icon: "bot" as IconName,
+    points: ["支持主流 AI 模型切换，兼容本地与远程部署模式", "可接入企业微信等通讯平台，持续响应业务消息", "自动沉淀使用经验，复杂工作流可拆分协同处理"],
+  },
+];
+
+const serviceAdvantages = [
+  { title: "即插即用 · 零门槛上手", icon: "plug" as IconName, tone: "blue", text: "内置运行时和控制入口，无需目标电脑预装 Node/Python，双击即可启动本地 AI 能力。" },
+  { title: "100万Tokens · 免费赠送", icon: "disk" as IconName, tone: "orange", text: "购机即送基础算力配额，适合上手测试、办公体验和轻量业务验证。" },
+  { title: "便携小巧 · 全场景随身", icon: "globe" as IconName, tone: "emerald", text: "围绕 U 盘交付设计，办公、出差、演示和跨机器部署都可以保持统一入口。" },
+];
+
+const serviceScenarios = [
+  { title: "一人公司/个人创业", text: "全能 AI 助手覆盖调研、文案、客服和运营，降低启动成本。" },
+  { title: "电商行业", text: "商品文案、客服回复、数据整理和多平台素材生成更顺手。" },
+  { title: "医疗/教育行业", text: "教案生成、资料整理、知识科普和结构化信息处理更高效。" },
+  { title: "企服知产", text: "专利检索、商标资料、客户服务和文档流程自动化。" },
+  { title: "财务审计", text: "报表整理、数据核对、风险筛查和审计材料初稿辅助。" },
+  { title: "法律服务", text: "合同审查、法律文书、合规咨询和案例资料整理。" },
+  { title: "工程招投标", text: "标书撰写、资质梳理、项目分析和材料汇总。" },
+  { title: "生产制造", text: "设备运维、流程优化、质检记录和生产数据分析。" },
+  { title: "企业办公", text: "公文撰写、会议纪要、知识库检索和日常办公自动化。" },
+];
+
+const serviceValueServices = [
+  "OpenClaw教学实训一体机",
+  "全系列培训服务",
+  "DigiTeam企业级数字员工平台",
+  "数字团队行业定制版",
+  "专属技能定制开发",
+  "AI应用深度定制开发",
+  "融云API大模型调用服务",
+  "大模型一体机定制",
+  "全行业垂直AI解决方案",
+];
+
+const serviceIndustries = ["工程", "制造", "法律", "知产", "金融", "电力", "能源", "交通", "教育", "医疗", "文化传媒", "文旅", "政务", "科研", "党务"];
+
+const serviceFaqs = [
+  { title: "目标电脑需要预装环境吗？", text: "不需要。交付包内置便携 Node/Python 运行时，控制台会从当前 U 盘根目录解析路径。" },
+  { title: "能替换或追加技能吗？", text: "可以。把技能放到根目录 skills 文件夹，OpenClaw 启动时会加载该目录，且不会重复追加同一路径。" },
+  { title: "换 U 盘后还能用吗？", text: "从未绑定母包复制到新 U 盘即可；首次启动会写入当前设备绑定信息。" },
+];
+
 const activeTab = ref("console");
 const services = ref<ServiceStatus[]>([]);
 const skillsPayload = ref<SkillsPayload>({ root: "", skillsDir: "", exists: false, total: 0, deduplicated: false, skills: [] });
@@ -253,6 +308,10 @@ function openContact() {
 
 function openDtSite() {
   requestFromBun("openUrl", { url: "https://digiteam.cn/" });
+}
+
+function openClawHub() {
+  requestFromBun("openUrl", { url: "https://cn.clawhub-mirror.com/" });
 }
 
 function openWeixinDocs() {
@@ -681,6 +740,24 @@ onBeforeUnmount(() => {
           <button class="ghost" type="button" @click="refreshSkills">刷新技能</button>
         </div>
 
+        <article class="panel skill-market-card">
+          <div class="skill-market-copy">
+            <span class="skill-market-icon color-icon orange">
+              <IconGlyph name="spark" />
+            </span>
+            <div>
+              <p class="eyebrow">ClawHub Skill Market</p>
+              <h3>ClawHub镜像站</h3>
+              <p>ClawHub 镜像站提供 6万+ Agent Skill 仓库，用户可以在线浏览、搜索和获取更多可复用技能，再按需放入本地交付目录的 skills 文件夹。</p>
+            </div>
+          </div>
+          <div class="skill-market-actions">
+            <strong>6万+ Agent Skill</strong>
+            <button class="primary" type="button" @click="openClawHub">访问技能站</button>
+            <code>https://cn.clawhub-mirror.com/</code>
+          </div>
+        </article>
+
         <div class="skill-stats">
           <article class="metric-card cyan">
             <span class="metric-icon color-icon cyan">
@@ -698,6 +775,15 @@ onBeforeUnmount(() => {
             <div>
               <span>去重状态</span>
               <strong>{{ skillsPayload.deduplicated ? "已去重" : "正常" }}</strong>
+            </div>
+          </article>
+          <article class="metric-card orange">
+            <span class="metric-icon color-icon orange">
+              <IconGlyph name="globe" />
+            </span>
+            <div>
+              <span>技能站规模</span>
+              <strong>6万+</strong>
             </div>
           </article>
         </div>
@@ -737,8 +823,11 @@ onBeforeUnmount(() => {
           <div class="service-nav-links">
             <button type="button" @click="scrollServiceSection('service-overview')">产品概述</button>
             <button type="button" @click="scrollServiceSection('service-core')">核心功能</button>
+            <button type="button" @click="scrollServiceSection('service-advantages')">产品优势</button>
+            <button type="button" @click="scrollServiceSection('service-scenarios')">应用场景</button>
             <button type="button" @click="scrollServiceSection('service-setup')">快速启动</button>
             <button type="button" @click="scrollServiceSection('service-faq')">常见问题</button>
+            <button type="button" @click="scrollServiceSection('service-value')">增值服务</button>
           </div>
         </nav>
 
@@ -765,27 +854,167 @@ onBeforeUnmount(() => {
           </div>
         </section>
 
-        <section id="service-overview" class="service-info-grid">
-          <article>
-            <span>01</span>
-            <h4>产品概述</h4>
-            <p>把 OpenClaw 与 Hermes 的本地运行、模型配置、Web UI 和日志管理收束到一个便携式入口，适合 U 盘交付和跨机器使用。</p>
-          </article>
-          <article id="service-core">
-            <span>02</span>
-            <h4>核心功能</h4>
-            <p>一键启动/停止服务、检测运行状态、配置模型供应商、打开 Web 界面，并在关闭窗口后自动释放相关服务占用。</p>
-          </article>
-          <article id="service-setup">
-            <span>03</span>
-            <h4>快速启动</h4>
+        <section id="service-overview" class="service-landing-section overview">
+          <div class="service-section-heading">
+            <span>Product Overview</span>
+            <h3>产品概述</h3>
+            <p>无需复杂安装，无需专业配置，插上 U 盘双击启动。DTClaw 即插即用龙虾双核版将 OpenClaw 与 Hermes Agent 收束到统一控制入口。</p>
+          </div>
+          <div class="service-overview-grid">
+            <article>
+              <span class="color-icon blue"><IconGlyph name="zap" /></span>
+              <div>
+                <h4>双核驱动 · 中文调优</h4>
+                <p>内置 OpenClaw 中文技能调优版与 Hermes Agent 中文调优版，减少语言壁垒和本地适配成本。</p>
+              </div>
+            </article>
+            <article>
+              <span class="color-icon emerald"><IconGlyph name="check" /></span>
+              <div>
+                <h4>便携交付 · 本地管理</h4>
+                <p>启动、停止、模型配置、Web UI、日志和技能包都通过本地控制台管理，适合 U 盘交付和跨机器使用。</p>
+              </div>
+            </article>
+            <article>
+              <span class="color-icon orange"><IconGlyph name="disk" /></span>
+              <div>
+                <h4>赠送100万Tokens</h4>
+                <p>基础算力配额适合上手体验、业务验证和轻量办公，让用户更快进入真实使用场景。</p>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section id="service-core" class="service-landing-section muted">
+          <div class="service-section-heading">
+            <span>Core Capabilities</span>
+            <h3>核心功能</h3>
+            <p>双核能力围绕技能调用和智能体协作展开，控制台负责把启动、配置和状态检测变成统一入口。</p>
+          </div>
+          <div class="service-feature-grid">
+            <article v-for="card in serviceFeatureCards" :key="card.title" class="service-feature-card">
+              <div class="service-feature-visual" :class="card.tone">
+                <IconGlyph :name="card.icon" />
+              </div>
+              <div class="service-feature-body">
+                <h4>{{ card.title }}</h4>
+                <p>{{ card.subtitle }}</p>
+                <ul>
+                  <li v-for="point in card.points" :key="point">
+                    <IconGlyph name="check" />
+                    <span>{{ point }}</span>
+                  </li>
+                </ul>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section id="service-advantages" class="service-landing-section">
+          <div class="service-section-heading">
+            <span>Advantages</span>
+            <h3>产品优势</h3>
+            <p>围绕零门槛上手、可复制交付和随身便携进行设计，减少部署和使用阻力。</p>
+          </div>
+          <div class="service-info-grid">
+            <article v-for="item in serviceAdvantages" :key="item.title">
+              <span class="service-info-icon color-icon" :class="item.tone">
+                <IconGlyph :name="item.icon" />
+              </span>
+              <h4>{{ item.title }}</h4>
+              <p>{{ item.text }}</p>
+            </article>
+          </div>
+        </section>
+
+        <section id="service-scenarios" class="service-landing-section muted">
+          <div class="service-section-heading">
+            <span>Scenarios</span>
+            <h3>应用场景</h3>
+            <p>覆盖个人创业、电商、医疗教育、企服知产、财务审计、法律服务、工程投标、生产制造和企业办公等高频场景。</p>
+          </div>
+          <div class="service-scenario-grid">
+            <article v-for="(scenario, index) in serviceScenarios" :key="scenario.title">
+              <span>{{ String(index + 1).padStart(2, "0") }}</span>
+              <h4>{{ scenario.title }}</h4>
+              <p>{{ scenario.text }}</p>
+            </article>
+          </div>
+        </section>
+
+        <section id="service-value" class="service-landing-section service-value-band">
+          <div class="service-section-heading light">
+            <span>Enterprise Upgrade</span>
+            <h3>增值服务</h3>
+            <p>不只是 OpenClaw，我们提供更具落地价值的企业级数字员工：全栈 AI 增值服务、数字员工定制、行业解决方案和全周期落地护航。</p>
+          </div>
+          <div class="service-standard-grid">
+            <article>
+              <IconGlyph name="globe" />
+              <h4>基础标配服务</h4>
+              <p>OpenClaw 官方交流社群、基础操作指导、常见故障排查和版本信息同步。</p>
+            </article>
+            <article>
+              <IconGlyph name="service" />
+              <h4>技术支持护航</h4>
+              <p>围绕模型配置、账号权限、插件接入和日常使用问题提供基础支持。</p>
+            </article>
+          </div>
+          <div class="service-section-heading compact light">
+            <span>Service Upgrade</span>
+            <h3>9大核心增值服务 · 覆盖企业AI全场景</h3>
+          </div>
+          <div class="service-value-grid">
+            <article v-for="(item, index) in serviceValueServices" :key="item" :class="{ highlight: index === serviceValueServices.length - 1 }">
+              <span>{{ index + 1 }}</span>
+              <strong>{{ item }}</strong>
+            </article>
+          </div>
+          <div class="service-solution-band">
+            <h4>全行业垂直AI解决方案</h4>
+            <p>垂直行业深度定制 · 直击业务痛点 · 落地即增效</p>
+            <div>
+              <span v-for="industry in serviceIndustries" :key="industry">{{ industry }}</span>
+            </div>
+          </div>
+        </section>
+
+        <section id="service-setup" class="service-landing-section">
+          <div class="service-section-heading">
+            <span>Quick Start</span>
+            <h3>快速启动</h3>
             <p>插入 U 盘后运行控制入口，选择模型服务商并填写 API Key，再返回控制台点击启动即可开始使用。</p>
-          </article>
-          <article id="service-faq">
-            <span>04</span>
-            <h4>常见问题</h4>
-            <p>无需目标电脑预装 Node/Python；当前交付包内置运行时和完整 OpenClaw、Hermes、Hermes Web UI payload。</p>
-          </article>
+          </div>
+          <div class="service-step-row">
+            <article>
+              <span>01</span>
+              <h4>打开控制台</h4>
+              <p>双击根目录的 Electrobun 控制入口，等待本地 control-server 就绪。</p>
+            </article>
+            <article>
+              <span>02</span>
+              <h4>配置模型</h4>
+              <p>选择融云API或自定义模型，填写 Base URL、模型名称和 API Key。</p>
+            </article>
+            <article>
+              <span>03</span>
+              <h4>启动服务</h4>
+              <p>返回控制台点击启动，状态变为 ready 后即可打开 Web 界面。</p>
+            </article>
+          </div>
+        </section>
+
+        <section id="service-faq" class="service-landing-section muted">
+          <div class="service-section-heading">
+            <span>FAQ</span>
+            <h3>常见问题</h3>
+          </div>
+          <div class="service-faq-list">
+            <article v-for="faq in serviceFaqs" :key="faq.title">
+              <h4>{{ faq.title }}</h4>
+              <p>{{ faq.text }}</p>
+            </article>
+          </div>
         </section>
       </section>
 

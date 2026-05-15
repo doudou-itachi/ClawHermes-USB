@@ -85,6 +85,7 @@ U 盘交付目录根部应优先开放 `ClawHermes-Control-Electrobun.exe`。它
 - 服务卡片固定展示 `OpenClaw`、`Hermes Agent`、`Hermes Web UI`、`Portal` 的完整名称，并增加二级说明，避免 Hermes Agent 与 Hermes Web UI 在窄卡片里都被截断成 `Herme...`。
 - 模型服务商卡片参考 `vh-claw` 的 preset 流程：点击服务商不会立即写配置，而是填入对应 Base URL；用户确认模型名称和 API Key 后点击“保存模型”，再通过现有 control-server 写入 OpenClaw 与 Hermes 的共享模型配置。当前只保留 `融云API` 与 `自定义` 两个入口，其中 `融云API` 预填 `https://models.mixedcloud.cn/v1`，模型和 API Key 留给使用者自行配置。
 - 左侧新增 `服务` 页面，参考 `D:\project\uclaw\src\mainview\components\HomePage.vue` 的导航栏、蓝色英雄区、粒子背景和 `product12.png` 主图。该页面以内嵌方式呈现，并去掉 `立即使用` 按钮，避免和根目录 `ClawHermes-Control-Electrobun.exe` 入口重复；英雄区 CTA 改为竖排展示的“联系客服获取更多支持”和“进入官网即可立即升级企业级数字员工”，并增加产品图片批次差异说明。
+- `服务` 页面进一步按产品官网式长页面调整，吸收外部 HTML 样稿中的栏目结构，但不引入 Tailwind、Font Awesome、AOS、GSAP、Three.js 等 CDN 依赖。当前内嵌栏目包括产品概述、核心功能、产品优势、应用场景、快速启动、常见问题和增值服务，其中增值服务展示基础标配服务、9大核心增值服务和全行业垂直AI解决方案。
 
 ## 渠道接入边界
 
@@ -101,6 +102,7 @@ U 盘交付目录根部应优先开放 `ClawHermes-Control-Electrobun.exe`。它
 ## 技能中心与独立技能包
 
 - 左侧导航新增 `技能中心`，通过 control-server 的 `/api/skills` 读取交付目录根部的 `skills/`，并以卡片形式展示 `SKILL.md` 中的技能名称、描述和相对路径。
+- 技能中心顶部会展示 `ClawHub镜像站` 入口，按钮打开 `https://cn.clawhub-mirror.com/`。该站作为外部技能获取入口，向用户说明可浏览 `6万+ Agent Skill`；交付包本身仍只加载本地 `skills/` 目录，避免把远端技能库整体打进离线包。
 - 技能包不放入 `apps/openclaw`。交付目录结构为 `<USB_ROOT>/skills/<skill>/SKILL.md`，便于后续单独维护技能包，也避免替换 OpenClaw payload 时覆盖用户技能。
 - OpenClaw 启动前，ClawHermes 会确保 `data/openclaw/openclaw.json` 中存在 `skills.load.extraDirs = ["<USB_ROOT>/skills"]`。如果该路径已经存在，不会重复追加。
 - 技能中心展示时按 `name` 去重。OpenClaw 自身也会按技能名合并，因此重复技能不会在模型可用技能列表中反复出现。

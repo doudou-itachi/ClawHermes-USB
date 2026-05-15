@@ -11,6 +11,63 @@ Update it whenever a milestone is completed, changed, blocked, or deferred.
 - `Blocked`: Waiting on external information or action.
 - `Deferred`: Intentionally postponed.
 
+## 2026-05-15
+
+### Website-Style Services Page
+
+Status: `Done`
+
+Summary:
+
+- Reworked the Electrobun `服务` page from a compact hero plus four info cards into an embedded product-site style page based on the operator-provided HTML reference.
+- Kept the page offline-friendly by translating the reference into Vue data arrays and local CSS instead of loading Tailwind, Font Awesome, AOS, GSAP, Three.js, or remote image dependencies.
+- Added sections for product overview, core capabilities, advantages, scenarios, quick start, FAQ, value-added services, 9 core service offerings, and industry solution tags.
+- Preserved the existing control shell, service start/stop controls, product image asset, particle background, and the no-`立即使用` policy for the service page.
+
+Changed areas:
+
+- `launcher/electrobun/src/mainview/App.vue`
+- `launcher/electrobun/src/mainview/style.css`
+- `tests/test_windows_core.py`
+- `docs/electrobun-control-shell.zh-CN.md`
+- `docs/PROGRESS.md`
+
+Validation performed:
+
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_electrobun_control_shell_scaffold_matches_vh_claw_style -v`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\launcher\electrobun\build.ps1 -SkipInstall -WebOnly`
+
+Next steps:
+
+- Rebuild the Electrobun-only USB package when the operator wants a fresh test artifact.
+
+### ClawHub Mirror Entry in Skill Center
+
+Status: `Done`
+
+Summary:
+
+- Added a ClawHub mirror entry to the Electrobun `技能中心` page so users can open `https://cn.clawhub-mirror.com/` from the control panel.
+- The skill center now communicates that ClawHub provides `6万+ Agent Skill`, while keeping the runtime behavior scoped to the local portable `skills/` directory.
+- Kept the remote skill market separate from the USB payload so release size and offline startup behavior remain stable.
+
+Changed areas:
+
+- `launcher/electrobun/src/mainview/App.vue`
+- `launcher/electrobun/src/mainview/style.css`
+- `tests/test_windows_core.py`
+- `docs/electrobun-control-shell.zh-CN.md`
+- `docs/usb-release-build-runbook.zh-CN.md`
+- `docs/PROGRESS.md`
+
+Validation performed:
+
+- `python -m unittest tests.test_windows_core.WindowsCoreTests.test_electrobun_control_shell_scaffold_matches_vh_claw_style -v`
+
+Next steps:
+
+- Rebuild the Electrobun USB package when the operator wants a testable artifact with the skill-market entry.
+
 ## 2026-05-09
 
 ### DTclaw Branding and MixedCloud Model Presets
