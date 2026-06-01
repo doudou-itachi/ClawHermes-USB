@@ -1059,6 +1059,126 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertIn("ClawHermes-Control.exe", build_path.read_text(encoding="utf-8"))
         self.assertIn("PyQt6", requirements_path.read_text(encoding="utf-8"))
 
+    def test_portable_env_uses_platform_specific_runtime_paths(self):
+        script = """
+import { portableEnv } from './core/node/dist/portable.js';
+const win = portableEnv('C:/usb', { platform: 'win32', arch: 'x64' });
+const mac = portableEnv('/Volumes/USB/ClawHermes', { platform: 'darwin', arch: 'arm64' });
+console.log(JSON.stringify({ winPath: win.PATH, macPath: mac.PATH }));
+"""
+        result = subprocess.run(
+            ["node", "--input-type=module", "-e", script],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertIn("runtimes\\windows\\node", payload["winPath"])
+        self.assertIn("runtimes/macos/node/darwin-arm64/bin", payload["macPath"].replace("\\", "/"))
+        self.assertIn(":", payload["macPath"])
+
+    def test_runtime_diagnostics_selects_darwin_arm64_candidates(self):
+        temp_dir, temp_root = make_temp_skeleton_usb_root()
+        try:
+            (temp_root / "config" / "defaults" / "runtimes.json").write_text(
+                json.dumps(
+                    {
+                        "platform": "multi",
+                        "runtimes": [
+                            {
+                                "name": "node",
+                                "label": "Portable Node.js",
+                                "versionPolicy": "lts",
+                                "packageType": "official",
+                                "sourceUrl": "https://nodejs.org/en/download",
+                                "installDir": "runtimes/windows/node",
+                                "candidates": ["runtimes/windows/node/node.exe"],
+                                "platforms": {
+                                    "darwin-arm64": {
+                                        "installDir": "runtimes/macos/node/darwin-arm64",
+                                        "candidates": ["runtimes/macos/node/darwin-arm64/bin/node"],
+                                    }
+                                },
+                                "notes": "portable node",
+                            }
+                        ],
+                    },
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
+            script = f"""
+import {{ runtimeDiagnostics }} from './core/node/dist/runtimes.js';
+const diagnostics = runtimeDiagnostics({json.dumps(str(temp_root))}, {{ platform: 'darwin', arch: 'arm64' }});
+console.log(JSON.stringify(diagnostics[0]));
+"""
+            result = subprocess.run(
+                ["node", "--input-type=module", "-e", script],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            diagnostic = json.loads(result.stdout)
+            self.assertIn("runtimes/macos/node/darwin-arm64/bin/node", diagnostic["path"].replace("\\", "/"))
+        finally:
+            temp_dir.cleanup()
+
+    def test_load_adapters_applies_darwin_platform_overrides(self):
+        temp_dir, temp_root = make_temp_process_usb_root()
+        try:
+            adapter_path = temp_root / "adapters" / "fake-service" / "adapter.json"
+            adapter = json.loads(adapter_path.read_text(encoding="utf-8"))
+            adapter["platformOverrides"] = {
+                "darwin": {
+                    "runtime": {"kind": "node", "platform": "darwin", "requiredExecutable": "node"},
+                    "commands": {"start": "node mac-service.js"},
+                    "env": {"variables": {"FAKE_PLATFORM": "darwin"}},
+                }
+            }
+            adapter_path.write_text(json.dumps(adapter, indent=2), encoding="utf-8")
+            script = f"""
+import {{ loadAdapters }} from './core/node/dist/adapters.js';
+const adapters = loadAdapters({json.dumps(str(temp_root))}, {{ platform: 'darwin', arch: 'arm64' }});
+console.log(JSON.stringify(adapters[0]));
+"""
+            result = subprocess.run(
+                ["node", "--input-type=module", "-e", script],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            adapter = json.loads(result.stdout)
+            self.assertEqual(adapter["runtime"]["platform"], "darwin")
+            self.assertEqual(adapter["commands"]["start"], "node mac-service.js")
+            self.assertEqual(adapter["env"]["variables"]["FAKE_PLATFORM"], "darwin")
+        finally:
+            temp_dir.cleanup()
+
+    def test_macos_launchers_prepare_runtime_and_prefer_electrobun_app(self):
+        start = (ROOT / "launcher" / "macos" / "Start.command").read_text(encoding="utf-8")
+        stop = (ROOT / "launcher" / "macos" / "Stop.command").read_text(encoding="utf-8")
+
+        self.assertIn("uname -m", start)
+        self.assertIn("darwin-arm64", start)
+        self.assertIn("darwin-x64", start)
+        self.assertIn("xattr -rd com.apple.quarantine", start)
+        self.assertIn("runtime-archives/macos", start)
+        self.assertIn("tar -xzf", start)
+        self.assertIn("clawhermes.js", start)
+        self.assertIn("ClawHermes-Control-Mac.app", start)
+        self.assertIn('open "$APP_PATH"', start)
+        self.assertIn("api/shutdown", stop)
+        self.assertIn("runtimes/macos/node", stop)
+
     def test_electrobun_control_shell_scaffold_matches_vh_claw_style(self):
         shell_root = ROOT / "launcher" / "electrobun"
         package_json = json.loads((shell_root / "package.json").read_text(encoding="utf-8"))
@@ -1217,6 +1337,20 @@ class WindowsCoreTests(unittest.TestCase):
         self.assertIn("text-overflow: ellipsis", styles)
         self.assertTrue(service_asset.exists())
         self.assertGreater(service_asset.stat().st_size, 900_000)
+
+    def test_electrobun_control_shell_has_macos_build_and_runtime_resolution(self):
+        shell_root = ROOT / "launcher" / "electrobun"
+        package_json = json.loads((shell_root / "package.json").read_text(encoding="utf-8"))
+        bun_entry = (shell_root / "src" / "bun" / "index.ts").read_text(encoding="utf-8")
+
+        self.assertIn("build:mac", package_json["scripts"])
+        self.assertIn("--platform=mac", package_json["scripts"].get("build:mac", ""))
+        self.assertIn("darwin-arm64", bun_entry)
+        self.assertIn("darwin-x64", bun_entry)
+        self.assertIn("process.platform", bun_entry)
+        self.assertIn("process.arch", bun_entry)
+        self.assertIn("nodeCommand(usbRoot)", bun_entry)
+        self.assertNotIn('spawnSync("node", ["-e"', bun_entry)
 
     def test_openclaw_channel_routes_match_vh_claw_depth(self):
         control_server = (ROOT / "core" / "node" / "src" / "control-server.ts").read_text(encoding="utf-8")
@@ -3965,7 +4099,7 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertEqual(refreshed["gateway"]["auth"]["token"], "clawhermes")
             self.assertEqual(refreshed["gateway"]["mode"], "local")
             self.assertEqual(refreshed["gateway"]["bind"], "loopback")
-            self.assertTrue(refreshed["logging"]["file"].endswith("data/logs/openclaw-runtime.log"))
+            self.assertTrue(refreshed["logging"]["file"].replace("\\", "/").endswith("data/logs/openclaw-runtime.log"))
         finally:
             run_dispatcher_for_root(temp_root, "stop", "-Json", env={"CLAWHERMES_WSL_EXE": str(temp_root / "fake-wsl.cmd")})
             if process_id:
@@ -4550,6 +4684,89 @@ class WindowsCoreTests(unittest.TestCase):
             self.assertEqual(manifest["entryPoint"], "ClawHermes-Control.exe")
             self.assertIn("PyQt", manifest["rootEntrypointPolicy"])
             self.assertTrue(manifest["build"]["skipped"])
+        finally:
+            temp_dir.cleanup()
+            output_dir.cleanup()
+
+    def test_usb_release_script_emits_macos_entrypoints_and_runtime_archives(self):
+        release_script = ROOT / "scripts" / "release" / "Build-UsbRelease.ps1"
+        temp_dir = tempfile.TemporaryDirectory()
+        output_dir = tempfile.TemporaryDirectory()
+        try:
+            source_root = Path(temp_dir.name)
+            output_root = Path(output_dir.name) / "ClawHermes"
+            for relative_dir in [
+                "launcher/pyqt/dist/ClawHermes-Control",
+                "launcher/macos",
+                "launcher/electrobun/build/canary-mac-arm64/DTclaw Control.app/Contents",
+                "core/node/dist",
+                "adapters/openclaw",
+                "config/defaults",
+                "portal",
+                "runtimes/windows/node",
+                "runtimes/windows/python",
+                "runtime-archives/macos",
+                "apps/openclaw/node_modules/@tencent-weixin/openclaw-weixin",
+                "docs",
+            ]:
+                (source_root / relative_dir).mkdir(parents=True, exist_ok=True)
+            (source_root / "launcher" / "pyqt" / "dist" / "ClawHermes-Control" / "ClawHermes-Control.exe").write_text(
+                "pyqt exe\n",
+                encoding="utf-8",
+            )
+            (source_root / "launcher" / "macos" / "Start.command").write_text("#!/usr/bin/env sh\necho start\n", encoding="utf-8")
+            (source_root / "launcher" / "macos" / "Stop.command").write_text("#!/usr/bin/env sh\necho stop\n", encoding="utf-8")
+            (source_root / "launcher" / "electrobun" / "build" / "canary-mac-arm64" / "DTclaw Control.app" / "Contents" / "Info.plist").write_text(
+                "plist\n",
+                encoding="utf-8",
+            )
+            (source_root / "core" / "node" / "dist" / "clawhermes.js").write_text("console.log('core')\n", encoding="utf-8")
+            (source_root / "adapters" / "openclaw" / "adapter.json").write_text('{"id":"openclaw"}\n', encoding="utf-8")
+            (source_root / "runtime-archives" / "macos" / "node-v22-darwin-arm64.tar.gz").write_text("archive\n", encoding="utf-8")
+            (source_root / "apps" / "openclaw" / "package.json").write_text('{"name":"openclaw"}\n', encoding="utf-8")
+            (
+                source_root
+                / "apps"
+                / "openclaw"
+                / "node_modules"
+                / "@tencent-weixin"
+                / "openclaw-weixin"
+                / "package.json"
+            ).write_text('{"name":"@tencent-weixin/openclaw-weixin"}\n', encoding="utf-8")
+
+            result = subprocess.run(
+                [
+                    "powershell",
+                    "-NoProfile",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(release_script),
+                    "-UsbRoot",
+                    str(source_root),
+                    "-OutputRoot",
+                    str(output_root),
+                    "-Clean",
+                    "-SkipBuild",
+                    "-NoStop",
+                    "-NoBundleHostRuntimes",
+                ],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue((output_root / "ClawHermes-Control.exe").exists())
+            self.assertTrue((output_root / "Start-ClawHermes-Mac.command").exists())
+            self.assertTrue((output_root / "Stop-ClawHermes-Mac.command").exists())
+            self.assertTrue((output_root / "ClawHermes-Control-Mac.app" / "Contents" / "Info.plist").exists())
+            self.assertTrue((output_root / "runtime-archives" / "macos" / "node-v22-darwin-arm64.tar.gz").exists())
+            manifest = json.loads((output_root / "release-manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual(manifest["entryPoints"]["windows"], "ClawHermes-Control.exe")
+            self.assertEqual(manifest["entryPoints"]["macos"], "Start-ClawHermes-Mac.command")
+            self.assertIn("sharedPayloads", manifest)
         finally:
             temp_dir.cleanup()
             output_dir.cleanup()

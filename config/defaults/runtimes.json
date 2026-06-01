@@ -12,6 +12,24 @@
         "runtimes/windows/node/node.exe",
         "runtimes/windows/node/bin/node.exe"
       ],
+      "platforms": {
+        "darwin-arm64": {
+          "packageType": "official-macos-tar-gz",
+          "installDir": "runtimes/macos/node/darwin-arm64",
+          "candidates": [
+            "runtimes/macos/node/darwin-arm64/bin/node"
+          ],
+          "notes": "Use the official macOS arm64 tarball. The macOS launcher extracts it from runtime-archives/macos on first run when bundled."
+        },
+        "darwin-x64": {
+          "packageType": "official-macos-tar-gz",
+          "installDir": "runtimes/macos/node/darwin-x64",
+          "candidates": [
+            "runtimes/macos/node/darwin-x64/bin/node"
+          ],
+          "notes": "Use the official macOS x64 tarball. The macOS launcher extracts it from runtime-archives/macos on first run when bundled."
+        }
+      },
       "notes": "Use the official Windows standalone zip. Extract so node.exe is available under runtimes/windows/node."
     },
     {

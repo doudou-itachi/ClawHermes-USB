@@ -11,10 +11,12 @@ const node_fs_1 = require("node:fs");
 const node_path_1 = require("node:path");
 const adapters_1 = require("./adapters");
 const portable_1 = require("./portable");
-function runtimeDiagnostics(usbRoot) {
+const platform_1 = require("./platform");
+function runtimeDiagnostics(usbRoot, probe = {}) {
     const root = (0, portable_1.getRoot)(usbRoot);
     const manifest = loadRuntimeManifest(root);
-    return manifest.runtimes.map((runtime) => {
+    return manifest.runtimes.map((item) => {
+        const runtime = resolveRuntimeForPlatform(item, probe);
         const resolvedCandidates = runtime.candidates.map((candidate) => (0, portable_1.resolveRelative)(root, candidate));
         const foundPath = resolvedCandidates.find((candidate) => (0, node_fs_1.existsSync)(candidate)) ?? resolvedCandidates[0];
         const found = resolvedCandidates.some((candidate) => (0, node_fs_1.existsSync)(candidate));
@@ -33,8 +35,8 @@ function runtimeDiagnostics(usbRoot) {
         };
     });
 }
-function adapterRuntimeRequirementDiagnostics(usbRoot, adapters) {
-    const runtimes = new Map(runtimeDiagnostics(usbRoot).map((runtime) => [runtime.name, runtime]));
+function adapterRuntimeRequirementDiagnostics(usbRoot, adapters, probe = {}) {
+    const runtimes = new Map(runtimeDiagnostics(usbRoot, probe).map((runtime) => [runtime.name, runtime]));
     return adapters
         .filter((adapter) => adapter.runtime)
         .map((adapter) => {
@@ -63,13 +65,14 @@ function loadRuntimeManifest(usbRoot) {
     const manifestPath = (0, node_path_1.join)((0, portable_1.getRoot)(usbRoot), "config", "defaults", "runtimes.json");
     return JSON.parse((0, node_fs_1.readFileSync)(manifestPath, "utf8"));
 }
-function runtimePreparationPlan(usbRoot) {
+function runtimePreparationPlan(usbRoot, probe = {}) {
     const root = (0, portable_1.getRoot)(usbRoot);
     const manifest = loadRuntimeManifest(root);
     const adapters = (0, adapters_1.loadAdapters)(root);
-    const diagnosticsByName = new Map(runtimeDiagnostics(root).map((runtime) => [runtime.name, runtime]));
-    const adapterRuntimeRequirements = adapterRuntimeRequirementDiagnostics(root, adapters);
-    const steps = manifest.runtimes.map((runtime) => {
+    const diagnosticsByName = new Map(runtimeDiagnostics(root, probe).map((runtime) => [runtime.name, runtime]));
+    const adapterRuntimeRequirements = adapterRuntimeRequirementDiagnostics(root, adapters, probe);
+    const steps = manifest.runtimes.map((item) => {
+        const runtime = resolveRuntimeForPlatform(item, probe);
         const diagnostic = diagnosticsByName.get(runtime.name);
         return {
             name: runtime.name,
@@ -98,13 +101,14 @@ function runtimePreparationPlan(usbRoot) {
         messages,
     };
 }
-function installRuntimeFromArchive(usbRoot, runtimeName, archivePath, dryRun, expectedSha256) {
+function installRuntimeFromArchive(usbRoot, runtimeName, archivePath, dryRun, expectedSha256, probe = {}) {
     const root = (0, portable_1.getRoot)(usbRoot);
     const manifest = loadRuntimeManifest(root);
-    const runtime = manifest.runtimes.find((item) => item.name === runtimeName);
-    if (!runtime) {
+    const manifestRuntime = manifest.runtimes.find((item) => item.name === runtimeName);
+    if (!manifestRuntime) {
         throw new Error(`Unknown runtime: ${runtimeName}`);
     }
+    const runtime = resolveRuntimeForPlatform(manifestRuntime, probe);
     const archive = (0, node_path_1.resolve)(archivePath);
     if (!(0, node_fs_1.existsSync)(archive)) {
         throw new Error(`Runtime archive not found: ${archive}`);
@@ -158,6 +162,17 @@ function installRuntimeFromArchive(usbRoot, runtimeName, archivePath, dryRun, ex
             : installed
                 ? `Installed ${runtime.label} into ${installDir}.`
                 : `Extracted ${archive}, but no expected executable was found under ${installDir}.`,
+    };
+}
+function resolveRuntimeForPlatform(runtime, probe) {
+    const platform = (0, platform_1.detectPlatform)(probe);
+    const override = runtime.platforms?.[platform.runtimeKey];
+    if (!override)
+        return runtime;
+    return {
+        ...runtime,
+        ...override,
+        platforms: runtime.platforms,
     };
 }
 function sha256File(file) {

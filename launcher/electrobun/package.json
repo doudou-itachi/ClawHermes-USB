@@ -9,6 +9,9 @@
     "dev": "vite build && node ./node_modules/electrobun/bin/electrobun.cjs dev --watch",
     "start": "vite build && node ./node_modules/electrobun/bin/electrobun.cjs dev",
     "build:win": "vite build && node ./node_modules/electrobun/bin/electrobun.cjs build --env=canary --platform=win",
+    "build:mac": "vite build && node ./node_modules/electrobun/bin/electrobun.cjs build --env=canary --platform=mac",
+    "build:mac:arm64": "vite build && node ./node_modules/electrobun/bin/electrobun.cjs build --env=canary --platform=mac --arch=arm64",
+    "build:mac:x64": "vite build && node ./node_modules/electrobun/bin/electrobun.cjs build --env=canary --platform=mac --arch=x64",
     "typecheck": "vue-tsc --noEmit --skipLibCheck"
   },
   "dependencies": {

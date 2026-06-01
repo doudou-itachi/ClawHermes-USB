@@ -2,15 +2,45 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
 import type { AdapterDescriptor, AdapterValidation, IntegrationReadiness } from "./types";
 import { getRoot } from "./portable";
+import { detectPlatform, type PlatformProbe } from "./platform";
 
-export function loadAdapters(usbRoot: string): AdapterDescriptor[] {
+export function loadAdapters(usbRoot: string, probe: PlatformProbe = {}): AdapterDescriptor[] {
   const adapterRoot = join(getRoot(usbRoot), "adapters");
+  const platform = detectPlatform(probe).id;
   return readdirSync(adapterRoot, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .map((entry) => join(adapterRoot, entry.name, "adapter.json"))
     .filter((file) => existsSync(file))
     .map((file) => JSON.parse(readFileSync(file, "utf8")) as AdapterDescriptor)
+    .map((adapter) => applyPlatformOverride(adapter, platform))
     .sort((a, b) => a.id.localeCompare(b.id));
+}
+
+function applyPlatformOverride(adapter: AdapterDescriptor, platform: string): AdapterDescriptor {
+  const override = adapter.platformOverrides?.[platform];
+  if (!override) return adapter;
+  return {
+    ...adapter,
+    ...override,
+    commands: {
+      ...adapter.commands,
+      ...override.commands,
+    },
+    env: mergeEnv(adapter.env, override.env),
+  };
+}
+
+function mergeEnv(base: AdapterDescriptor["env"], override: AdapterDescriptor["env"]): AdapterDescriptor["env"] {
+  if (!override) return base;
+  return {
+    ...base,
+    ...override,
+    files: override.files ?? base?.files,
+    variables: {
+      ...(base?.variables ?? {}),
+      ...(override.variables ?? {}),
+    },
+  };
 }
 
 function isRelativePath(value: string | null | undefined): boolean {

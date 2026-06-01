@@ -7,14 +7,16 @@ exports.dataWritable = dataWritable;
 exports.writeLog = writeLog;
 const node_fs_1 = require("node:fs");
 const node_path_1 = require("node:path");
+const platform_1 = require("./platform");
 function getRoot(usbRoot) {
     return (0, node_path_1.resolve)(usbRoot);
 }
 function resolveRelative(usbRoot, relativePath) {
     return (0, node_path_1.join)(getRoot(usbRoot), ...relativePath.replaceAll("\\", "/").split("/").filter(Boolean));
 }
-function portableEnv(usbRoot) {
+function portableEnv(usbRoot, probe = {}) {
     const root = getRoot(usbRoot);
+    const platform = (0, platform_1.detectPlatform)(probe);
     return {
         USB_ROOT: root,
         HOME: (0, node_path_1.join)(root, "data", "home"),
@@ -28,11 +30,9 @@ function portableEnv(usbRoot) {
         PIP_CACHE_DIR: (0, node_path_1.join)(root, "data", "cache", "pip"),
         UV_CACHE_DIR: (0, node_path_1.join)(root, "data", "cache", "uv"),
         PATH: [
-            (0, node_path_1.join)(root, "runtimes", "windows", "node"),
-            (0, node_path_1.join)(root, "runtimes", "windows", "python"),
-            (0, node_path_1.join)(root, "runtimes", "windows", "git", "cmd"),
+            ...(0, platform_1.runtimePathEntries)(root, platform),
             process.env.PATH ?? "",
-        ].join(";"),
+        ].join(platform.pathSeparator),
     };
 }
 function dataWritable(usbRoot) {

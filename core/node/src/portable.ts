@@ -1,5 +1,6 @@
 import { appendFileSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { detectPlatform, runtimePathEntries, type PlatformProbe } from "./platform";
 
 export function getRoot(usbRoot: string): string {
   return resolve(usbRoot);
@@ -9,8 +10,9 @@ export function resolveRelative(usbRoot: string, relativePath: string): string {
   return join(getRoot(usbRoot), ...relativePath.replaceAll("\\", "/").split("/").filter(Boolean));
 }
 
-export function portableEnv(usbRoot: string): Record<string, string> {
+export function portableEnv(usbRoot: string, probe: PlatformProbe = {}): Record<string, string> {
   const root = getRoot(usbRoot);
+  const platform = detectPlatform(probe);
   return {
     USB_ROOT: root,
     HOME: join(root, "data", "home"),
@@ -24,11 +26,9 @@ export function portableEnv(usbRoot: string): Record<string, string> {
     PIP_CACHE_DIR: join(root, "data", "cache", "pip"),
     UV_CACHE_DIR: join(root, "data", "cache", "uv"),
     PATH: [
-      join(root, "runtimes", "windows", "node"),
-      join(root, "runtimes", "windows", "python"),
-      join(root, "runtimes", "windows", "git", "cmd"),
+      ...runtimePathEntries(root, platform),
       process.env.PATH ?? "",
-    ].join(";"),
+    ].join(platform.pathSeparator),
   };
 }
 

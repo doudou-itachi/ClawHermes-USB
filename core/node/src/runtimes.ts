@@ -5,11 +5,15 @@ import { join, resolve } from "node:path";
 import type { AdapterDescriptor, AdapterRuntimeRequirementDiagnostic, RuntimeDiagnostic, RuntimeInstallResult, RuntimeManifest, RuntimePreparationStep } from "./types";
 import { loadAdapters } from "./adapters";
 import { getRoot, resolveRelative } from "./portable";
+import { detectPlatform, type PlatformProbe } from "./platform";
 
-export function runtimeDiagnostics(usbRoot: string): RuntimeDiagnostic[] {
+type RuntimeManifestItem = RuntimeManifest["runtimes"][number];
+
+export function runtimeDiagnostics(usbRoot: string, probe: PlatformProbe = {}): RuntimeDiagnostic[] {
   const root = getRoot(usbRoot);
   const manifest = loadRuntimeManifest(root);
-  return manifest.runtimes.map((runtime) => {
+  return manifest.runtimes.map((item) => {
+    const runtime = resolveRuntimeForPlatform(item, probe);
     const resolvedCandidates = runtime.candidates.map((candidate) => resolveRelative(root, candidate));
     const foundPath = resolvedCandidates.find((candidate) => existsSync(candidate)) ?? resolvedCandidates[0];
     const found = resolvedCandidates.some((candidate) => existsSync(candidate));
@@ -29,8 +33,8 @@ export function runtimeDiagnostics(usbRoot: string): RuntimeDiagnostic[] {
   });
 }
 
-export function adapterRuntimeRequirementDiagnostics(usbRoot: string, adapters: AdapterDescriptor[]): AdapterRuntimeRequirementDiagnostic[] {
-  const runtimes = new Map(runtimeDiagnostics(usbRoot).map((runtime) => [runtime.name, runtime]));
+export function adapterRuntimeRequirementDiagnostics(usbRoot: string, adapters: AdapterDescriptor[], probe: PlatformProbe = {}): AdapterRuntimeRequirementDiagnostic[] {
+  const runtimes = new Map(runtimeDiagnostics(usbRoot, probe).map((runtime) => [runtime.name, runtime]));
   return adapters
     .filter((adapter) => adapter.runtime)
     .map((adapter) => {
@@ -61,13 +65,14 @@ export function loadRuntimeManifest(usbRoot: string): RuntimeManifest {
   return JSON.parse(readFileSync(manifestPath, "utf8")) as RuntimeManifest;
 }
 
-export function runtimePreparationPlan(usbRoot: string) {
+export function runtimePreparationPlan(usbRoot: string, probe: PlatformProbe = {}) {
   const root = getRoot(usbRoot);
   const manifest = loadRuntimeManifest(root);
   const adapters = loadAdapters(root);
-  const diagnosticsByName = new Map(runtimeDiagnostics(root).map((runtime) => [runtime.name, runtime]));
-  const adapterRuntimeRequirements = adapterRuntimeRequirementDiagnostics(root, adapters);
-  const steps: RuntimePreparationStep[] = manifest.runtimes.map((runtime) => {
+  const diagnosticsByName = new Map(runtimeDiagnostics(root, probe).map((runtime) => [runtime.name, runtime]));
+  const adapterRuntimeRequirements = adapterRuntimeRequirementDiagnostics(root, adapters, probe);
+  const steps: RuntimePreparationStep[] = manifest.runtimes.map((item) => {
+    const runtime = resolveRuntimeForPlatform(item, probe);
     const diagnostic = diagnosticsByName.get(runtime.name);
     return {
       name: runtime.name,
@@ -97,13 +102,14 @@ export function runtimePreparationPlan(usbRoot: string) {
   };
 }
 
-export function installRuntimeFromArchive(usbRoot: string, runtimeName: string, archivePath: string, dryRun: boolean, expectedSha256?: string): RuntimeInstallResult {
+export function installRuntimeFromArchive(usbRoot: string, runtimeName: string, archivePath: string, dryRun: boolean, expectedSha256?: string, probe: PlatformProbe = {}): RuntimeInstallResult {
   const root = getRoot(usbRoot);
   const manifest = loadRuntimeManifest(root);
-  const runtime = manifest.runtimes.find((item) => item.name === runtimeName);
-  if (!runtime) {
+  const manifestRuntime = manifest.runtimes.find((item) => item.name === runtimeName);
+  if (!manifestRuntime) {
     throw new Error(`Unknown runtime: ${runtimeName}`);
   }
+  const runtime = resolveRuntimeForPlatform(manifestRuntime, probe);
   const archive = resolve(archivePath);
   if (!existsSync(archive)) {
     throw new Error(`Runtime archive not found: ${archive}`);
@@ -158,6 +164,17 @@ export function installRuntimeFromArchive(usbRoot: string, runtimeName: string, 
       : installed
         ? `Installed ${runtime.label} into ${installDir}.`
         : `Extracted ${archive}, but no expected executable was found under ${installDir}.`,
+  };
+}
+
+function resolveRuntimeForPlatform(runtime: RuntimeManifestItem, probe: PlatformProbe): RuntimeManifestItem {
+  const platform = detectPlatform(probe);
+  const override = runtime.platforms?.[platform.runtimeKey];
+  if (!override) return runtime;
+  return {
+    ...runtime,
+    ...override,
+    platforms: runtime.platforms,
   };
 }
 

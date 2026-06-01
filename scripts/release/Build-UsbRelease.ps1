@@ -237,6 +237,74 @@ function Copy-PyQtControlToRoot {
     }
 }
 
+function Copy-MacLaunchersToRoot {
+    param([Parameter(Mandatory = $true)][string] $ReleaseRoot)
+
+    $launcherRoot = Join-Path $script:SourceRoot "launcher\macos"
+    $launchers = @(
+        @{ Source = "Start.command"; Target = "Start-ClawHermes-Mac.command" },
+        @{ Source = "Stop.command"; Target = "Stop-ClawHermes-Mac.command" }
+    )
+
+    foreach ($launcher in $launchers) {
+        $source = Join-Path $launcherRoot $launcher.Source
+        if (-not (Test-Path -LiteralPath $source -PathType Leaf)) {
+            $script:Warnings += "Skipped missing macOS launcher: launcher/macos/$($launcher.Source)"
+            continue
+        }
+        $target = Join-Path $ReleaseRoot $launcher.Target
+        Copy-Item -LiteralPath $source -Destination $target -Force
+        $script:CopiedPaths += [ordered]@{
+            path = $launcher.Target
+            source = $source
+            target = $target
+        }
+    }
+}
+
+function Copy-MacElectrobunAppIfPresent {
+    param([Parameter(Mandatory = $true)][string] $ReleaseRoot)
+
+    $buildRoot = Join-Path $script:SourceRoot "launcher\electrobun\build"
+    if (-not (Test-Path -LiteralPath $buildRoot -PathType Container)) {
+        $script:Warnings += "No macOS Electrobun build directory found; release will use macOS Portal fallback."
+        return
+    }
+
+    $app = Get-ChildItem -LiteralPath $buildRoot -Directory -Recurse -Filter "*.app" -ErrorAction SilentlyContinue |
+        Select-Object -First 1
+    if ($null -eq $app) {
+        $script:Warnings += "No macOS Electrobun .app found; release will use macOS Portal fallback."
+        return
+    }
+
+    $target = Join-Path $ReleaseRoot "ClawHermes-Control-Mac.app"
+    Copy-Tree -Source $app.FullName -Destination $target
+    $script:CopiedPaths += [ordered]@{
+        path = "ClawHermes-Control-Mac.app"
+        source = $app.FullName
+        target = $target
+    }
+}
+
+function Copy-MacRuntimeArchives {
+    param([Parameter(Mandatory = $true)][string] $ReleaseRoot)
+
+    $source = Join-Path $script:SourceRoot "runtime-archives\macos"
+    if (-not (Test-Path -LiteralPath $source -PathType Container)) {
+        $script:Warnings += "No macOS runtime archives found under runtime-archives/macos."
+        return
+    }
+
+    $target = Join-Path $ReleaseRoot "runtime-archives\macos"
+    Copy-Tree -Source $source -Destination $target
+    $script:CopiedPaths += [ordered]@{
+        path = "runtime-archives/macos"
+        source = $source
+        target = $target
+    }
+}
+
 function New-QuickStart {
     param([Parameter(Mandatory = $true)][string] $ReleaseRoot)
 
@@ -255,6 +323,27 @@ ClawHermes-USB 交付包
 - release-manifest.json 记录来源目录、入口策略、payload 列表和裁剪规则。
 - 根目录只开放 PyQt 控制面板入口；内部 Node/Python/PowerShell 文件由控制面板调用。
 - 如果 manifest 提示 portable runtime missing，需要在交付前补齐 runtimes/windows/node 和 runtimes/windows/python，或确保目标机器 PATH 中已有对应运行时。
+'@
+    $content = @'
+ClawHermes-USB portable release
+
+Windows:
+1. Double-click ClawHermes-Control.exe.
+2. Use the control panel to configure API URL, model, and API key.
+3. Click Start to launch the shared payload services.
+
+macOS:
+1. Double-click Start-ClawHermes-Mac.command.
+2. If macOS blocks the script, open Terminal here and run:
+   chmod +x Start-ClawHermes-Mac.command Stop-ClawHermes-Mac.command
+   ./Start-ClawHermes-Mac.command
+3. The launcher opens ClawHermes-Control-Mac.app when bundled.
+4. If the app is not bundled, the launcher opens the local Portal in your browser.
+
+Release notes:
+- Windows and macOS share core, adapters, apps, portal, config, data, and skills.
+- Platform-specific launchers and runtimes stay at the release root or under runtimes/.
+- release-manifest.json records copied payloads, entrypoints, and warnings.
 '@
     Write-Utf8File -Path $quickStartPath -Value $content
 }
@@ -635,6 +724,9 @@ if (-not $NoPayloads) {
 
 Copy-SkillsPayload
 Copy-PyQtControlToRoot -ReleaseRoot $script:TargetRoot
+Copy-MacLaunchersToRoot -ReleaseRoot $script:TargetRoot
+Copy-MacElectrobunAppIfPresent -ReleaseRoot $script:TargetRoot
+Copy-MacRuntimeArchives -ReleaseRoot $script:TargetRoot
 New-QuickStart -ReleaseRoot $script:TargetRoot
 
 $manifest = [ordered]@{
@@ -646,7 +738,17 @@ $manifest = [ordered]@{
     includeData = [bool] $IncludeData
     payloadsIncluded = -not [bool] $NoPayloads
     entryPoint = "ClawHermes-Control.exe"
-    rootEntrypointPolicy = "Only the PyQt control executable is placed at the release root. Legacy VBS/PowerShell launchers are not exposed as root entrypoints."
+    entryPoints = [ordered]@{
+        windows = "ClawHermes-Control.exe"
+        macos = "Start-ClawHermes-Mac.command"
+        macosUi = "ClawHermes-Control-Mac.app"
+    }
+    rootEntrypointPolicy = "The release root exposes the Windows PyQt control executable and macOS .command launcher. Legacy Windows VBS/PowerShell launchers are not exposed as root entrypoints."
+    sharedPayloads = @("core", "adapters", "apps", "portal", "config", "data", "skills")
+    platformPayloads = [ordered]@{
+        windows = @("ClawHermes-Control.exe", "runtimes/windows")
+        macos = @("Start-ClawHermes-Mac.command", "Stop-ClawHermes-Mac.command", "ClawHermes-Control-Mac.app", "runtime-archives/macos", "runtimes/macos")
+    }
     build = [ordered]@{
         skipped = [bool] $SkipBuild
         stoppedExistingServices = -not [bool] $NoStop

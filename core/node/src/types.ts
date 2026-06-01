@@ -23,6 +23,13 @@ export type RuntimeManifest = {
     installDir: string;
     candidates: string[];
     notes: string;
+    platforms?: Record<string, {
+      packageType?: string;
+      sourceUrl?: string;
+      installDir?: string;
+      candidates?: string[];
+      notes?: string;
+    }>;
   }>;
 };
 
@@ -115,6 +122,7 @@ export type AdapterDescriptor = {
     strategy?: string;
   };
   dependsOn?: string[];
+  platformOverrides?: Record<string, Partial<Pick<AdapterDescriptor, "runtime" | "commands" | "env" | "health" | "portal" | "integration">>>;
 };
 
 export type AdapterValidation = {

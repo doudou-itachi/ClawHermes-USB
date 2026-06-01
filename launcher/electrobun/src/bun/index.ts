@@ -255,6 +255,11 @@ function ancestorPaths(start: string): string[] {
 }
 
 function nodeCommand(usbRoot: string): string[] {
+  if (process.platform === "darwin") {
+    const platform = process.arch === "arm64" ? "darwin-arm64" : "darwin-x64";
+    const portableNode = join(usbRoot, "runtimes", "macos", "node", platform, "bin", "node");
+    return existsSync(portableNode) ? [portableNode] : ["node"];
+  }
   const portableNode = join(usbRoot, "runtimes", "windows", "node", "node.exe");
   return existsSync(portableNode) ? [portableNode] : ["node"];
 }
@@ -269,7 +274,8 @@ async function ping(url: string): Promise<boolean> {
 }
 
 function pingSync(url: string): boolean {
-  const completed = spawnSync("node", ["-e", `fetch(${JSON.stringify(url)}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))`], {
+  const command = nodeCommand(root);
+  const completed = spawnSync(command[0], [...command.slice(1), "-e", `fetch(${JSON.stringify(url)}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))`], {
     encoding: "utf8",
     windowsHide: true,
   });
