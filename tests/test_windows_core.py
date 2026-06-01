@@ -1178,7 +1178,10 @@ console.log(JSON.stringify(adapters[0]));
         self.assertIn("clawhermes-usb-root.txt", start)
         self.assertIn("Contents/Resources", start)
         self.assertLess(start.index("Opening Electrobun UI"), start.index("Starting ClawHermes core"))
-        self.assertIn('tell application "ClawHermes-Control-Mac" to quit', start)
+        self.assertIn('tell application id "dev.clawhermes.control" to quit', start)
+        self.assertIn("control-server.pid", start)
+        self.assertIn("control-server.json", start)
+        self.assertIn("process.kill", start)
         self.assertIn('open -n "$APP_PATH"', start)
         self.assertIn("api/shutdown", stop)
         self.assertIn("runtimes/macos/node", stop)
@@ -1356,6 +1359,7 @@ console.log(JSON.stringify(adapters[0]));
         self.assertIn("process.platform", bun_entry)
         self.assertIn("process.arch", bun_entry)
         self.assertIn("nodeCommand(usbRoot)", bun_entry)
+        self.assertIn("timeout: 3000", bun_entry)
         self.assertNotIn('spawnSync("node", ["-e"', bun_entry)
 
     def test_openclaw_channel_routes_match_vh_claw_depth(self):

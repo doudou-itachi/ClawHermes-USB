@@ -288,6 +288,7 @@ function pingSync(url: string): boolean {
   const command = nodeCommand(root);
   const completed = spawnSync(command[0], [...command.slice(1), "-e", `fetch(${JSON.stringify(url)}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))`], {
     encoding: "utf8",
+    timeout: 3000,
     windowsHide: true,
   });
   return completed.status === 0;

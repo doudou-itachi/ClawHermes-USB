@@ -33,6 +33,8 @@ fi
 
 APP_PATH="$ROOT/ClawHermes-Control-Mac.app"
 APP_OPENED=0
+CONTROL_PID_FILE="$ROOT/data/tmp/pids/control-server.pid"
+CONTROL_METADATA_FILE="$ROOT/data/tmp/control-server.json"
 
 if [ -d "$APP_PATH" ]; then
   RESOURCE_DIR="$APP_PATH/Contents/Resources"
@@ -40,8 +42,10 @@ if [ -d "$APP_PATH" ]; then
   printf '%s\n' "$ROOT" > "$RESOURCE_DIR/clawhermes-usb-root.txt" 2>/dev/null || true
   printf '%s\n' "$ROOT" > "$ROOT/clawhermes-usb-root.txt" 2>/dev/null || true
   xattr -rd com.apple.quarantine "$APP_PATH" >/dev/null 2>&1 || true
-  osascript -e 'tell application "ClawHermes-Control-Mac" to quit' >/dev/null 2>&1 || true
-  sleep 0.3
+  osascript -e 'tell application id "dev.clawhermes.control" to quit' >/dev/null 2>&1 || true
+  "$NODE" -e "const fs=require('node:fs'); for (const file of process.argv.slice(1)) { try { const pid = JSON.parse(fs.readFileSync(file, 'utf8')).processId; if (Number.isInteger(pid) && pid > 0) process.kill(pid, 'SIGTERM'); } catch {} }" "$CONTROL_PID_FILE" "$CONTROL_METADATA_FILE" >/dev/null 2>&1 || true
+  rm -f "$CONTROL_PID_FILE" "$CONTROL_METADATA_FILE" >/dev/null 2>&1 || true
+  sleep 0.6
   echo "Opening Electrobun UI: $APP_PATH"
   if open -n "$APP_PATH"; then
     APP_OPENED=1
