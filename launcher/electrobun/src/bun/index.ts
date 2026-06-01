@@ -110,39 +110,50 @@ function beginImmediateClose(): void {
   }, 0).unref();
 }
 
-async function requestJson(path: string, options: { method?: string; body?: unknown } = {}) {
-  const response = await fetch(`${controlUrl}${path}`, {
-    method: options.method ?? "GET",
-    headers: options.body ? { "content-type": "application/json" } : undefined,
-    body: options.body ? JSON.stringify(options.body) : undefined,
-  });
-  if (!response.ok) {
-    let detail = `${response.status} ${response.statusText}`;
-    try {
-      const payload = await response.json() as { error?: { message?: string } };
-      if (payload.error?.message) detail = payload.error.message;
-    } catch {
-      // Keep the HTTP status when the response is not JSON.
+async function requestJson(path: string, options: { method?: string; body?: unknown; timeoutMs?: number } = {}) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? 15000);
+  try {
+    const response = await fetch(`${controlUrl}${path}`, {
+      method: options.method ?? "GET",
+      headers: options.body ? { "content-type": "application/json" } : undefined,
+      body: options.body ? JSON.stringify(options.body) : undefined,
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      let detail = `${response.status} ${response.statusText}`;
+      try {
+        const payload = await response.json() as { error?: { message?: string } };
+        if (payload.error?.message) detail = payload.error.message;
+      } catch {
+        // Keep the HTTP status when the response is not JSON.
+      }
+      throw new Error(`Control API failed: ${detail}`);
     }
-    throw new Error(`Control API failed: ${detail}`);
+    return response.json();
+  } finally {
+    clearTimeout(timeout);
   }
-  return response.json();
+}
+
+async function requestJsonWithTimeout(path: string, options: { method?: string; body?: unknown } = {}, timeoutMs = 4000) {
+  return requestJson(path, { ...options, timeoutMs });
 }
 
 async function cleanupBeforeExit(): Promise<void> {
   try {
-    await requestJson("/api/channels/weixin/stop", { method: "POST", body: {} });
+    await requestJsonWithTimeout("/api/channels/weixin/stop", { method: "POST", body: {} });
   } catch {
     // Channel login may not have been started in this build.
   }
   try {
-    await requestJson("/api/services/stop", { method: "POST", body: {} });
+    await requestJsonWithTimeout("/api/services/stop", { method: "POST", body: {} });
     await waitForServicesStopped();
   } catch {
     // The control server may already be down.
   }
   try {
-    await requestJson("/api/shutdown", { method: "POST", body: {} });
+    await requestJsonWithTimeout("/api/shutdown", { method: "POST", body: {} });
   } catch {
     // The process may have exited before the response is read.
   }
@@ -152,10 +163,10 @@ async function cleanupBeforeExit(): Promise<void> {
 async function waitForServicesStopped(timeoutMs = 9000): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    const status = await requestJson("/api/status") as StatusPayload;
+    const status = await requestJsonWithTimeout("/api/status", {}, 3000) as StatusPayload;
     const running = (status.services ?? []).filter((service) => service.status === "running");
     if (running.length === 0) return true;
-    await requestJson("/api/services/stop", { method: "POST", body: {} });
+    await requestJsonWithTimeout("/api/services/stop", { method: "POST", body: {} }, 3000);
     await sleep(250);
   }
   return false;

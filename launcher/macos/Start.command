@@ -40,8 +40,10 @@ if [ -d "$APP_PATH" ]; then
   printf '%s\n' "$ROOT" > "$RESOURCE_DIR/clawhermes-usb-root.txt" 2>/dev/null || true
   printf '%s\n' "$ROOT" > "$ROOT/clawhermes-usb-root.txt" 2>/dev/null || true
   xattr -rd com.apple.quarantine "$APP_PATH" >/dev/null 2>&1 || true
+  osascript -e 'tell application "ClawHermes-Control-Mac" to quit' >/dev/null 2>&1 || true
+  sleep 0.3
   echo "Opening Electrobun UI: $APP_PATH"
-  if open "$APP_PATH"; then
+  if open -n "$APP_PATH"; then
     APP_OPENED=1
   else
     echo "Failed to open Electrobun UI. Falling back to browser Portal after core start."

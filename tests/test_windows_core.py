@@ -1178,7 +1178,8 @@ console.log(JSON.stringify(adapters[0]));
         self.assertIn("clawhermes-usb-root.txt", start)
         self.assertIn("Contents/Resources", start)
         self.assertLess(start.index("Opening Electrobun UI"), start.index("Starting ClawHermes core"))
-        self.assertIn('open "$APP_PATH"', start)
+        self.assertIn('tell application "ClawHermes-Control-Mac" to quit', start)
+        self.assertIn('open -n "$APP_PATH"', start)
         self.assertIn("api/shutdown", stop)
         self.assertIn("runtimes/macos/node", stop)
 
@@ -1224,6 +1225,8 @@ console.log(JSON.stringify(adapters[0]));
         self.assertIn("startWeixinChannelLogin", bun_entry)
         self.assertIn("stopWeixinChannelLogin", bun_entry)
         self.assertIn("/api/shutdown", bun_entry)
+        self.assertIn("AbortController", bun_entry)
+        self.assertIn("requestJsonWithTimeout", bun_entry)
         self.assertIn('titleBarStyle: "hidden"', bun_entry)
         self.assertIn("minimizeWindow", bun_entry)
         self.assertIn("maximizeWindow", bun_entry)
