@@ -33,6 +33,21 @@ dist-usb/ClawHermes/
 - 如果 `ClawHermes-Control-Mac.app` 存在，macOS 启动脚本优先打开 Electrobun UI。
 - 如果 `.app` 不存在，macOS 启动脚本回退打开浏览器 Portal。
 
+## 仓库与产物边界
+
+macOS 构建产物和 runtime archive 不提交到 git，只作为构建机本地文件参与 release：
+
+```text
+launcher/electrobun/build/
+launcher/electrobun/artifacts/
+runtime-archives/macos/*.tar.gz
+apps/hermes-agent/vendor/darwin-*/
+apps/hermes-web-ui/dist/
+apps/hermes-web-ui/node_modules/
+```
+
+这些目录在 macOS 构建机或发布机上准备好即可。代码仓库只保存启动脚本、adapter 配置、release 脚本、文档和测试。
+
 ## 哪些步骤能在 Windows 上完成
 
 Windows 构建机可以完成：

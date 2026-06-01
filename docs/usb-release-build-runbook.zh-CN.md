@@ -322,7 +322,7 @@ apps/hermes-agent/vendor/darwin-arm64/ 或 apps/hermes-agent/vendor/darwin-x64/
 runtime-archives/macos/python-3.11-darwin-arm64.tar.gz 或目标架构对应包
 ```
 
-以及上游运行所需的 Python package、agent 代码目录和入口脚本都仍然存在。不要盲目删除 `agent/`、`gateway/`、`hermes_cli/` 这类可能是运行时必需的目录。
+以上 macOS vendor/runtime 文件是本地 release 输入，不提交到 git。以及上游运行所需的 Python package、agent 代码目录和入口脚本都仍然存在。不要盲目删除 `agent/`、`gateway/`、`hermes_cli/` 这类可能是运行时必需的目录。
 
 ### 3.4 Hermes Web UI payload
 

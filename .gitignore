@@ -11,6 +11,8 @@ runtimes/macos/python/*
 runtimes/macos/git/*
 runtimes/wsl/*.tar
 runtimes/wsl/*.tar.*
+runtime-archives/macos/*.tar.gz
+runtime-archives/macos/*.zip
 
 # Upstream application payloads
 apps/openclaw/*
