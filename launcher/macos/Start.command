@@ -31,9 +31,8 @@ if [ ! -x "$NODE" ]; then
   tar -xzf "$ARCHIVE" -C "$ROOT/runtimes/macos/node/$PLATFORM" --strip-components 1
 fi
 
-echo "Starting ClawHermes core from $ROOT..."
-JSON="$("$NODE" "$ROOT/core/node/dist/clawhermes.js" start --usb-root "$ROOT" --json)"
 APP_PATH="$ROOT/ClawHermes-Control-Mac.app"
+APP_OPENED=0
 
 if [ -d "$APP_PATH" ]; then
   RESOURCE_DIR="$APP_PATH/Contents/Resources"
@@ -42,8 +41,28 @@ if [ -d "$APP_PATH" ]; then
   printf '%s\n' "$ROOT" > "$ROOT/clawhermes-usb-root.txt" 2>/dev/null || true
   xattr -rd com.apple.quarantine "$APP_PATH" >/dev/null 2>&1 || true
   echo "Opening Electrobun UI: $APP_PATH"
-  open "$APP_PATH" && exit 0
-  echo "Failed to open Electrobun UI. Falling back to browser Portal."
+  if open "$APP_PATH"; then
+    APP_OPENED=1
+  else
+    echo "Failed to open Electrobun UI. Falling back to browser Portal after core start."
+  fi
+fi
+
+echo "Starting ClawHermes core from $ROOT..."
+JSON="$("$NODE" "$ROOT/core/node/dist/clawhermes.js" start --usb-root "$ROOT" --json 2>&1)"
+STATUS="$?"
+
+if [ "$STATUS" -ne 0 ]; then
+  echo "ClawHermes core start exited with status $STATUS."
+  echo "$JSON"
+  if [ "$APP_OPENED" -eq 1 ]; then
+    exit 0
+  fi
+  exit "$STATUS"
+fi
+
+if [ "$APP_OPENED" -eq 1 ]; then
+  exit 0
 fi
 
 URL="$(printf '%s' "$JSON" | "$NODE" -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>{try{const p=JSON.parse(s);console.log(p.portal?.url||'')}catch{}})")"

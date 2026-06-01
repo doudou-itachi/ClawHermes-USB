@@ -1177,6 +1177,7 @@ console.log(JSON.stringify(adapters[0]));
         self.assertIn("ClawHermes-Control-Mac.app", start)
         self.assertIn("clawhermes-usb-root.txt", start)
         self.assertIn("Contents/Resources", start)
+        self.assertLess(start.index("Opening Electrobun UI"), start.index("Starting ClawHermes core"))
         self.assertIn('open "$APP_PATH"', start)
         self.assertIn("api/shutdown", stop)
         self.assertIn("runtimes/macos/node", stop)
