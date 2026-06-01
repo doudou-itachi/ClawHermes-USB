@@ -160,6 +160,7 @@ function portAvailable(port: number): Promise<boolean> {
 }
 
 function tcpPortListed(port: number): boolean {
+  if (process.platform !== "win32") return false;
   try {
     const output = execFileSync("netstat", ["-ano", "-p", "tcp"], { encoding: "utf8", timeout: 3000, windowsHide: true });
     const pattern = new RegExp(`(?:^|\\s)(?:127\\.0\\.0\\.1|0\\.0\\.0\\.0|\\[?::1\\]?|\\[?::\\]?):${port}\\s+[^\\r\\n]*\\sLISTENING\\s`, "im");

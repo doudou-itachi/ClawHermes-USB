@@ -131,12 +131,16 @@ function launchManagedAdapterProcess(root: string, adapter: AdapterDescriptor, s
         stdio: serviceStdio,
         windowsHide: true,
       });
+    if (!child.pid || child.pid <= 0) {
+      child.kill();
+      throw new Error(`Adapter ${adapter.id} managed service did not expose a valid process id.`);
+    }
     child.unref();
     return {
       serviceId: adapter.id,
       displayName: adapter.displayName,
       status: "running",
-      processId: child.pid ?? 0,
+      processId: child.pid,
       startedAt: new Date().toISOString(),
       command: processPlan?.command ?? command,
       workingDirectory: processPlan?.workingDirectory ?? workingDirectory,
@@ -514,11 +518,19 @@ function runWslStopHook(root: string, adapter: AdapterDescriptor): void {
 }
 
 export function killProcessTree(pid: number): void {
+  if (!Number.isInteger(pid) || pid <= 0) {
+    throw new Error(`Cannot stop managed service with invalid process id ${pid}.`);
+  }
   if (process.platform === "win32") {
     execFileSync("taskkill", ["/PID", String(pid), "/T", "/F"], { stdio: "ignore", windowsHide: true });
     waitForProcessExit(pid);
   } else {
-    process.kill(pid, "SIGTERM");
+    try {
+      process.kill(-pid, "SIGTERM");
+    } catch {
+      process.kill(pid, "SIGTERM");
+    }
+    waitForProcessExit(pid);
   }
 }
 
@@ -533,6 +545,7 @@ function waitForProcessExit(pid: number, timeoutMs = 5000): void {
 }
 
 function processExists(pid: number): boolean {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
   try {
     process.kill(pid, 0);
     return true;

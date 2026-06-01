@@ -241,6 +241,7 @@ function getStatus(usbRoot) {
         let healthOverride = null;
         if ((0, node_fs_1.existsSync)(pidFile)) {
             const metadata = JSON.parse((0, node_fs_1.readFileSync)(pidFile, "utf8"));
+            const validProcessId = Number.isInteger(metadata.processId) && (metadata.processId ?? 0) > 0 ? metadata.processId : null;
             if (metadata.placeholder === false && metadata.runner === "wsl2-background") {
                 const candidateStatus = metadata.status ?? "running";
                 const candidateHealth = adapter.runtime?.kind === "wsl2" && adapter.health?.type === "http"
@@ -257,7 +258,7 @@ function getStatus(usbRoot) {
                     status = "stopped";
                 }
             }
-            else if (metadata.placeholder === false && metadata.processId && !(0, status_1.processExists)(metadata.processId)) {
+            else if (metadata.placeholder === false && (!validProcessId || !(0, status_1.processExists)(validProcessId))) {
                 const candidateStatus = metadata.status ?? "running";
                 const candidateHealth = adapter.runtime?.kind === "wsl2" && adapter.health?.type === "http"
                     ? (0, status_1.adapterHealth)(adapter, candidateStatus, false)

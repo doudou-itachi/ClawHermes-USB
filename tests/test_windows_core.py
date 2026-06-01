@@ -1175,6 +1175,8 @@ console.log(JSON.stringify(adapters[0]));
         self.assertIn("tar -xzf", start)
         self.assertIn("clawhermes.js", start)
         self.assertIn("ClawHermes-Control-Mac.app", start)
+        self.assertIn("clawhermes-usb-root.txt", start)
+        self.assertIn("Contents/Resources", start)
         self.assertIn('open "$APP_PATH"', start)
         self.assertIn("api/shutdown", stop)
         self.assertIn("runtimes/macos/node", stop)
@@ -1425,6 +1427,22 @@ console.log(JSON.stringify(adapters[0]));
         self.assertIn("windowsHide: true", lifecycle)
         self.assertIn('execFileSync(executablePath, ["--version"]', runtimes)
         self.assertIn("windowsHide: true", runtimes)
+
+    def test_non_windows_service_lifecycle_kills_detached_process_group(self):
+        lifecycle = (ROOT / "core" / "node" / "src" / "lifecycle.ts").read_text(encoding="utf-8")
+
+        self.assertIn('process.kill(-pid, "SIGTERM")', lifecycle)
+        self.assertIn("child.pid", lifecycle)
+        self.assertIn("managed service did not expose a valid process id", lifecycle)
+
+    def test_port_detection_does_not_run_windows_netstat_on_macos(self):
+        ports_runtime = (ROOT / "core" / "node" / "src" / "ports-runtime.ts").read_text(encoding="utf-8")
+        diagnostics = (ROOT / "core" / "node" / "src" / "diagnostics.ts").read_text(encoding="utf-8")
+
+        self.assertIn('if (process.platform !== "win32") return false;', ports_runtime)
+        self.assertIn('if (process.platform !== "win32") return false;', diagnostics)
+        self.assertIn('execFileSync("netstat", ["-ano", "-p", "tcp"]', ports_runtime)
+        self.assertIn('execFileSync("netstat", ["-ano", "-p", "tcp"]', diagnostics)
 
     def test_gui_control_theme_preference_and_docs_are_user_facing(self):
         text = (ROOT / "launcher" / "windows" / "ClawHermes-Control.ps1").read_text(encoding="utf-8")
@@ -4268,6 +4286,38 @@ console.log(JSON.stringify(adapters[0]));
             status_payload = json.loads(status.stdout)
             statuses = {service["id"]: service["status"] for service in status_payload["services"]}
             self.assertEqual(statuses["fake-service"], "stopped")
+            self.assertFalse(pid_file.exists())
+        finally:
+            temp_dir.cleanup()
+
+    def test_status_removes_zero_managed_adapter_pid_file(self):
+        temp_dir, temp_root = make_temp_process_usb_root()
+        try:
+            pid_dir = temp_root / "data" / "tmp" / "pids"
+            pid_dir.mkdir(parents=True, exist_ok=True)
+            pid_file = pid_dir / "fake-service.pid"
+            pid_file.write_text(
+                json.dumps(
+                    {
+                        "serviceId": "fake-service",
+                        "displayName": "Fake Service",
+                        "status": "running",
+                        "processId": 0,
+                        "placeholder": False,
+                        "logFile": str(temp_root / "data" / "logs" / "fake-service.log"),
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            status = run_dispatcher_for_root(temp_root, "status", "-Json")
+
+            self.assertEqual(status.returncode, 0, status.stderr)
+            status_payload = json.loads(status.stdout)
+            services = {service["id"]: service for service in status_payload["services"]}
+            self.assertEqual(services["fake-service"]["status"], "stopped")
+            self.assertIsNone(services["fake-service"]["processId"])
+            self.assertFalse(services["fake-service"]["health"]["ready"])
             self.assertFalse(pid_file.exists())
         finally:
             temp_dir.cleanup()

@@ -179,6 +179,7 @@ export function getStatus(usbRoot: string) {
     let healthOverride: ReturnType<typeof adapterHealth> | null = null;
     if (existsSync(pidFile)) {
       const metadata = JSON.parse(readFileSync(pidFile, "utf8")) as { status?: string; placeholder?: boolean; processId?: number; runner?: string };
+      const validProcessId = Number.isInteger(metadata.processId) && (metadata.processId ?? 0) > 0 ? metadata.processId as number : null;
       if (metadata.placeholder === false && metadata.runner === "wsl2-background") {
         const candidateStatus = metadata.status ?? "running";
         const candidateHealth = adapter.runtime?.kind === "wsl2" && adapter.health?.type === "http"
@@ -193,7 +194,7 @@ export function getStatus(usbRoot: string) {
           rmSync(pidFile, { force: true });
           status = "stopped";
         }
-      } else if (metadata.placeholder === false && metadata.processId && !processExists(metadata.processId)) {
+      } else if (metadata.placeholder === false && (!validProcessId || !processExists(validProcessId))) {
         const candidateStatus = metadata.status ?? "running";
         const candidateHealth = adapter.runtime?.kind === "wsl2" && adapter.health?.type === "http"
           ? adapterHealth(adapter, candidateStatus, false)

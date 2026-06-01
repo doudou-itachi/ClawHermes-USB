@@ -312,6 +312,8 @@ function isTcpPortAvailableSync(port) {
     }
 }
 function tcpPortListedSync(port) {
+    if (process.platform !== "win32")
+        return false;
     try {
         const output = (0, node_child_process_1.execFileSync)("netstat", ["-ano", "-p", "tcp"], { encoding: "utf8", timeout: 3000, windowsHide: true });
         const pattern = new RegExp(`(?:^|\\s)(?:127\\.0\\.0\\.1|0\\.0\\.0\\.0|\\[?::1\\]?|\\[?::\\]?):${port}\\s+[^\\r\\n]*\\sLISTENING\\s`, "im");
