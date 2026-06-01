@@ -15,6 +15,9 @@ export function portableEnv(usbRoot: string, probe: PlatformProbe = {}): Record<
   const platform = detectPlatform(probe);
   return {
     USB_ROOT: root,
+    CLAWHERMES_PLATFORM: platform.id,
+    CLAWHERMES_RUNTIME_KEY: platform.runtimeKey,
+    CLAWHERMES_PATH_SEPARATOR: platform.pathSeparator,
     HOME: join(root, "data", "home"),
     USERPROFILE: join(root, "data", "home"),
     APPDATA: join(root, "data", "home", "AppData", "Roaming"),

@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import { appendFileSync, existsSync, mkdirSync, readdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { loadAdapters } from "./adapters";
+import { expandCommandTemplate } from "./command-template";
 import { resolveServiceEnvironment } from "./environment";
 import { getRoot, resolveRelative } from "./portable";
 import { assertWslReadyForAdapterDistro, wslAdapterSetupPlan } from "./wsl-adapter";
@@ -21,18 +22,19 @@ export function runAdapterSetup(usbRoot: string, serviceId: string | undefined, 
   }
 
   const serviceEnv = resolveServiceEnvironment(root, serviceId);
+  const expandedCommand = expandCommandTemplate(command, serviceEnv.env);
   const logFile = resolveRelative(root, `data/logs/setup-${serviceId}.log`);
   const wslPlan = adapter.runtime?.kind === "wsl2" ? wslAdapterSetupPlan(root, adapter, serviceEnv) : null;
   const result = {
     root,
     serviceId,
     displayName: adapter.displayName,
-    runner: wslPlan ? "wsl2" : "windows",
+    runner: wslPlan ? "wsl2" : serviceEnv.env.CLAWHERMES_PLATFORM ?? "windows",
     dryRun: options.dryRun,
     confirmed: options.confirm,
     wouldModify: !options.dryRun,
     executed: false,
-    command,
+    command: expandedCommand,
     workingDirectory,
     logFile,
     wsl: wslPlan
@@ -68,14 +70,14 @@ export function runAdapterSetup(usbRoot: string, serviceId: string | undefined, 
       encoding: "utf8",
       windowsHide: true,
     })
-    : spawnSync(command, {
+    : spawnSync(expandedCommand, {
       cwd: workingDirectory,
       env: { ...process.env, ...serviceEnv.env },
       shell: true,
       encoding: "utf8",
       windowsHide: true,
     });
-  appendSetupLog(logFile, serviceId, wslPlan ? `wsl ${wslPlan.args.join(" ")}` : command, completed.stdout, completed.stderr, completed.status);
+  appendSetupLog(logFile, serviceId, wslPlan ? `wsl ${wslPlan.args.join(" ")}` : expandedCommand, completed.stdout, completed.stderr, completed.status);
   if (completed.error) throw new Error(`Adapter setup failed: ${completed.error.message}`);
   if (completed.status !== 0) {
     throw new Error(`Adapter setup failed with exit code ${completed.status}: ${(completed.stderr || completed.stdout || "unknown error").trim()}`);

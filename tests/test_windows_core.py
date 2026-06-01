@@ -1064,7 +1064,13 @@ class WindowsCoreTests(unittest.TestCase):
 import { portableEnv } from './core/node/dist/portable.js';
 const win = portableEnv('C:/usb', { platform: 'win32', arch: 'x64' });
 const mac = portableEnv('/Volumes/USB/ClawHermes', { platform: 'darwin', arch: 'arm64' });
-console.log(JSON.stringify({ winPath: win.PATH, macPath: mac.PATH }));
+console.log(JSON.stringify({
+  winPath: win.PATH,
+  macPath: mac.PATH,
+  macRuntimeKey: mac.CLAWHERMES_RUNTIME_KEY,
+  macPlatform: mac.CLAWHERMES_PLATFORM,
+  macPathSeparator: mac.CLAWHERMES_PATH_SEPARATOR
+}));
 """
         result = subprocess.run(
             ["node", "--input-type=module", "-e", script],
@@ -1079,6 +1085,9 @@ console.log(JSON.stringify({ winPath: win.PATH, macPath: mac.PATH }));
         self.assertIn("runtimes\\windows\\node", payload["winPath"])
         self.assertIn("runtimes/macos/node/darwin-arm64/bin", payload["macPath"].replace("\\", "/"))
         self.assertIn(":", payload["macPath"])
+        self.assertEqual(payload["macRuntimeKey"], "darwin-arm64")
+        self.assertEqual(payload["macPlatform"], "darwin")
+        self.assertEqual(payload["macPathSeparator"], ":")
 
     def test_runtime_diagnostics_selects_darwin_arm64_candidates(self):
         temp_dir, temp_root = make_temp_skeleton_usb_root()
@@ -1163,6 +1172,50 @@ console.log(JSON.stringify(adapters[0]));
         finally:
             temp_dir.cleanup()
 
+    def test_hermes_adapters_apply_darwin_runtime_overrides(self):
+        temp_dir, temp_root = make_temp_skeleton_usb_root()
+        try:
+            script = f"""
+import {{ loadAdapters }} from './core/node/dist/adapters.js';
+const adapters = loadAdapters({json.dumps(str(temp_root))}, {{ platform: 'darwin', arch: 'arm64' }});
+console.log(JSON.stringify(Object.fromEntries(adapters.map((adapter) => [adapter.id, adapter]))));
+"""
+            result = subprocess.run(
+                ["node", "--input-type=module", "-e", script],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            adapters = json.loads(result.stdout)
+            hermes_agent = adapters["hermes-agent"]
+            self.assertEqual(hermes_agent["runtime"]["platform"], "darwin")
+            self.assertEqual(hermes_agent["runtime"]["requiredExecutable"], "python3")
+            self.assertIn("vendor/${CLAWHERMES_RUNTIME_KEY}", hermes_agent["commands"]["setup"])
+            self.assertEqual(
+                hermes_agent["commands"]["start"],
+                'python3 -c "from hermes_cli.main import main; raise SystemExit(main())" gateway run',
+            )
+            self.assertIn("vendor/${CLAWHERMES_RUNTIME_KEY}:${USB_ROOT}/apps/hermes-agent", hermes_agent["env"]["variables"]["PYTHONPATH"])
+            self.assertNotIn(".venv\\\\Scripts", hermes_agent["env"]["variables"]["PYTHONPATH"])
+            self.assertEqual(hermes_agent["integration"]["platform"], "darwin")
+            self.assertEqual(hermes_agent["integration"]["strategy"], "macos-python-vendor")
+            self.assertTrue(hermes_agent["integration"]["productionReady"])
+
+            hermes_web = adapters["hermes-web-ui"]
+            self.assertEqual(hermes_web["runtime"]["platform"], "darwin")
+            self.assertEqual(hermes_web["runtime"]["requiredExecutable"], "node")
+            self.assertEqual(hermes_web["runtime"]["versionRequirement"], ">=23.0.0")
+            self.assertEqual(hermes_web["commands"]["setup"], "npm install && npm run build")
+            self.assertEqual(hermes_web["commands"]["start"], "node dist/server/index.js")
+            self.assertEqual(hermes_web["integration"]["platform"], "darwin")
+            self.assertEqual(hermes_web["integration"]["strategy"], "macos-node-adapter")
+            self.assertTrue(hermes_web["integration"]["productionReady"])
+        finally:
+            temp_dir.cleanup()
+
     def test_macos_launchers_prepare_runtime_and_prefer_electrobun_app(self):
         start = (ROOT / "launcher" / "macos" / "Start.command").read_text(encoding="utf-8")
         stop = (ROOT / "launcher" / "macos" / "Stop.command").read_text(encoding="utf-8")
@@ -1172,6 +1225,9 @@ console.log(JSON.stringify(adapters[0]));
         self.assertIn("darwin-x64", start)
         self.assertIn("xattr -rd com.apple.quarantine", start)
         self.assertIn("runtime-archives/macos", start)
+        self.assertIn("node-v24-$PLATFORM.tar.gz", start)
+        self.assertIn("python-3.11-$PLATFORM.tar.gz", start)
+        self.assertIn("Preparing portable Python runtime", start)
         self.assertIn("tar -xzf", start)
         self.assertIn("clawhermes.js", start)
         self.assertIn("ClawHermes-Control-Mac.app", start)
@@ -3009,6 +3065,36 @@ console.log(JSON.stringify(adapters[0]));
         finally:
             temp_dir.cleanup()
 
+    def test_setup_adapter_expands_command_templates_before_execution(self):
+        temp_dir, temp_root = make_temp_process_usb_root()
+        try:
+            adapter_path = temp_root / "adapters" / "fake-service" / "adapter.json"
+            adapter = json.loads(adapter_path.read_text(encoding="utf-8"))
+            adapter["commands"]["setup"] = 'node setup-template.js "${FAKE_INLINE}"'
+            adapter_path.write_text(json.dumps(adapter, indent=2), encoding="utf-8")
+            marker = temp_root / "data" / "tmp" / "setup-expanded.txt"
+            (temp_root / "apps" / "fake-service" / "setup-template.js").write_text(
+                "\n".join(
+                    [
+                        "const fs = require('node:fs');",
+                        "const path = require('node:path');",
+                        "fs.writeFileSync(path.join(process.env.USB_ROOT, 'data', 'tmp', 'setup-expanded.txt'), process.argv[2]);",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = run_dispatcher_for_root(temp_root, "setup-adapter", "fake-service", "--confirm-setup", "-Json")
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(result.stdout)
+            expected_path = str(temp_root / "data" / "fake-service").replace("\\", "/")
+            self.assertIn(expected_path, payload["command"].replace("\\", "/"))
+            self.assertEqual(marker.read_text(encoding="utf-8").replace("\\", "/"), expected_path)
+        finally:
+            temp_dir.cleanup()
+
     def test_setup_adapter_wsl2_dry_run_reports_wsl_command_without_running(self):
         temp_dir, temp_root = make_temp_usb_root()
         try:
@@ -3941,6 +4027,77 @@ console.log(JSON.stringify(adapters[0]));
         finally:
             temp_dir.cleanup()
 
+    def test_start_adapter_prepares_macos_hermes_web_ui_cli_shim(self):
+        temp_dir, temp_root = make_temp_process_usb_root()
+        try:
+            adapter_dir = temp_root / "adapters" / "hermes-web-ui"
+            app_dir = temp_root / "apps" / "hermes-web-ui"
+            adapter_dir.mkdir(parents=True, exist_ok=True)
+            app_dir.mkdir(parents=True, exist_ok=True)
+            adapter = {
+                "id": "hermes-web-ui",
+                "displayName": "Hermes Web UI",
+                "description": "Test Hermes Web UI",
+                "type": "node-service",
+                "enabled": True,
+                "appDir": "apps/hermes-web-ui",
+                "runtime": {"kind": "node", "platform": "darwin", "requiredExecutable": "node"},
+                "commands": {"setup": None, "start": "node service.js", "stop": None},
+                "env": {
+                    "files": [],
+                    "variables": {
+                        "CLAWHERMES_PLATFORM": "darwin",
+                        "CLAWHERMES_RUNTIME_KEY": "darwin-arm64",
+                        "CLAWHERMES_PATH_SEPARATOR": ":",
+                        "HERMES_HOME": "${USB_ROOT}/data/hermes",
+                        "AUTH_TOKEN": "clawhermes",
+                    },
+                },
+                "dataDir": "data/hermes-web-ui",
+                "logFile": "data/logs/hermes-web-ui.log",
+                "pidFile": "data/tmp/pids/hermes-web-ui.pid",
+                "health": {"type": "process", "timeoutSeconds": 5},
+                "portal": {"label": "Hermes Web UI", "url": None, "group": "Hermes"},
+                "integration": {"status": "verified", "productionReady": True, "verifiedAt": "2026-06-01", "summary": "test", "sources": []},
+                "dependsOn": [],
+            }
+            (adapter_dir / "adapter.json").write_text(json.dumps(adapter, indent=2), encoding="utf-8")
+            (app_dir / "service.js").write_text(
+                "\n".join(
+                    [
+                        "const fs = require('node:fs');",
+                        "const path = require('node:path');",
+                        "const root = process.env.USB_ROOT;",
+                        "fs.writeFileSync(path.join(root, 'data', 'tmp', 'hermes-web-ui-env.json'), JSON.stringify({",
+                        "  HERMES_BIN: process.env.HERMES_BIN,",
+                        "  API_SERVER_KEY: process.env.API_SERVER_KEY,",
+                        "  PATH: process.env.PATH",
+                        "}, null, 2));",
+                        "setInterval(() => {}, 1000);",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = run_dispatcher_for_root(temp_root, "start-adapter", "hermes-web-ui", "--confirm-start", "-Json")
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            marker = temp_root / "data" / "tmp" / "hermes-web-ui-env.json"
+            wait_for_file(marker)
+            env_payload = json.loads(marker.read_text(encoding="utf-8"))
+            hermes_bin = Path(env_payload["HERMES_BIN"])
+            self.assertEqual(hermes_bin, temp_root / "data" / "tmp" / "bin" / "hermes-web-ui" / "hermes")
+            self.assertEqual(env_payload["API_SERVER_KEY"], "clawhermes")
+            self.assertTrue(env_payload["PATH"].startswith(str(hermes_bin.parent) + ":"))
+            shim = hermes_bin.read_text(encoding="utf-8")
+            self.assertIn("python3 -c", shim)
+            self.assertIn("vendor/$RUNTIME_KEY", shim)
+            self.assertIn("hermes_cli.main", shim)
+        finally:
+            run_dispatcher_for_root(temp_root, "stop", "-Json")
+            temp_dir.cleanup()
+
     def test_start_adapter_wsl2_dry_run_reports_wsl_command_without_running(self):
         temp_dir, temp_root = make_temp_usb_root()
         try:
@@ -4847,7 +5004,8 @@ console.log(JSON.stringify(adapters[0]));
             )
             (source_root / "core" / "node" / "dist" / "clawhermes.js").write_text("console.log('core')\n", encoding="utf-8")
             (source_root / "adapters" / "openclaw" / "adapter.json").write_text('{"id":"openclaw"}\n', encoding="utf-8")
-            (source_root / "runtime-archives" / "macos" / "node-v22-darwin-arm64.tar.gz").write_text("archive\n", encoding="utf-8")
+            (source_root / "runtime-archives" / "macos" / "node-v24-darwin-arm64.tar.gz").write_text("archive\n", encoding="utf-8")
+            (source_root / "runtime-archives" / "macos" / "python-3.11-darwin-arm64.tar.gz").write_text("python archive\n", encoding="utf-8")
             (source_root / "apps" / "openclaw" / "package.json").write_text('{"name":"openclaw"}\n', encoding="utf-8")
             (
                 source_root
@@ -4887,7 +5045,8 @@ console.log(JSON.stringify(adapters[0]));
             self.assertTrue((output_root / "Start-ClawHermes-Mac.command").exists())
             self.assertTrue((output_root / "Stop-ClawHermes-Mac.command").exists())
             self.assertTrue((output_root / "ClawHermes-Control-Mac.app" / "Contents" / "Info.plist").exists())
-            self.assertTrue((output_root / "runtime-archives" / "macos" / "node-v22-darwin-arm64.tar.gz").exists())
+            self.assertTrue((output_root / "runtime-archives" / "macos" / "node-v24-darwin-arm64.tar.gz").exists())
+            self.assertTrue((output_root / "runtime-archives" / "macos" / "python-3.11-darwin-arm64.tar.gz").exists())
             manifest = json.loads((output_root / "release-manifest.json").read_text(encoding="utf-8"))
             self.assertEqual(manifest["entryPoints"]["windows"], "ClawHermes-Control.exe")
             self.assertEqual(manifest["entryPoints"]["macos"], "Start-ClawHermes-Mac.command")

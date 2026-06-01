@@ -68,7 +68,7 @@ export function loadRuntimeManifest(usbRoot: string): RuntimeManifest {
 export function runtimePreparationPlan(usbRoot: string, probe: PlatformProbe = {}) {
   const root = getRoot(usbRoot);
   const manifest = loadRuntimeManifest(root);
-  const adapters = loadAdapters(root);
+  const adapters = loadAdapters(root, probe);
   const diagnosticsByName = new Map(runtimeDiagnostics(root, probe).map((runtime) => [runtime.name, runtime]));
   const adapterRuntimeRequirements = adapterRuntimeRequirementDiagnostics(root, adapters, probe);
   const steps: RuntimePreparationStep[] = manifest.runtimes.map((item) => {

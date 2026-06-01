@@ -68,7 +68,7 @@ function loadRuntimeManifest(usbRoot) {
 function runtimePreparationPlan(usbRoot, probe = {}) {
     const root = (0, portable_1.getRoot)(usbRoot);
     const manifest = loadRuntimeManifest(root);
-    const adapters = (0, adapters_1.loadAdapters)(root);
+    const adapters = (0, adapters_1.loadAdapters)(root, probe);
     const diagnosticsByName = new Map(runtimeDiagnostics(root, probe).map((runtime) => [runtime.name, runtime]));
     const adapterRuntimeRequirements = adapterRuntimeRequirementDiagnostics(root, adapters, probe);
     const steps = manifest.runtimes.map((item) => {

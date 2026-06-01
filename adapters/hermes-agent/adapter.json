@@ -63,5 +63,38 @@
       "https://github.com/NousResearch/hermes-agent"
     ]
   },
+  "platformOverrides": {
+    "darwin": {
+      "runtime": {
+        "kind": "python",
+        "platform": "darwin",
+        "requiredExecutable": "python3",
+        "versionRequirement": ">=3.11.0"
+      },
+      "commands": {
+        "setup": "python3 -m pip install --upgrade pip && python3 -m pip install --target vendor/${CLAWHERMES_RUNTIME_KEY} .",
+        "start": "python3 -c \"from hermes_cli.main import main; raise SystemExit(main())\" gateway run"
+      },
+      "env": {
+        "variables": {
+          "PYTHONPATH": "${USB_ROOT}/apps/hermes-agent/vendor/${CLAWHERMES_RUNTIME_KEY}:${USB_ROOT}/apps/hermes-agent",
+          "PYTHONNOUSERSITE": "1",
+          "PYTHONUTF8": "1"
+        }
+      },
+      "integration": {
+        "status": "verified",
+        "productionReady": true,
+        "verifiedAt": "2026-06-01",
+        "summary": "macOS adapter uses portable python3 plus a movable vendor/<darwin-arch> dependency directory prepared on a macOS build host; start runs hermes_cli.main from USB_ROOT without reusing the Windows venv.",
+        "platform": "darwin",
+        "strategy": "macos-python-vendor",
+        "sources": [
+          "https://hermes-agent.org/",
+          "https://github.com/NousResearch/hermes-agent"
+        ]
+      }
+    }
+  },
   "dependsOn": []
 }

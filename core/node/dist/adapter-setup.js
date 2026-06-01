@@ -5,6 +5,7 @@ const node_child_process_1 = require("node:child_process");
 const node_fs_1 = require("node:fs");
 const node_path_1 = require("node:path");
 const adapters_1 = require("./adapters");
+const command_template_1 = require("./command-template");
 const environment_1 = require("./environment");
 const portable_1 = require("./portable");
 const wsl_adapter_1 = require("./wsl-adapter");
@@ -24,18 +25,19 @@ function runAdapterSetup(usbRoot, serviceId, options) {
         throw new Error(`App directory is not ready for setup: ${adapter.appDir}`);
     }
     const serviceEnv = (0, environment_1.resolveServiceEnvironment)(root, serviceId);
+    const expandedCommand = (0, command_template_1.expandCommandTemplate)(command, serviceEnv.env);
     const logFile = (0, portable_1.resolveRelative)(root, `data/logs/setup-${serviceId}.log`);
     const wslPlan = adapter.runtime?.kind === "wsl2" ? (0, wsl_adapter_1.wslAdapterSetupPlan)(root, adapter, serviceEnv) : null;
     const result = {
         root,
         serviceId,
         displayName: adapter.displayName,
-        runner: wslPlan ? "wsl2" : "windows",
+        runner: wslPlan ? "wsl2" : serviceEnv.env.CLAWHERMES_PLATFORM ?? "windows",
         dryRun: options.dryRun,
         confirmed: options.confirm,
         wouldModify: !options.dryRun,
         executed: false,
-        command,
+        command: expandedCommand,
         workingDirectory,
         logFile,
         wsl: wslPlan
@@ -70,14 +72,14 @@ function runAdapterSetup(usbRoot, serviceId, options) {
             encoding: "utf8",
             windowsHide: true,
         })
-        : (0, node_child_process_1.spawnSync)(command, {
+        : (0, node_child_process_1.spawnSync)(expandedCommand, {
             cwd: workingDirectory,
             env: { ...process.env, ...serviceEnv.env },
             shell: true,
             encoding: "utf8",
             windowsHide: true,
         });
-    appendSetupLog(logFile, serviceId, wslPlan ? `wsl ${wslPlan.args.join(" ")}` : command, completed.stdout, completed.stderr, completed.status);
+    appendSetupLog(logFile, serviceId, wslPlan ? `wsl ${wslPlan.args.join(" ")}` : expandedCommand, completed.stdout, completed.stderr, completed.status);
     if (completed.error)
         throw new Error(`Adapter setup failed: ${completed.error.message}`);
     if (completed.status !== 0) {

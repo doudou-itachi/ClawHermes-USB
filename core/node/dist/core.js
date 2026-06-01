@@ -159,7 +159,7 @@ function startSingleAdapter(usbRoot, serviceId, options) {
         root,
         serviceId,
         displayName: runtimeAdapter.displayName,
-        runner: wslPlan ? "wsl2" : "windows",
+        runner: wslPlan ? "wsl2" : serviceEnv.env.CLAWHERMES_PLATFORM ?? "windows",
         dryRun: options.dryRun,
         confirmed: options.confirm,
         wouldModify: !options.dryRun,

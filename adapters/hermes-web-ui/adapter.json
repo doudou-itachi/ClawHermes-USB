@@ -61,6 +61,31 @@
       "https://github.com/EKKOLearnAI/hermes-web-ui"
     ]
   },
+  "platformOverrides": {
+    "darwin": {
+      "runtime": {
+        "kind": "node",
+        "platform": "darwin",
+        "requiredExecutable": "node",
+        "versionRequirement": ">=23.0.0"
+      },
+      "commands": {
+        "setup": "npm install && npm run build",
+        "start": "node dist/server/index.js"
+      },
+      "integration": {
+        "status": "verified",
+        "productionReady": true,
+        "verifiedAt": "2026-06-01",
+        "summary": "macOS adapter uses the same built dist/server payload with Node >=23 from runtimes/macos/node/<darwin-arch>/bin and macOS-compatible dependencies prepared by npm install on a macOS build host.",
+        "platform": "darwin",
+        "strategy": "macos-node-adapter",
+        "sources": [
+          "https://github.com/EKKOLearnAI/hermes-web-ui"
+        ]
+      }
+    }
+  },
   "dependsOn": [
     "hermes-agent"
   ]

@@ -19,6 +19,9 @@ function portableEnv(usbRoot, probe = {}) {
     const platform = (0, platform_1.detectPlatform)(probe);
     return {
         USB_ROOT: root,
+        CLAWHERMES_PLATFORM: platform.id,
+        CLAWHERMES_RUNTIME_KEY: platform.runtimeKey,
+        CLAWHERMES_PATH_SEPARATOR: platform.pathSeparator,
         HOME: (0, node_path_1.join)(root, "data", "home"),
         USERPROFILE: (0, node_path_1.join)(root, "data", "home"),
         APPDATA: (0, node_path_1.join)(root, "data", "home", "AppData", "Roaming"),

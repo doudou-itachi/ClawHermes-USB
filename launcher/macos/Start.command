@@ -18,7 +18,7 @@ case "$ARCH" in
 esac
 
 NODE="$ROOT/runtimes/macos/node/$PLATFORM/bin/node"
-ARCHIVE="$ROOT/runtime-archives/macos/node-v22-$PLATFORM.tar.gz"
+ARCHIVE="$ROOT/runtime-archives/macos/node-v24-$PLATFORM.tar.gz"
 
 if [ ! -x "$NODE" ]; then
   if [ ! -f "$ARCHIVE" ]; then
@@ -29,6 +29,20 @@ if [ ! -x "$NODE" ]; then
   echo "Preparing portable Node runtime for $PLATFORM..."
   mkdir -p "$ROOT/runtimes/macos/node/$PLATFORM"
   tar -xzf "$ARCHIVE" -C "$ROOT/runtimes/macos/node/$PLATFORM" --strip-components 1
+fi
+
+PYTHON="$ROOT/runtimes/macos/python/$PLATFORM/bin/python3"
+PYTHON_ARCHIVE="$ROOT/runtime-archives/macos/python-3.11-$PLATFORM.tar.gz"
+
+if [ ! -x "$PYTHON" ]; then
+  if [ -f "$PYTHON_ARCHIVE" ]; then
+    echo "Preparing portable Python runtime for $PLATFORM..."
+    mkdir -p "$ROOT/runtimes/macos/python/$PLATFORM"
+    tar -xzf "$PYTHON_ARCHIVE" -C "$ROOT/runtimes/macos/python/$PLATFORM" --strip-components 1
+  else
+    echo "Portable Python archive not found: $PYTHON_ARCHIVE"
+    echo "Hermes Agent requires Python 3.11+. OpenClaw can still start, but Hermes Agent will remain stopped until Python is prepared."
+  fi
 fi
 
 APP_PATH="$ROOT/ClawHermes-Control-Mac.app"

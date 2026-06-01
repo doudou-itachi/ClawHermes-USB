@@ -288,18 +288,20 @@ apps/hermes-agent
 
 当前适配器模型：
 
-- 运行位置：WSL2，目标 distro 为 `ClawHermes-Ubuntu`。
+- Windows 运行位置：Windows-native Python，依赖 `apps/hermes-agent/.venv/`。
+- macOS 运行位置：macOS `python3`，依赖 `apps/hermes-agent/vendor/<darwin-arch>/`。
 - 默认端口：`8642`。
 - 健康检查：`http://127.0.0.1:8642/health`。
-- 启动命令：`./venv/bin/hermes gateway run`。
+- Windows 启动命令：`python -c "from hermes_cli.main import main; raise SystemExit(main())" gateway run`。
+- macOS 启动命令：`python3 -c "from hermes_cli.main import main; raise SystemExit(main())" gateway run`。
 - 数据目录：`data/hermes`。
 
 准备方式：
 
 1. 在开发机或构建机上准备真实 `apps/hermes-agent` 上游 payload。
-2. 在 WSL 环境中运行 Hermes Agent 的安装脚本或等价依赖安装步骤。
-3. 确认 Python 虚拟环境已经存在：`apps/hermes-agent/venv/`。
-4. 确认 `./venv/bin/hermes gateway run` 可以直接执行。
+2. Windows 构建机执行 `node core/node/dist/clawhermes.js setup-adapter hermes-agent --confirm-setup --json`，生成 `.venv`。
+3. macOS 构建机在 `apps/hermes-agent` 下执行 `python3 -m pip install --target vendor/darwin-arm64 .` 或对应 Intel 架构的 `vendor/darwin-x64`。
+4. 确认 `hermes_cli/`、`gateway/`、`agent/` 等上游运行代码目录仍然在 payload 内。
 
 可用 adapter 命令验证：
 
@@ -315,8 +317,9 @@ node core/node/dist/clawhermes.js stop --json
 交付前至少确认：
 
 ```text
-apps/hermes-agent/venv/
-apps/hermes-agent/setup-hermes.sh
+apps/hermes-agent/.venv/
+apps/hermes-agent/vendor/darwin-arm64/ 或 apps/hermes-agent/vendor/darwin-x64/
+runtime-archives/macos/python-3.11-darwin-arm64.tar.gz 或目标架构对应包
 ```
 
 以及上游运行所需的 Python package、agent 代码目录和入口脚本都仍然存在。不要盲目删除 `agent/`、`gateway/`、`hermes_cli/` 这类可能是运行时必需的目录。
@@ -425,7 +428,7 @@ runtimes/windows/git/
 
 ### 4.2 WSL rootfs artifact
 
-OpenClaw 和 Hermes Agent 当前都走 WSL2 adapter。交付包需要提前准备 WSL rootfs artifact：
+这是旧版 WSL2 adapter 交付路径，仅在显式改回 WSL2 adapter 时需要。当前默认交付路径是 Windows-native / macOS-native，不要求携带 WSL rootfs artifact：
 
 ```text
 runtimes/wsl/ubuntu-rootfs.tar

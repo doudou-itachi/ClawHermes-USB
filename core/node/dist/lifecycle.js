@@ -342,6 +342,13 @@ function prepareHermesWebUiEnvironment(root, serviceEnv) {
             (0, node_fs_1.appendFileSync)(envPath, `${separator}API_SERVER_KEY=${apiKey}\n`, "utf8");
         }
     }
+    if (serviceEnv.env.CLAWHERMES_PLATFORM === "darwin" || process.platform === "darwin") {
+        prepareHermesWebUiMacEnvironment(root, serviceEnv);
+        return;
+    }
+    prepareHermesWebUiWindowsEnvironment(root, serviceEnv);
+}
+function prepareHermesWebUiWindowsEnvironment(root, serviceEnv) {
     const shimDir = (0, node_path_1.join)(root, "data", "tmp", "bin", "hermes-web-ui");
     writeHermesWebUiShim(shimDir);
     const powershell = (0, node_path_1.join)(process.env.SystemRoot || "C:\\Windows", "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
@@ -349,6 +356,17 @@ function prepareHermesWebUiEnvironment(root, serviceEnv) {
     serviceEnv.env.CLAWHERMES_HERMES_WSL_DISTRO = serviceEnv.env.CLAWHERMES_HERMES_WSL_DISTRO || "ClawHermes-Ubuntu";
     serviceEnv.env.PSExecutionPolicyPreference = "Bypass";
     serviceEnv.env.PATH = [shimDir, serviceEnv.env.PATH || process.env.PATH || ""].filter(Boolean).join(";");
+}
+function prepareHermesWebUiMacEnvironment(root, serviceEnv) {
+    const shimDir = (0, node_path_1.join)(root, "data", "tmp", "bin", "hermes-web-ui");
+    const hermesBin = (0, node_path_1.join)(shimDir, "hermes");
+    writeHermesWebUiMacShim(hermesBin);
+    serviceEnv.env.HERMES_BIN = hermesBin;
+    serviceEnv.env.API_SERVER_KEY = serviceEnv.env.API_SERVER_KEY || serviceEnv.env.AUTH_TOKEN || "clawhermes";
+    serviceEnv.env.PYTHONNOUSERSITE = "1";
+    serviceEnv.env.PYTHONUTF8 = "1";
+    const pathSeparator = serviceEnv.env.CLAWHERMES_PATH_SEPARATOR || ":";
+    serviceEnv.env.PATH = [shimDir, serviceEnv.env.PATH || process.env.PATH || ""].filter(Boolean).join(pathSeparator);
 }
 function hermesWebUiProfileConfig(serviceEnv) {
     const upstream = serviceEnv.env.HERMES_AGENT_API_BASE || serviceEnv.env.UPSTREAM || "http://127.0.0.1:8642";
@@ -381,6 +399,37 @@ function writeHermesWebUiShim(shimDir) {
     for (const command of ["gateway", "logs", "profile", "sessions", "setup"]) {
         (0, node_fs_1.writeFileSync)((0, node_path_1.join)(shimDir, `${command}.ps1`), hermesSubcommandScript(command), "utf8");
     }
+}
+function writeHermesWebUiMacShim(hermesBin) {
+    (0, node_fs_1.mkdirSync)((0, node_path_1.dirname)(hermesBin), { recursive: true });
+    (0, node_fs_1.writeFileSync)(hermesBin, [
+        "#!/usr/bin/env sh",
+        "set -u",
+        "ROOT=\"${USB_ROOT:-}\"",
+        "if [ -z \"$ROOT\" ]; then",
+        "  echo \"USB_ROOT is not set.\" >&2",
+        "  exit 1",
+        "fi",
+        "RUNTIME_KEY=\"${CLAWHERMES_RUNTIME_KEY:-}\"",
+        "if [ -z \"$RUNTIME_KEY\" ]; then",
+        "  case \"$(uname -m)\" in",
+        "    arm64) RUNTIME_KEY=\"darwin-arm64\" ;;",
+        "    x86_64) RUNTIME_KEY=\"darwin-x64\" ;;",
+        "    *) RUNTIME_KEY=\"darwin-x64\" ;;",
+        "  esac",
+        "fi",
+        "export HERMES_HOME=\"${HERMES_HOME:-$ROOT/data/hermes}\"",
+        "if [ -z \"${API_SERVER_KEY:-}\" ] && [ -n \"${AUTH_TOKEN:-}\" ]; then",
+        "  export API_SERVER_KEY=\"$AUTH_TOKEN\"",
+        "fi",
+        "export PYTHONNOUSERSITE=1",
+        "export PYTHONUTF8=1",
+        "export PYTHONPATH=\"$ROOT/apps/hermes-agent/vendor/$RUNTIME_KEY:$ROOT/apps/hermes-agent${PYTHONPATH:+:$PYTHONPATH}\"",
+        "cd \"$ROOT/apps/hermes-agent\" || exit 1",
+        "exec python3 -c \"from hermes_cli.main import main; raise SystemExit(main())\" \"$@\"",
+        "",
+    ].join("\n"), "utf8");
+    (0, node_fs_1.chmodSync)(hermesBin, 0o755);
 }
 function hermesSubcommandScript(command) {
     return [

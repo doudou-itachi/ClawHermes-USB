@@ -111,8 +111,8 @@ runtimes/macos/node/darwin-x64/bin/node
 如果不存在，会从以下 archive 首次解压：
 
 ```text
-runtime-archives/macos/node-v22-darwin-arm64.tar.gz
-runtime-archives/macos/node-v22-darwin-x64.tar.gz
+runtime-archives/macos/node-v24-darwin-arm64.tar.gz
+runtime-archives/macos/node-v24-darwin-x64.tar.gz
 ```
 
 准备 archive 时，使用 Node.js 官方 macOS tarball，并重命名为上述文件名。启动脚本会解压到：
@@ -120,6 +120,38 @@ runtime-archives/macos/node-v22-darwin-x64.tar.gz
 ```text
 runtimes/macos/node/darwin-arm64/
 runtimes/macos/node/darwin-x64/
+```
+
+## macOS Python runtime 与 Hermes Agent
+
+Hermes Agent 在 macOS 上不复用 Windows `.venv`，而是使用 macOS `python3` 和可移动依赖目录：
+
+```text
+apps/hermes-agent/vendor/darwin-arm64/
+apps/hermes-agent/vendor/darwin-x64/
+```
+
+在 macOS 构建机上准备 Apple Silicon 依赖：
+
+```bash
+cd apps/hermes-agent
+python3 -m pip install --upgrade pip
+python3 -m pip install --target vendor/darwin-arm64 .
+```
+
+Intel Mac 对应把目标目录改为 `vendor/darwin-x64`。发布包还可以携带 Python runtime archive，启动脚本会按当前架构首次解压：
+
+```text
+runtime-archives/macos/python-3.11-darwin-arm64.tar.gz
+runtime-archives/macos/python-3.11-darwin-x64.tar.gz
+```
+
+Hermes Web UI 在 macOS 上仍使用同一份 `dist/server`，但需要在 macOS 构建机上准备兼容依赖并构建：
+
+```bash
+cd apps/hermes-web-ui
+npm install
+npm run build
 ```
 
 ## macOS 真机验证
@@ -133,7 +165,7 @@ npm install
 npm run build:mac:arm64
 ```
 
-准备或复制 `runtime-archives/macos/node-v22-darwin-arm64.tar.gz` 后，将发布目录放到 USB 或本地测试目录，执行：
+准备或复制 `runtime-archives/macos/node-v24-darwin-arm64.tar.gz` 和 `runtime-archives/macos/python-3.11-darwin-arm64.tar.gz` 后，将发布目录放到 USB 或本地测试目录，执行：
 
 ```bash
 cd dist-usb/ClawHermes
@@ -143,8 +175,10 @@ chmod +x Start-ClawHermes-Mac.command Stop-ClawHermes-Mac.command
 
 验证点：
 
-- 首次运行能解压 macOS Node runtime。
+- 首次运行能解压 macOS Node runtime 和 Python runtime。
 - `core/node/dist/clawhermes.js start --json` 能正常启动。
+- Hermes Agent 的 `http://127.0.0.1:8642/health` 返回 200。
+- Hermes Web UI 的 `http://127.0.0.1:8648` 可以打开。
 - 有 `ClawHermes-Control-Mac.app` 时会打开 Electrobun UI。
 - 没有 `.app` 时会打开浏览器 Portal。
 - `Stop-ClawHermes-Mac.command` 能停止服务。

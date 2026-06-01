@@ -298,6 +298,17 @@ function Copy-MacRuntimeArchives {
 
     $target = Join-Path $ReleaseRoot "runtime-archives\macos"
     Copy-Tree -Source $source -Destination $target
+    foreach ($archiveName in @(
+        "node-v24-darwin-arm64.tar.gz",
+        "node-v24-darwin-x64.tar.gz",
+        "python-3.11-darwin-arm64.tar.gz",
+        "python-3.11-darwin-x64.tar.gz"
+    )) {
+        $archivePath = Join-Path $source $archiveName
+        if (-not (Test-Path -LiteralPath $archivePath -PathType Leaf)) {
+            $script:Warnings += "Missing optional macOS runtime archive: runtime-archives/macos/$archiveName."
+        }
+    }
     $script:CopiedPaths += [ordered]@{
         path = "runtime-archives/macos"
         source = $source
