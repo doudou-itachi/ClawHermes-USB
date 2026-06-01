@@ -69,8 +69,7 @@ const rpc = BrowserView.defineRPC({
       },
       closeWindow: async () => {
         beginImmediateClose();
-        mainWindow?.close();
-        return { closed: true, cleanup: "background" };
+        return { closed: true, cleanup: "foreground" };
       },
     },
   },
@@ -99,15 +98,13 @@ mainWindow.on("close", () => {
 function beginImmediateClose(): void {
   if (closingFromUi) return;
   closingFromUi = true;
-  setTimeout(() => {
-    cleanupBeforeExit()
-      .catch((error) => {
-        console.error("cleanup before exit failed", error);
-      })
-      .finally(() => {
-        Utils.quit();
-      });
-  }, 0).unref();
+  void cleanupBeforeExit()
+    .catch((error) => {
+      console.error("cleanup before exit failed", error);
+    })
+    .finally(() => {
+      Utils.quit();
+    });
 }
 
 async function requestJson(path: string, options: { method?: string; body?: unknown; timeoutMs?: number } = {}) {

@@ -124,8 +124,12 @@ function launchManagedAdapterProcess(root, adapter, serviceEnv, processPlan, att
                         stdio: serviceStdio,
                         windowsHide: true,
                     });
+        child.on("error", (error) => {
+            (0, node_fs_1.appendFileSync)(logFile, `${new Date().toISOString()} [${adapter.id}] [ERROR] Managed service spawn failed: ${error.message}\n`, "utf8");
+        });
         if (!child.pid || child.pid <= 0) {
-            child.kill();
+            if (child.pid && child.pid > 0)
+                child.kill();
             throw new Error(`Adapter ${adapter.id} managed service did not expose a valid process id.`);
         }
         child.unref();

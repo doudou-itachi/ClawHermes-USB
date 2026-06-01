@@ -1182,8 +1182,13 @@ console.log(JSON.stringify(adapters[0]));
         self.assertIn("control-server.pid", start)
         self.assertIn("control-server.json", start)
         self.assertIn("process.kill", start)
+        self.assertIn('clawhermes.js" stop --usb-root "$ROOT" --json', start)
         self.assertIn('open -n "$APP_PATH"', start)
+        self.assertLess(start.index('clawhermes.js" stop --usb-root "$ROOT" --json'), start.index("Opening Electrobun UI"))
         self.assertIn("api/shutdown", stop)
+        self.assertIn("STOPPED=0", stop)
+        self.assertIn("STOPPED=1", stop)
+        self.assertIn('clawhermes.js" stop --usb-root "$ROOT" --json', stop)
         self.assertIn("runtimes/macos/node", stop)
 
     def test_electrobun_control_shell_scaffold_matches_vh_claw_style(self):
@@ -1235,7 +1240,7 @@ console.log(JSON.stringify(adapters[0]));
         self.assertIn("maximizeWindow", bun_entry)
         self.assertIn("closeWindow", bun_entry)
         self.assertIn("beginImmediateClose", bun_entry)
-        self.assertIn('cleanup: "background"', bun_entry)
+        self.assertIn('cleanup: "foreground"', bun_entry)
         self.assertIn("Utils.quit", bun_entry)
         self.assertIn("cleanupBeforeExit", bun_entry)
         self.assertIn("waitForServicesStopped", bun_entry)
@@ -1258,6 +1263,20 @@ console.log(JSON.stringify(adapters[0]));
         self.assertNotIn("插件缺失", vue_app)
         self.assertNotIn("openclaw channels setup", vue_app)
         self.assertNotIn("QQ Bot", vue_app)
+
+        close_handler_start = bun_entry.index("closeWindow: async () => {")
+        close_handler_end = bun_entry.index("      },", close_handler_start)
+        close_handler = bun_entry[close_handler_start:close_handler_end]
+        self.assertIn("beginImmediateClose();", close_handler)
+        self.assertNotIn("mainWindow?.close()", close_handler)
+        self.assertIn('cleanup: "foreground"', close_handler)
+
+        begin_close_start = bun_entry.index("function beginImmediateClose")
+        begin_close_end = bun_entry.index("async function requestJson", begin_close_start)
+        begin_close = bun_entry[begin_close_start:begin_close_end]
+        self.assertIn("void cleanupBeforeExit()", begin_close)
+        self.assertNotIn("setTimeout", begin_close)
+        self.assertNotIn(".unref()", begin_close)
         self.assertNotIn("Telegram", vue_app)
         self.assertNotIn("Slack", vue_app)
         self.assertIn("startWeixinLogin", vue_app)
@@ -3540,6 +3559,54 @@ console.log(JSON.stringify(adapters[0]));
             self.assertEqual(json.loads(stop.stdout)["stopped"], ["portal", "fake-service"])
             self.assertFalse(pid_file.exists())
             self.assertFalse(process_exists(metadata["processId"]))
+        finally:
+            run_dispatcher_for_root(temp_root, "stop", "-Json")
+            temp_dir.cleanup()
+
+    def test_start_continues_and_reports_failed_adapter_when_one_service_cannot_launch(self):
+        temp_dir, temp_root = make_temp_process_usb_root()
+        try:
+            broken_dir = temp_root / "adapters" / "broken-service"
+            broken_dir.mkdir(parents=True, exist_ok=True)
+            broken_app = temp_root / "apps" / "broken-service"
+            broken_app.mkdir(parents=True, exist_ok=True)
+            (broken_app / "README.md").write_text("real app content\n", encoding="utf-8")
+
+            fake_adapter = json.loads((temp_root / "adapters" / "fake-service" / "adapter.json").read_text(encoding="utf-8"))
+            broken_adapter = {
+                **fake_adapter,
+                "id": "broken-service",
+                "displayName": "Broken Service",
+                "appDir": "apps/broken-service",
+                "logFile": "data/logs/broken-service.log",
+                "pidFile": "data/tmp/pids/broken-service.pid",
+                "commands": {**fake_adapter["commands"], "start": "missing-binary-for-test"},
+            }
+            (broken_dir / "adapter.json").write_text(json.dumps(broken_adapter, indent=2), encoding="utf-8")
+            (temp_root / "config" / "defaults" / "services.json").write_text(
+                json.dumps({"startOrder": ["fake-service", "broken-service"], "stopOrder": ["broken-service", "fake-service"]}, indent=2),
+                encoding="utf-8",
+            )
+
+            start = run_dispatcher_for_root(temp_root, "start", "-Json")
+
+            self.assertEqual(start.returncode, 0, start.stderr)
+            payload = json.loads(start.stdout)
+            self.assertEqual(payload["started"], ["fake-service"])
+            self.assertEqual(payload["failed"][0]["serviceId"], "broken-service")
+            self.assertIn("managed service did not expose a valid process id", payload["failed"][0]["message"])
+
+            fake_pid = temp_root / "data" / "tmp" / "pids" / "fake-service.pid"
+            broken_pid = temp_root / "data" / "tmp" / "pids" / "broken-service.pid"
+            self.assertTrue(fake_pid.exists())
+            self.assertFalse(broken_pid.exists())
+            fake_metadata = json.loads(fake_pid.read_text(encoding="utf-8"))
+            self.assertTrue(process_exists(fake_metadata["processId"]))
+
+            snapshot = json.loads((temp_root / "data" / "tmp" / "status.json").read_text(encoding="utf-8"))
+            snapshot_services = {service["id"]: service for service in snapshot["services"]}
+            self.assertEqual(snapshot_services["fake-service"]["status"], "running")
+            self.assertEqual(snapshot_services["broken-service"]["status"], "stopped")
         finally:
             run_dispatcher_for_root(temp_root, "stop", "-Json")
             temp_dir.cleanup()

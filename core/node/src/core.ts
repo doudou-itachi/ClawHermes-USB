@@ -4,7 +4,7 @@ import { loadAdapters, serviceOrder } from "./adapters";
 import { setupDiagnostics, writeSetupSnapshot } from "./diagnostics";
 import { resolveServiceEnvironment } from "./environment";
 import { startAdapter, stopAdapter } from "./lifecycle";
-import { getRoot, resolveRelative } from "./portable";
+import { getRoot, resolveRelative, writeLog } from "./portable";
 import { generatePortal, getPortalStatus, startPortalServer, stopPortalServer } from "./portal";
 import { adapterHealth, processExists, writeStatusSnapshot } from "./status";
 import { assertWslReadyForAdapterDistro, wslAdapterCommandPlan } from "./wsl-adapter";
@@ -40,26 +40,37 @@ export async function startSkeleton(usbRoot: string, options: { attachManagedToP
   const setup = setupDiagnostics(root);
   writeSetupSnapshot(root, setup);
   const started: string[] = [];
+  const failed: Array<{ serviceId: string; displayName: string; message: string }> = [];
   const adapters = serviceOrder(root, "start").filter((item) => item.enabled);
   const existingPortState = readRuntimePortState(root);
   const portState = existingPortState && adapters.some((adapter) => adapterHasRunningPid(root, adapter))
     ? existingPortState
     : await assignRuntimePorts(root, adapters);
   for (const sourceAdapter of adapters) {
-    const adapter = applyRuntimePortsToAdapter(sourceAdapter, portState);
-    const serviceEnv = applyRuntimePortsToEnvironment(resolveServiceEnvironment(root, adapter.id), portState);
-    const shouldPrepareWslPlan = adapter.runtime?.kind === "wsl2" && adapter.integration?.productionReady === true && Boolean(adapter.commands.start);
-    const wslPlan = shouldPrepareWslPlan ? wslAdapterCommandPlan(root, adapter, serviceEnv, "start") : null;
-    if (wslPlan && adapter.integration?.productionReady === true) {
-      assertWslReadyForAdapterDistro(root, adapter.id, adapter.runtime?.distro);
+    try {
+      const adapter = applyRuntimePortsToAdapter(sourceAdapter, portState);
+      const serviceEnv = applyRuntimePortsToEnvironment(resolveServiceEnvironment(root, adapter.id), portState);
+      const shouldPrepareWslPlan = adapter.runtime?.kind === "wsl2" && adapter.integration?.productionReady === true && Boolean(adapter.commands.start);
+      const wslPlan = shouldPrepareWslPlan ? wslAdapterCommandPlan(root, adapter, serviceEnv, "start") : null;
+      if (wslPlan && adapter.integration?.productionReady === true) {
+        assertWslReadyForAdapterDistro(root, adapter.id, adapter.runtime?.distro);
+      }
+      startAdapter(root, adapter, wslPlan ? { processPlan: wslManagedProcessPlan(root, wslPlan), serviceEnv, attachToParent: options.attachManagedToParent === true } : { serviceEnv, attachToParent: options.attachManagedToParent === true });
+      started.push(adapter.id);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      failed.push({
+        serviceId: sourceAdapter.id,
+        displayName: sourceAdapter.displayName,
+        message,
+      });
+      writeLog(root, sourceAdapter.id, "ERROR", `Failed to start service: ${message}`);
     }
-    startAdapter(root, adapter, wslPlan ? { processPlan: wslManagedProcessPlan(root, wslPlan), serviceEnv, attachToParent: options.attachManagedToParent === true } : { serviceEnv, attachToParent: options.attachManagedToParent === true });
-    started.push(adapter.id);
   }
   generatePortal(root, getStatus(root).services);
   const portal = await startPortalServer(root, portState.portal.assignedPort);
   writeStatusSnapshot(root, getStatus(root));
-  return { root, started, portal, setupMessages: setup.messages, deviceBinding };
+  return { root, started, failed, portal, setupMessages: setup.messages, deviceBinding };
 }
 
 function adapterHasRunningPid(root: string, adapter: { pidFile: string }): boolean {

@@ -45,6 +45,7 @@ if [ -d "$APP_PATH" ]; then
   osascript -e 'tell application id "dev.clawhermes.control" to quit' >/dev/null 2>&1 || true
   "$NODE" -e "const fs=require('node:fs'); for (const file of process.argv.slice(1)) { try { const pid = JSON.parse(fs.readFileSync(file, 'utf8')).processId; if (Number.isInteger(pid) && pid > 0) process.kill(pid, 'SIGTERM'); } catch {} }" "$CONTROL_PID_FILE" "$CONTROL_METADATA_FILE" >/dev/null 2>&1 || true
   rm -f "$CONTROL_PID_FILE" "$CONTROL_METADATA_FILE" >/dev/null 2>&1 || true
+  "$NODE" "$ROOT/core/node/dist/clawhermes.js" stop --usb-root "$ROOT" --json >/dev/null 2>&1 || true
   sleep 0.6
   echo "Opening Electrobun UI: $APP_PATH"
   if open -n "$APP_PATH"; then

@@ -100,26 +100,38 @@ async function startSkeleton(usbRoot, options = {}) {
     const setup = (0, diagnostics_1.setupDiagnostics)(root);
     (0, diagnostics_1.writeSetupSnapshot)(root, setup);
     const started = [];
+    const failed = [];
     const adapters = (0, adapters_1.serviceOrder)(root, "start").filter((item) => item.enabled);
     const existingPortState = (0, ports_runtime_1.readRuntimePortState)(root);
     const portState = existingPortState && adapters.some((adapter) => adapterHasRunningPid(root, adapter))
         ? existingPortState
         : await (0, ports_runtime_1.assignRuntimePorts)(root, adapters);
     for (const sourceAdapter of adapters) {
-        const adapter = (0, ports_runtime_1.applyRuntimePortsToAdapter)(sourceAdapter, portState);
-        const serviceEnv = (0, ports_runtime_1.applyRuntimePortsToEnvironment)((0, environment_1.resolveServiceEnvironment)(root, adapter.id), portState);
-        const shouldPrepareWslPlan = adapter.runtime?.kind === "wsl2" && adapter.integration?.productionReady === true && Boolean(adapter.commands.start);
-        const wslPlan = shouldPrepareWslPlan ? (0, wsl_adapter_1.wslAdapterCommandPlan)(root, adapter, serviceEnv, "start") : null;
-        if (wslPlan && adapter.integration?.productionReady === true) {
-            (0, wsl_adapter_1.assertWslReadyForAdapterDistro)(root, adapter.id, adapter.runtime?.distro);
+        try {
+            const adapter = (0, ports_runtime_1.applyRuntimePortsToAdapter)(sourceAdapter, portState);
+            const serviceEnv = (0, ports_runtime_1.applyRuntimePortsToEnvironment)((0, environment_1.resolveServiceEnvironment)(root, adapter.id), portState);
+            const shouldPrepareWslPlan = adapter.runtime?.kind === "wsl2" && adapter.integration?.productionReady === true && Boolean(adapter.commands.start);
+            const wslPlan = shouldPrepareWslPlan ? (0, wsl_adapter_1.wslAdapterCommandPlan)(root, adapter, serviceEnv, "start") : null;
+            if (wslPlan && adapter.integration?.productionReady === true) {
+                (0, wsl_adapter_1.assertWslReadyForAdapterDistro)(root, adapter.id, adapter.runtime?.distro);
+            }
+            (0, lifecycle_1.startAdapter)(root, adapter, wslPlan ? { processPlan: wslManagedProcessPlan(root, wslPlan), serviceEnv, attachToParent: options.attachManagedToParent === true } : { serviceEnv, attachToParent: options.attachManagedToParent === true });
+            started.push(adapter.id);
         }
-        (0, lifecycle_1.startAdapter)(root, adapter, wslPlan ? { processPlan: wslManagedProcessPlan(root, wslPlan), serviceEnv, attachToParent: options.attachManagedToParent === true } : { serviceEnv, attachToParent: options.attachManagedToParent === true });
-        started.push(adapter.id);
+        catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            failed.push({
+                serviceId: sourceAdapter.id,
+                displayName: sourceAdapter.displayName,
+                message,
+            });
+            (0, portable_1.writeLog)(root, sourceAdapter.id, "ERROR", `Failed to start service: ${message}`);
+        }
     }
     (0, portal_1.generatePortal)(root, getStatus(root).services);
     const portal = await (0, portal_1.startPortalServer)(root, portState.portal.assignedPort);
     (0, status_1.writeStatusSnapshot)(root, getStatus(root));
-    return { root, started, portal, setupMessages: setup.messages, deviceBinding };
+    return { root, started, failed, portal, setupMessages: setup.messages, deviceBinding };
 }
 function adapterHasRunningPid(root, adapter) {
     try {
