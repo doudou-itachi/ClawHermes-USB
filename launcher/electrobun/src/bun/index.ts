@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { BrowserView, BrowserWindow, Utils } from "electrobun/bun";
@@ -12,15 +12,18 @@ type ControlServerMetadata = {
 };
 
 const root = findUsbRoot();
-const controlUrl = ensureControlServer(root).replace(/\/$/, "");
+let controlUrl = "";
+let controlServerPromise: Promise<string> | undefined;
 let mainWindow: BrowserWindow | undefined;
 let closingFromUi = false;
+
+writeElectrobunLog(`Electrobun control starting. root=${root}`);
 
 const rpc = BrowserView.defineRPC({
   maxRequestTime: Infinity,
   handlers: {
     requests: {
-      getBootstrap: (): BootstrapPayload => ({ root, controlUrl }),
+      getBootstrap: async (): Promise<BootstrapPayload> => ({ root, controlUrl: await getControlUrl() }),
       getStatus: () => requestJson("/api/status"),
       getLogs: () => requestJson("/api/logs?service=launcher&lines=140"),
       getSkills: () => requestJson("/api/skills") as Promise<SkillsPayload>,
@@ -91,6 +94,15 @@ mainWindow = new BrowserWindow({
   rpc,
 });
 
+writeElectrobunLog("BrowserWindow created.");
+void getControlUrl()
+  .then((url) => {
+    writeElectrobunLog(`Control server ready: ${url}`);
+  })
+  .catch((error) => {
+    writeElectrobunLog(`Control server startup failed: ${error instanceof Error ? error.message : String(error)}`);
+  });
+
 mainWindow.on("close", () => {
   if (!closingFromUi) beginImmediateClose();
 });
@@ -108,10 +120,11 @@ function beginImmediateClose(): void {
 }
 
 async function requestJson(path: string, options: { method?: string; body?: unknown; timeoutMs?: number } = {}) {
+  const baseUrl = await getControlUrl();
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? 15000);
   try {
-    const response = await fetch(`${controlUrl}${path}`, {
+    const response = await fetch(`${baseUrl}${path}`, {
       method: options.method ?? "GET",
       headers: options.body ? { "content-type": "application/json" } : undefined,
       body: options.body ? JSON.stringify(options.body) : undefined,
@@ -131,6 +144,23 @@ async function requestJson(path: string, options: { method?: string; body?: unkn
   } finally {
     clearTimeout(timeout);
   }
+}
+
+async function getControlUrl(): Promise<string> {
+  if (controlUrl) return controlUrl;
+  if (!controlServerPromise) {
+    controlServerPromise = Promise.resolve()
+      .then(() => ensureControlServer(root).replace(/\/$/, ""))
+      .then((url) => {
+        controlUrl = url;
+        return url;
+      })
+      .catch((error) => {
+        controlServerPromise = undefined;
+        throw error;
+      });
+  }
+  return controlServerPromise;
 }
 
 async function requestJsonWithTimeout(path: string, options: { method?: string; body?: unknown } = {}, timeoutMs = 4000) {
@@ -172,15 +202,17 @@ async function waitForServicesStopped(timeoutMs = 9000): Promise<boolean> {
 async function waitForControlServerShutdown(timeoutMs = 8000): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    if (!(await ping(`${controlUrl}/api/health`))) return true;
+    if (!controlUrl || !(await ping(`${controlUrl}/api/health`))) return true;
     await sleep(120);
   }
   return false;
 }
 
 function ensureControlServer(usbRoot: string): string {
+  writeElectrobunLog("Ensuring control server.");
   const metadata = readControlServerMetadata(usbRoot);
   if (metadata && pingSync(`${metadata.url.replace(/\/$/, "")}/api/health`)) {
+    writeElectrobunLog(`Reusing control server metadata: ${metadata.url}`);
     return metadata.url;
   }
 
@@ -194,12 +226,17 @@ function ensureControlServer(usbRoot: string): string {
     "0",
     "--json",
   ];
+  writeElectrobunLog(`Starting control server command: ${command.join(" ")}`);
   const completed = spawnSync(command[0], command.slice(1), {
     cwd: usbRoot,
     encoding: "utf8",
+    timeout: 10000,
     windowsHide: true,
   });
+  writeElectrobunLog(`Control server command completed. status=${completed.status ?? "null"} signal=${completed.signal ?? "null"} error=${completed.error?.message ?? "none"}`);
   if (completed.status !== 0) {
+    if (completed.stdout) writeElectrobunLog(`Control server stdout: ${completed.stdout.slice(-2000)}`);
+    if (completed.stderr) writeElectrobunLog(`Control server stderr: ${completed.stderr.slice(-2000)}`);
     throw new Error(completed.stderr || "Failed to start control server.");
   }
   const payload = JSON.parse(completed.stdout) as ControlServerMetadata;
@@ -289,6 +326,16 @@ function pingSync(url: string): boolean {
     windowsHide: true,
   });
   return completed.status === 0;
+}
+
+function writeElectrobunLog(message: string): void {
+  try {
+    const logFile = join(root, "data", "logs", "electrobun-control.log");
+    mkdirSync(dirname(logFile), { recursive: true });
+    appendFileSync(logFile, `${new Date().toISOString()} ${message}\n`, "utf8");
+  } catch (error) {
+    console.error("electrobun log write failed", error);
+  }
 }
 
 function sleep(ms: number): Promise<void> {

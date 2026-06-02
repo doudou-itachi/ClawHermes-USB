@@ -353,6 +353,7 @@ macOS:
 
 Runtime logs:
 - data/logs/macos-launcher.log records macOS runtime extraction, Electrobun launch probing, core startup, and Portal fallback.
+- data/logs/electrobun-control.log records the macOS Electrobun process startup, window creation, and control-server handshake.
 - data/logs/launcher.log, portal.log, openclaw.log, hermes-agent.log, and hermes-web-ui.log record the shared core and service runtime details.
 
 Release notes:
