@@ -2,6 +2,14 @@
 set -u
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+LOG_DIR="$ROOT/data/logs"
+LOG_FILE="$ROOT/data/logs/macos-launcher.log"
+mkdir -p "$LOG_DIR" >/dev/null 2>&1 || true
+
+log() {
+  printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" | tee -a "$LOG_FILE"
+}
+
 ARCH="$(uname -m)"
 
 case "$ARCH" in
@@ -12,19 +20,25 @@ case "$ARCH" in
     PLATFORM="darwin-x64"
     ;;
   *)
-    echo "Unsupported macOS architecture: $ARCH"
+    log "Unsupported macOS architecture: $ARCH"
     exit 1
     ;;
 esac
 
+log "Stopping ClawHermes from $ROOT on $PLATFORM"
+
 NODE="$ROOT/runtimes/macos/node/$PLATFORM/bin/node"
 if [ ! -x "$NODE" ]; then
+  log "Portable Node runtime is missing; using node from PATH."
   NODE="node"
+else
+  log "Using portable Node runtime: $NODE"
 fi
 
 METADATA="$ROOT/data/tmp/control-server.json"
 STOPPED=0
 if [ -f "$METADATA" ]; then
+  log "Stopping through control server metadata: $METADATA"
   "$NODE" -e "
 const fs = require('node:fs');
 const meta = JSON.parse(fs.readFileSync(process.argv[1], 'utf8'));
@@ -39,5 +53,8 @@ post('/api/services/stop').then(() => post('/api/shutdown'));
 fi
 
 if [ "$STOPPED" -ne 1 ]; then
+  log "Control server stop path did not complete; falling back to core stop."
   "$NODE" "$ROOT/core/node/dist/clawhermes.js" stop --usb-root "$ROOT" --json
+else
+  log "Control server stop and shutdown requests completed."
 fi

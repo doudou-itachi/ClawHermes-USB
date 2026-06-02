@@ -351,6 +351,10 @@ macOS:
 3. The launcher opens ClawHermes-Control-Mac.app when bundled.
 4. If the app is not bundled, the launcher opens the local Portal in your browser.
 
+Runtime logs:
+- data/logs/macos-launcher.log records macOS runtime extraction, Electrobun launch probing, core startup, and Portal fallback.
+- data/logs/launcher.log, portal.log, openclaw.log, hermes-agent.log, and hermes-web-ui.log record the shared core and service runtime details.
+
 Release notes:
 - Windows and macOS share core, adapters, apps, portal, config, data, and skills.
 - Platform-specific launchers and runtimes stay at the release root or under runtimes/.
