@@ -1,5 +1,7 @@
 # macOS Electrobun 构建与跨平台 USB 发布流程
 
+如果只是给 macOS 同事执行本次 `.app`、Hermes macOS vendor、Hermes Web UI macOS 依赖和 runtime archive 重建，请优先看 [macOS 同事构建交付说明](./macos-colleague-build-handoff.zh-CN.md)。
+
 本文档说明如何在 Windows 和 macOS 之间协作生成同一个 `dist-usb/ClawHermes` 产物。
 
 ## 目标产物
