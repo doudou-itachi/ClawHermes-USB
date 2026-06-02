@@ -59,9 +59,11 @@ else
   log "Portable Python runtime already exists: $PYTHON"
 fi
 
-APP_PATH="$ROOT/ClawHermes-Control-Mac.app"
+APP_BUNDLED_PATH="$ROOT/ClawHermes-Control-Mac.app"
 APP_ARCHIVE="$ROOT/ClawHermes-Control-Mac.app.tar.gz"
-APP_EXTRACT_DIR="$ROOT/data/tmp/macos-app"
+APP_CACHE_ROOT="${HOME:-/tmp}/Library/Application Support/ClawHermes-USB/macos-app"
+APP_EXTRACT_DIR="$APP_CACHE_ROOT/current"
+APP_PATH="$APP_EXTRACT_DIR/ClawHermes-Control-Mac.app"
 APP_EXECUTABLE="$APP_PATH/Contents/MacOS/launcher"
 APP_OPENED=0
 CONTROL_PID_FILE="$ROOT/data/tmp/pids/control-server.pid"
@@ -69,17 +71,26 @@ CONTROL_METADATA_FILE="$ROOT/data/tmp/control-server.json"
 ELECTROBUN_PID_FILE="$ROOT/data/tmp/pids/electrobun-ui.pid"
 ELECTROBUN_STDIO_LOG="$ROOT/data/logs/electrobun-app-process.log"
 
-extractElectrobunAppArchive() {
-  if [ ! -f "$APP_ARCHIVE" ]; then
-    log "Electrobun UI app archive is not bundled: $APP_ARCHIVE"
-    return 1
-  fi
-
-  log "Extracting Electrobun UI app archive: $APP_ARCHIVE"
+stageElectrobunAppBundle() {
   rm -rf "$APP_EXTRACT_DIR" >/dev/null 2>&1 || true
   mkdir -p "$APP_EXTRACT_DIR" >/dev/null 2>&1 || true
-  if ! tar -xzf "$APP_ARCHIVE" -C "$APP_EXTRACT_DIR" >/dev/null 2>&1; then
-    log "Failed to extract Electrobun UI app archive: $APP_ARCHIVE"
+
+  if [ -f "$APP_ARCHIVE" ]; then
+    log "Staging Electrobun UI app locally from archive: $APP_ARCHIVE -> $APP_EXTRACT_DIR"
+    if ! tar -xzf "$APP_ARCHIVE" -C "$APP_EXTRACT_DIR" >/dev/null 2>&1; then
+      log "Failed to extract Electrobun UI app archive: $APP_ARCHIVE"
+      return 1
+    fi
+  elif [ -d "$APP_BUNDLED_PATH" ]; then
+    log "Staging Electrobun UI app locally from bundle: $APP_BUNDLED_PATH -> $APP_PATH"
+    if command -v ditto >/dev/null 2>&1; then
+      ditto "$APP_BUNDLED_PATH" "$APP_PATH" >/dev/null 2>&1 || return 1
+    else
+      cp -R "$APP_BUNDLED_PATH" "$APP_PATH" >/dev/null 2>&1 || return 1
+    fi
+  else
+    log "Electrobun UI app is not bundled: $APP_BUNDLED_PATH"
+    log "Electrobun UI app archive is not bundled: $APP_ARCHIVE"
     return 1
   fi
 
@@ -94,16 +105,13 @@ extractElectrobunAppArchive() {
 
   APP_PATH="$EXTRACTED_APP"
   APP_EXECUTABLE="$APP_PATH/Contents/MacOS/launcher"
-  log "Electrobun UI app extracted to: $APP_PATH"
+  log "Electrobun UI app staged locally at: $APP_PATH"
   return 0
 }
 
 verifyElectrobunAppBundle() {
-  if [ ! -d "$APP_PATH" ]; then
-    log "Electrobun UI app directory is missing: $APP_PATH"
-    if ! extractElectrobunAppArchive; then
-      return 1
-    fi
+  if ! stageElectrobunAppBundle; then
+    return 1
   fi
   if [ ! -f "$APP_PATH/Contents/Info.plist" ]; then
     log "Electrobun UI app bundle is incomplete: missing $APP_PATH/Contents/Info.plist"
