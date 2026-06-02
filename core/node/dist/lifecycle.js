@@ -366,6 +366,11 @@ function prepareHermesWebUiMacEnvironment(root, serviceEnv) {
     serviceEnv.env.PYTHONNOUSERSITE = "1";
     serviceEnv.env.PYTHONUTF8 = "1";
     const pathSeparator = serviceEnv.env.CLAWHERMES_PATH_SEPARATOR || ":";
+    const runtimeKey = serviceEnv.env.CLAWHERMES_RUNTIME_KEY || "darwin-arm64";
+    serviceEnv.env.PYTHONPATH = [
+        (0, node_path_1.join)(root, "apps", "hermes-agent", "vendor", runtimeKey),
+        (0, node_path_1.join)(root, "apps", "hermes-agent"),
+    ].join(pathSeparator);
     serviceEnv.env.PATH = [shimDir, serviceEnv.env.PATH || process.env.PATH || ""].filter(Boolean).join(pathSeparator);
 }
 function hermesWebUiProfileConfig(serviceEnv) {

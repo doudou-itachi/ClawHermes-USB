@@ -72,7 +72,7 @@
         "versionRequirement": ">=3.11.0"
       },
       "commands": {
-        "setup": "python3 -m pip install --upgrade pip && python3 -m pip install --target vendor/${CLAWHERMES_RUNTIME_KEY} .",
+        "setup": "python3 -m pip install --upgrade pip && python3 -m pip install --target vendor/${CLAWHERMES_RUNTIME_KEY} . aiohttp==3.13.3",
         "start": "python3 -c \"from hermes_cli.main import main; raise SystemExit(main())\" gateway run"
       },
       "env": {

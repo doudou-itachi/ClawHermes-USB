@@ -1194,6 +1194,7 @@ console.log(JSON.stringify(Object.fromEntries(adapters.map((adapter) => [adapter
             self.assertEqual(hermes_agent["runtime"]["platform"], "darwin")
             self.assertEqual(hermes_agent["runtime"]["requiredExecutable"], "python3")
             self.assertIn("vendor/${CLAWHERMES_RUNTIME_KEY}", hermes_agent["commands"]["setup"])
+            self.assertIn("aiohttp==3.13.3", hermes_agent["commands"]["setup"])
             self.assertEqual(
                 hermes_agent["commands"]["start"],
                 'python3 -c "from hermes_cli.main import main; raise SystemExit(main())" gateway run',
@@ -4124,7 +4125,8 @@ console.log(JSON.stringify(Object.fromEntries(adapters.map((adapter) => [adapter
                         "fs.writeFileSync(path.join(root, 'data', 'tmp', 'hermes-web-ui-env.json'), JSON.stringify({",
                         "  HERMES_BIN: process.env.HERMES_BIN,",
                         "  API_SERVER_KEY: process.env.API_SERVER_KEY,",
-                        "  PATH: process.env.PATH",
+                        "  PATH: process.env.PATH,",
+                        "  PYTHONPATH: process.env.PYTHONPATH",
                         "}, null, 2));",
                         "setInterval(() => {}, 1000);",
                         "",
@@ -4143,6 +4145,10 @@ console.log(JSON.stringify(Object.fromEntries(adapters.map((adapter) => [adapter
             self.assertEqual(hermes_bin, temp_root / "data" / "tmp" / "bin" / "hermes-web-ui" / "hermes")
             self.assertEqual(env_payload["API_SERVER_KEY"], "clawhermes")
             self.assertTrue(env_payload["PATH"].startswith(str(hermes_bin.parent) + ":"))
+            expected_vendor = str(temp_root / "apps" / "hermes-agent" / "vendor" / "darwin-arm64")
+            expected_app = str(temp_root / "apps" / "hermes-agent")
+            self.assertTrue(env_payload["PYTHONPATH"].startswith(expected_vendor + ":"))
+            self.assertIn(expected_app, env_payload["PYTHONPATH"])
             shim = hermes_bin.read_text(encoding="utf-8")
             self.assertIn("python3 -c", shim)
             self.assertIn("vendor/$RUNTIME_KEY", shim)
