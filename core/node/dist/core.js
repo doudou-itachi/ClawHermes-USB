@@ -317,5 +317,7 @@ function stopSkeleton(usbRoot) {
             stopped.push(adapter.id);
     }
     (0, node_fs_1.rmSync)((0, ports_runtime_1.runtimePortsPath)(root), { force: true });
-    return { root, stopped };
+    const status = getStatus(root);
+    (0, status_1.writeStatusSnapshot)(root, status);
+    return { root, stopped, status };
 }

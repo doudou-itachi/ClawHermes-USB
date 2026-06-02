@@ -23,8 +23,8 @@ const rpc = BrowserView.defineRPC({
   maxRequestTime: Infinity,
   handlers: {
     requests: {
-      getBootstrap: async (): Promise<BootstrapPayload> => ({ root, controlUrl: await getControlUrl() }),
-      getStatus: () => requestJson("/api/status"),
+      getBootstrap: async (): Promise<BootstrapPayload> => ({ root, controlUrl: await getControlUrlOrEmpty() }),
+      getStatus: () => getStatusPayload(),
       getLogs: () => requestJson("/api/logs?service=launcher&lines=140"),
       getSkills: () => requestJson("/api/skills") as Promise<SkillsPayload>,
       getDeviceBinding: () => requestJson("/api/device-binding") as Promise<DeviceBindingStatus>,
@@ -34,8 +34,8 @@ const rpc = BrowserView.defineRPC({
       startWeixinChannelLogin: () => requestJson("/api/channels/weixin/login", { method: "POST", body: {} }) as Promise<ChannelLoginStatus>,
       stopWeixinChannelLogin: () => requestJson("/api/channels/weixin/stop", { method: "POST", body: {} }) as Promise<ChannelLoginStatus>,
       getModelConfig: () => requestJson("/api/model-config"),
-      startAll: () => requestJson("/api/services/start", { method: "POST", body: {} }),
-      stopAll: () => requestJson("/api/services/stop", { method: "POST", body: {} }),
+      startAll: () => startAllServices(),
+      stopAll: () => stopAllServices(),
       saveModelConfig: (config: unknown) => {
         const modelConfig = config as ModelConfig;
         return requestJson("/api/model-config", {
@@ -163,6 +163,15 @@ async function getControlUrl(): Promise<string> {
   return controlServerPromise;
 }
 
+async function getControlUrlOrEmpty(): Promise<string> {
+  try {
+    return await getControlUrl();
+  } catch (error) {
+    writeElectrobunLog(`Control server bootstrap failed; UI will use fallback status paths. ${error instanceof Error ? error.message : String(error)}`);
+    return "";
+  }
+}
+
 async function requestJsonWithTimeout(path: string, options: { method?: string; body?: unknown } = {}, timeoutMs = 4000) {
   return requestJson(path, { ...options, timeoutMs });
 }
@@ -173,18 +182,43 @@ async function cleanupBeforeExit(): Promise<void> {
   } catch {
     // Channel login may not have been started in this build.
   }
-  try {
-    await requestJsonWithTimeout("/api/services/stop", { method: "POST", body: {} });
-    await waitForServicesStopped();
-  } catch {
-    // The control server may already be down.
-  }
+  await stopAllServices({ waitForStopped: true });
   try {
     await requestJsonWithTimeout("/api/shutdown", { method: "POST", body: {} });
   } catch {
     // The process may have exited before the response is read.
   }
   await waitForControlServerShutdown();
+}
+
+async function getStatusPayload(): Promise<StatusPayload> {
+  try {
+    return await requestJson("/api/status") as StatusPayload;
+  } catch (error) {
+    writeElectrobunLog(`Control API status failed; falling back to status snapshot. ${error instanceof Error ? error.message : String(error)}`);
+    return readStatusSnapshot();
+  }
+}
+
+async function startAllServices(): Promise<unknown> {
+  try {
+    return await requestJson("/api/services/start", { method: "POST", body: {} });
+  } catch (error) {
+    writeElectrobunLog(`Control API start failed; falling back to CLI start. ${error instanceof Error ? error.message : String(error)}`);
+    return runClawHermesLifecycle("start", { throwOnFailure: true });
+  }
+}
+
+async function stopAllServices(options: { waitForStopped?: boolean } = {}): Promise<unknown> {
+  let apiResult: unknown = null;
+  try {
+    apiResult = await requestJsonWithTimeout("/api/services/stop", { method: "POST", body: {} }, 5000);
+    if (options.waitForStopped) await waitForServicesStopped();
+  } catch (error) {
+    writeElectrobunLog(`Control API stop failed; falling back to CLI stop. ${error instanceof Error ? error.message : String(error)}`);
+  }
+  const cliResult = runClawHermesLifecycle("stop", { throwOnFailure: false });
+  return apiResult ?? cliResult;
 }
 
 async function waitForServicesStopped(timeoutMs = 9000): Promise<boolean> {
@@ -307,6 +341,44 @@ function nodeCommand(usbRoot: string): string[] {
   }
   const portableNode = join(usbRoot, "runtimes", "windows", "node", "node.exe");
   return existsSync(portableNode) ? [portableNode] : ["node"];
+}
+
+function readStatusSnapshot(): StatusPayload {
+  const path = join(root, "data", "tmp", "status.json");
+  try {
+    return JSON.parse(readFileSync(path, "utf8")) as StatusPayload;
+  } catch {
+    return { services: [] };
+  }
+}
+
+function runClawHermesLifecycle(action: "start" | "stop", options: { throwOnFailure: boolean }): unknown {
+  const command = [
+    ...nodeCommand(root),
+    join(root, "core", "node", "dist", "clawhermes.js"),
+    action,
+    "--usb-root",
+    root,
+    "--json",
+  ];
+  writeElectrobunLog(`Running CLI lifecycle fallback: ${command.join(" ")}`);
+  const completed = spawnSync(command[0], command.slice(1), {
+    cwd: root,
+    encoding: "utf8",
+    timeout: action === "start" ? 20000 : 10000,
+    windowsHide: true,
+  });
+  writeElectrobunLog(`CLI lifecycle fallback completed. action=${action} status=${completed.status ?? "null"} signal=${completed.signal ?? "null"} error=${completed.error?.message ?? "none"}`);
+  if (completed.stdout) writeElectrobunLog(`CLI lifecycle stdout: ${completed.stdout.slice(-2000)}`);
+  if (completed.stderr) writeElectrobunLog(`CLI lifecycle stderr: ${completed.stderr.slice(-2000)}`);
+  if (completed.status !== 0 && options.throwOnFailure) {
+    throw new Error(completed.stderr || completed.error?.message || `${action} fallback failed.`);
+  }
+  try {
+    return completed.stdout ? JSON.parse(completed.stdout) : { root, action, status: completed.status };
+  } catch {
+    return { root, action, status: completed.status, stdout: completed.stdout, stderr: completed.stderr };
+  }
 }
 
 async function ping(url: string): Promise<boolean> {

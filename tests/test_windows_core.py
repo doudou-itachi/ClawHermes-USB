@@ -1252,7 +1252,11 @@ console.log(JSON.stringify(Object.fromEntries(adapters.map((adapter) => [adapter
         self.assertIn("control-server.json", start)
         self.assertIn("process.kill", start)
         self.assertIn('clawhermes.js" stop --usb-root "$ROOT" --json', start)
-        self.assertIn('open -n "$APP_PATH"', start)
+        self.assertIn("CLAWHERMES_USB_ROOT", start)
+        self.assertIn("USB_ROOT", start)
+        self.assertIn("nohup", start)
+        self.assertIn("electrobun-app-process.log", start)
+        self.assertIn("Electrobun process stayed alive for current bundle", start)
         self.assertIn("waitForElectrobunApp", start)
         self.assertIn("electrobunWindowCount", start)
         self.assertIn("WINDOW_TMP", start)
@@ -1331,8 +1335,16 @@ console.log(JSON.stringify(Object.fromEntries(adapters.map((adapter) => [adapter
         self.assertIn("cleanupBeforeExit", bun_entry)
         self.assertIn("waitForServicesStopped", bun_entry)
         self.assertIn("/api/services/stop", bun_entry)
+        self.assertIn("stopAllServices", bun_entry)
+        self.assertIn("startAllServices", bun_entry)
+        self.assertIn("readStatusSnapshot", bun_entry)
+        self.assertIn("runClawHermesLifecycle", bun_entry)
+        self.assertIn("Control API status failed", bun_entry)
+        self.assertIn("CLI lifecycle fallback", bun_entry)
         self.assertIn("clawhermes-usb-root.txt", bun_entry)
         self.assertIn("rootHintCandidates", bun_entry)
+        self.assertIn("Promise.allSettled", vue_app)
+        self.assertIn("status refresh failed", vue_app)
         self.assertIn("Electroview.defineRPC", vue_app)
         self.assertIn("window-controls", vue_app)
         self.assertIn("traffic close", vue_app)
@@ -3629,6 +3641,13 @@ console.log(JSON.stringify(Object.fromEntries(adapters.map((adapter) => [adapter
                 stop_payload["stopped"],
                 ["portal", "hermes-web-ui", "hermes-agent", "openclaw"],
             )
+            stop_services = {service["id"]: service for service in stop_payload["status"]["services"]}
+            self.assertEqual(stop_services["openclaw"]["status"], "stopped")
+            self.assertEqual(stop_services["hermes-agent"]["status"], "stopped")
+            self.assertEqual(stop_services["hermes-web-ui"]["status"], "stopped")
+            stop_snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
+            stop_snapshot_services = {service["id"]: service for service in stop_snapshot["services"]}
+            self.assertEqual(stop_snapshot_services["openclaw"]["status"], "stopped")
 
             for service_id in start_payload["started"]:
                 self.assertFalse((pid_dir / f"{service_id}.pid").exists())

@@ -66,6 +66,8 @@ APP_EXECUTABLE="$APP_PATH/Contents/MacOS/launcher"
 APP_OPENED=0
 CONTROL_PID_FILE="$ROOT/data/tmp/pids/control-server.pid"
 CONTROL_METADATA_FILE="$ROOT/data/tmp/control-server.json"
+ELECTROBUN_PID_FILE="$ROOT/data/tmp/pids/electrobun-ui.pid"
+ELECTROBUN_STDIO_LOG="$ROOT/data/logs/electrobun-app-process.log"
 
 extractElectrobunAppArchive() {
   if [ ! -f "$APP_ARCHIVE" ]; then
@@ -135,6 +137,31 @@ logElectrobunProcessState() {
   fi
 }
 
+launchElectrobunApp() {
+  mkdir -p "$ROOT/data/tmp/pids" >/dev/null 2>&1 || true
+  rm -f "$ELECTROBUN_PID_FILE" >/dev/null 2>&1 || true
+  log "Launching Electrobun UI executable with USB root env: $APP_EXECUTABLE"
+  (
+    cd "$ROOT" || exit 1
+    export CLAWHERMES_USB_ROOT="$ROOT"
+    export USB_ROOT="$ROOT"
+    nohup "$APP_EXECUTABLE" >> "$ELECTROBUN_STDIO_LOG" 2>&1 &
+    printf '%s\n' "$!" > "$ELECTROBUN_PID_FILE"
+  )
+  STATUS="$?"
+  if [ "$STATUS" -ne 0 ]; then
+    log "Failed to launch Electrobun UI executable. status=$STATUS"
+    return "$STATUS"
+  fi
+  APP_PID="$(cat "$ELECTROBUN_PID_FILE" 2>/dev/null || true)"
+  if [ -n "$APP_PID" ]; then
+    log "Electrobun UI executable launched. pid=$APP_PID stdioLog=$ELECTROBUN_STDIO_LOG"
+  else
+    log "Electrobun UI executable launch did not publish a pid."
+  fi
+  return 0
+}
+
 electrobunWindowCount() {
   WINDOW_TMP="$ROOT/data/tmp/electrobun-window-count.$$"
   mkdir -p "$ROOT/data/tmp" >/dev/null 2>&1 || true
@@ -167,9 +194,11 @@ APPLESCRIPT
 
 waitForElectrobunApp() {
   ATTEMPTS=0
+  PROCESS_SEEN=0
   while [ "$ATTEMPTS" -lt 20 ]; do
     PIDS="$(electrobunPidsForCurrentBundle || true)"
     if [ -n "$PIDS" ]; then
+      PROCESS_SEEN=$((PROCESS_SEEN + 1))
       osascript -e 'tell application id "dev.clawhermes.control" to activate' >/dev/null 2>&1 || true
       WINDOW_COUNT="$(electrobunWindowCount || true)"
       if printf '%s\n' "$WINDOW_COUNT" | grep -Eq '^[1-9][0-9]*$'; then
@@ -177,6 +206,10 @@ waitForElectrobunApp() {
         return 0
       fi
       log "Electrobun app process is running for current bundle, but no visible window yet. pid=$(printf '%s' "$PIDS" | tr '\n' ' ') windowCount=${WINDOW_COUNT:-unknown}"
+      if [ "$PROCESS_SEEN" -ge 4 ]; then
+        log "Electrobun process stayed alive for current bundle; treating UI as opened even though window count is unavailable."
+        return 0
+      fi
     fi
     ATTEMPTS=$((ATTEMPTS + 1))
     sleep 0.25
@@ -196,13 +229,13 @@ if verifyElectrobunAppBundle; then
   for PID in $(electrobunPidsForCurrentBundle || true); do
     kill "$PID" >/dev/null 2>&1 || true
   done
+  rm -f "$ELECTROBUN_PID_FILE" >/dev/null 2>&1 || true
   "$NODE" -e "const fs=require('node:fs'); for (const file of process.argv.slice(1)) { try { const pid = JSON.parse(fs.readFileSync(file, 'utf8')).processId; if (Number.isInteger(pid) && pid > 0) process.kill(pid, 'SIGTERM'); } catch {} }" "$CONTROL_PID_FILE" "$CONTROL_METADATA_FILE" >/dev/null 2>&1 || true
   rm -f "$CONTROL_PID_FILE" "$CONTROL_METADATA_FILE" >/dev/null 2>&1 || true
   "$NODE" "$ROOT/core/node/dist/clawhermes.js" stop --usb-root "$ROOT" --json >/dev/null 2>&1 || true
   sleep 0.6
   log "Opening Electrobun UI: $APP_PATH"
-  if open -n "$APP_PATH"; then
-    log "macOS open accepted Electrobun UI launch request."
+  if launchElectrobunApp; then
     logElectrobunProcessState
     if waitForElectrobunApp; then
       APP_OPENED=1

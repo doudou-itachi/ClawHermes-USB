@@ -518,11 +518,17 @@ function stopServiceParticles() {
 }
 
 onMounted(async () => {
-  const data = (await requestFromBun("getBootstrap")) as BootstrapPayload;
-  bootstrap.root = data.root;
-  bootstrap.controlUrl = data.controlUrl;
-  await Promise.all([refresh(), refreshSkills(), refreshDeviceBinding(), refreshLogs(), loadModelConfig(), refreshWeixinChannel(), refreshWeixinChannelLogs()]);
-  timer = window.setInterval(refresh, 1500);
+  try {
+    const data = (await requestFromBun("getBootstrap")) as BootstrapPayload;
+    bootstrap.root = data.root;
+    bootstrap.controlUrl = data.controlUrl;
+  } catch (error) {
+    console.error("bootstrap failed", error);
+  }
+  await Promise.allSettled([refresh(), refreshSkills(), refreshDeviceBinding(), refreshLogs(), loadModelConfig(), refreshWeixinChannel(), refreshWeixinChannelLogs()]);
+  timer = window.setInterval(() => {
+    refresh().catch((error) => console.error("status refresh failed", error));
+  }, 1500);
 });
 
 watch(activeTab, async (tab) => {

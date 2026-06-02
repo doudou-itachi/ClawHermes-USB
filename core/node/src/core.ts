@@ -249,5 +249,7 @@ export function stopSkeleton(usbRoot: string) {
     if (stopAdapter(root, adapter)) stopped.push(adapter.id);
   }
   rmSync(runtimePortsPath(root), { force: true });
-  return { root, stopped };
+  const status = getStatus(root);
+  writeStatusSnapshot(root, status);
+  return { root, stopped, status };
 }
