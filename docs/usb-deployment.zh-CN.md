@@ -205,6 +205,15 @@ release-manifest.json
 
 `release-manifest.json` 会记录来源目录、输出目录、payload 列表、裁剪规则和警告信息，方便交付前复核。
 
+如果交付包需要支持 macOS Electrobun UI，最终 `DTC` 目录里应同时保留：
+
+```text
+ClawHermes-Control-Mac.app/
+ClawHermes-Control-Mac.app.tar.gz
+```
+
+`.app` 在 macOS 上是目录，部分 ISO/USB 写入工具写到 FAT32 U 盘时可能会漏掉这个目录。`ClawHermes-Control-Mac.app.tar.gz` 是 fallback 文件；macOS 启动脚本发现 `.app` 缺失时会自动解压到 `data/tmp/macos-app/` 后再启动 UI。
+
 默认情况下，脚本不会复制当前开发机的 `data/` 用户数据，只会创建空的 `data/logs`、`data/tmp`、`data/backups`、`data/settings` 和 `data/cache`。如果确实要把当前数据一起带走，可以显式加上：
 
 ```powershell

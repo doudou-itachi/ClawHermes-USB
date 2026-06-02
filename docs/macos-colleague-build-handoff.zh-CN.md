@@ -148,6 +148,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\release\Build-UsbRel
 dist-usb/ClawHermes/
 ```
 
+release 脚本会把 `.app` 复制为 `ClawHermes-Control-Mac.app`，并额外生成 `ClawHermes-Control-Mac.app.tar.gz`。两个文件都要保留在最终 `DTC` 目录里；部分 ISO/USB 写入工具可能会漏掉 `.app` 目录，macOS 启动脚本会用 `.tar.gz` 自动恢复。
+
 再把 `dist-usb/ClawHermes` 作为 `DTC` 目录，和 ISO 根目录入口文件一起放到 U 盘或 ISO 根目录。
 
 ## macOS 真机验证

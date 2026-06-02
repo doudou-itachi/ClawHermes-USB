@@ -285,6 +285,21 @@ function Copy-MacElectrobunAppIfPresent {
         source = $app.FullName
         target = $target
     }
+
+    $archiveTarget = Join-Path $ReleaseRoot "ClawHermes-Control-Mac.app.tar.gz"
+    if (Test-Path -LiteralPath $archiveTarget -PathType Leaf) {
+        Remove-Item -LiteralPath $archiveTarget -Force
+    }
+    $tarResult = & tar -czf $archiveTarget -C $ReleaseRoot "ClawHermes-Control-Mac.app" 2>&1
+    if ($LASTEXITCODE -eq 0 -and (Test-Path -LiteralPath $archiveTarget -PathType Leaf)) {
+        $script:CopiedPaths += [ordered]@{
+            path = "ClawHermes-Control-Mac.app.tar.gz"
+            source = $target
+            target = $archiveTarget
+        }
+    } else {
+        $script:Warnings += "Failed to create macOS Electrobun .app archive for write tools that drop .app directories: $tarResult"
+    }
 }
 
 function Copy-MacRuntimeArchives {
@@ -763,7 +778,7 @@ $manifest = [ordered]@{
     sharedPayloads = @("core", "adapters", "apps", "portal", "config", "data", "skills")
     platformPayloads = [ordered]@{
         windows = @("ClawHermes-Control.exe", "runtimes/windows")
-        macos = @("Start-ClawHermes-Mac.command", "Stop-ClawHermes-Mac.command", "ClawHermes-Control-Mac.app", "runtime-archives/macos", "runtimes/macos")
+        macos = @("Start-ClawHermes-Mac.command", "Stop-ClawHermes-Mac.command", "ClawHermes-Control-Mac.app", "ClawHermes-Control-Mac.app.tar.gz", "runtime-archives/macos", "runtimes/macos")
     }
     build = [ordered]@{
         skipped = [bool] $SkipBuild
