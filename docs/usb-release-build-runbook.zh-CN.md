@@ -300,7 +300,7 @@ apps/hermes-agent
 
 1. 在开发机或构建机上准备真实 `apps/hermes-agent` 上游 payload。
 2. Windows 构建机执行 `node core/node/dist/clawhermes.js setup-adapter hermes-agent --confirm-setup --json`，生成 `.venv`。
-3. macOS 构建机在 `apps/hermes-agent` 下执行 `python3 -m pip install --target vendor/darwin-arm64 .` 或对应 Intel 架构的 `vendor/darwin-x64`。
+3. macOS 构建机在 `apps/hermes-agent` 下执行 `python3 -m pip install --target vendor/darwin-arm64 . aiohttp==3.13.3` 或对应 Intel 架构的 `vendor/darwin-x64`，再用 `PYTHONPATH=vendor/darwin-arm64:. python3 -c "import aiohttp, dotenv, httpx, requests, websockets, yaml"` 自检。
 4. 确认 `hermes_cli/`、`gateway/`、`agent/` 等上游运行代码目录仍然在 payload 内。
 
 可用 adapter 命令验证：

@@ -1,141 +1,162 @@
-# macOS 同事构建交付说明
+# macOS 构建交付说明
 
-本文档用于给使用 macOS 的同事执行构建。目标不是重新打 Windows 包，而是补齐 Windows 无法可靠生成的 macOS 产物，再把这些产物交回 Windows 发布机生成最终 USB/ISO 内容。
+这份文档给 macOS 同事使用。目标是补齐 Windows 发布机不能可靠生成的 macOS 原生产物，然后把产物交回 Windows 发布机，最终生成一个同时兼容 Windows 和 macOS 的 `DTC`/USB/ISO 包。
 
-## 为什么需要 macOS 构建
+## 为什么要在 macOS 上做
 
-Windows 可以完成 `dist-usb/ClawHermes` 的整体打包，也可以携带同一套业务 payload；但下面这些内容必须在 macOS 或 macOS CI 上构建、准备或验证：
+Windows 可以负责最终打包 `dist-usb/ClawHermes`，也可以继续使用同一套业务 payload；但下面几类内容和 macOS 平台强相关，不能只靠 Windows 可靠生成：
 
-- Electrobun 原生 UI 的 `.app`。它包含 macOS 平台的应用壳、Bun/Electrobun 打包结果和平台相关可执行文件，Windows 不能可靠生成和验证。
-- Hermes Agent 的 macOS Python vendor 依赖。Windows `.venv` 不能直接在 macOS 上复用。
-- Hermes Web UI 的 macOS 原生 Node 依赖，例如 `node-pty` 的 `darwin-arm64` 预编译模块。
-- macOS Node/Python portable runtime archive。USB 首次运行时会解压到 `DTC/runtimes/macos/...`。
+- Electrobun 原生 UI `.app`：包含 macOS app bundle、Bun/Electrobun 自解压内容和 macOS 可执行文件。
+- Hermes Agent Python vendor：Windows `.venv` 不能直接给 macOS portable Python 使用。
+- Hermes Web UI 的 macOS Node 原生依赖：例如 `node-pty` 的 `darwin-arm64` 预编译模块。
+- macOS portable runtime archive：USB 首次运行时会解压成 `DTC/runtimes/macos/...`。
 
-最近一次 macOS 真机现象是：Portal 和服务可以启动，`http://127.0.0.1:17000/` 能访问，但 Electrobun app 进程没有创建可见窗口。代码里已经增加了 macOS 启动日志和“先显示窗口、再启动控制服务”的修复；旧 `.app` 不会自动包含这些修复，所以必须在 macOS 上重新构建 `.app`。
+本次 Hermes 问题的根因是 macOS 运行时没有完整接入 Python vendor：
 
-## 需要构建什么
+- Hermes Web UI 的 Python bridge 缺少 `PYTHONPATH`，导致 `No module named 'dotenv'`。
+- Hermes Agent API Server 缺少 `aiohttp`，导致 Agent 进程是 running，但 8642 health/API 不 ready。
 
-Apple Silicon Mac 当前至少需要准备这些产物：
+代码侧已经修复 `PYTHONPATH` 注入；macOS 构建侧需要确保 `vendor/darwin-arm64` 或 `vendor/darwin-x64` 里包含 `aiohttp` 和 Hermes 常用 Python 依赖。
+
+## 当前需要做什么
+
+如果只是验证本次 Hermes 修复，至少需要重新准备：
+
+```text
+apps/hermes-agent/vendor/darwin-arm64/
+```
+
+如果本轮还改过 Electrobun UI 或 Hermes Web UI，则也需要准备：
 
 ```text
 launcher/electrobun/build/canary-macos-arm64/DTclaw Control-canary.app
-apps/hermes-agent/vendor/darwin-arm64/
-apps/hermes-web-ui/dist/server/index.js
+apps/hermes-web-ui/dist/
 apps/hermes-web-ui/node_modules/node-pty/prebuilds/darwin-arm64/pty.node
+```
+
+如果 portable runtime archive 缺失，还需要补齐：
+
+```text
 runtime-archives/macos/node-v24-darwin-arm64.tar.gz
 runtime-archives/macos/python-3.11-darwin-arm64.tar.gz
 ```
 
-如果要支持 Intel Mac，还需要额外准备对应的 `darwin-x64` 产物和 runtime archive。当前主线优先覆盖 Apple Silicon `darwin-arm64`。
+Intel Mac 对应使用 `darwin-x64`，当前优先支持 Apple Silicon `darwin-arm64`。
 
-## 拉取最新代码
+## 拉取代码
 
 ```bash
 git fetch origin
 git checkout codex/macos-electrobun-usb-release
 git pull --ff-only
-git log --oneline -3
+git log --oneline -5
 ```
 
-确认最近提交里能看到类似内容：
+确认能看到类似提交：
 
 ```text
-37a1c8e fix: show macos electrobun window before control startup
+fix: wire macos hermes python dependencies
+```
+
+## 构建 Hermes Agent vendor
+
+在 Apple Silicon Mac 上执行：
+
+```bash
+cd apps/hermes-agent
+rm -rf vendor/darwin-arm64
+python3 -m pip install --upgrade pip
+python3 -m pip install --target vendor/darwin-arm64 . aiohttp==3.13.3
+PYTHONPATH=vendor/darwin-arm64:. python3 -c "import aiohttp, dotenv, httpx, requests, websockets, yaml"
+```
+
+自检命令无输出且退出码为 0 即通过。这个目录会给 USB 上的 portable Python 使用，不要用 Windows `.venv` 替代。
+
+Intel Mac 对应改成：
+
+```bash
+cd apps/hermes-agent
+rm -rf vendor/darwin-x64
+python3 -m pip install --upgrade pip
+python3 -m pip install --target vendor/darwin-x64 . aiohttp==3.13.3
+PYTHONPATH=vendor/darwin-x64:. python3 -c "import aiohttp, dotenv, httpx, requests, websockets, yaml"
 ```
 
 ## 构建 Electrobun macOS UI
+
+只有在 Electrobun UI 代码、启动逻辑或打包配置有变化时才需要重新构建 `.app`。
 
 ```bash
 cd launcher/electrobun
 npm install
 npm run typecheck
 npm run build:mac:arm64
-```
-
-构建完成后检查 `.app` 是否存在：
-
-```bash
 test -d "build/canary-macos-arm64/DTclaw Control-canary.app"
 ```
 
-如果实际输出目录名略有不同，请在 `launcher/electrobun/build/` 下查找最新生成的 `.app`，交回 Windows 时最终会被复制为：
+交回 Windows 后，发布脚本会把它复制为：
 
 ```text
 dist-usb/ClawHermes/ClawHermes-Control-Mac.app
 ```
 
-## 准备 Hermes Agent macOS vendor
+同时会生成：
 
-```bash
-cd ../../apps/hermes-agent
-rm -rf vendor/darwin-arm64
-python3 -m pip install --upgrade pip
-python3 -m pip install --target vendor/darwin-arm64 .
-test -d vendor/darwin-arm64
+```text
+dist-usb/ClawHermes/ClawHermes-Control-Mac.app.tar.gz
 ```
 
-这个目录是给 USB 上的 portable Python 使用的，不要用 Windows `.venv` 替代。
+这个 `.tar.gz` 必须保留；部分 ISO/USB 工具会漏写 `.app` 目录，macOS 启动脚本会用 `.tar.gz` 自动恢复。
 
-## 准备 Hermes Web UI macOS payload
+## 构建 Hermes Web UI macOS payload
+
+只有在 Hermes Web UI 代码、Node 依赖或 `node-pty` 相关内容变化时才需要重新构建。
 
 ```bash
-cd ../hermes-web-ui
+cd apps/hermes-web-ui
 npm install
 npm run build
 test -f dist/server/index.js
 test -f node_modules/node-pty/prebuilds/darwin-arm64/pty.node
 ```
 
-`apps/hermes-web-ui/node_modules/` 里会包含 macOS 原生依赖。Windows 发布机后续打包时应使用 `-SkipBuild`，避免在 Windows 上重新覆盖这份 macOS 依赖。
+Windows 发布机后续打包时要用 `-SkipBuild`，避免 Windows 上的 `npm install` 覆盖 macOS 原生依赖。
 
-## 检查 macOS portable runtime archive
+## 检查 runtime archive
 
-仓库本地或交付目录中应存在：
+在仓库根目录检查：
 
 ```bash
 test -f runtime-archives/macos/node-v24-darwin-arm64.tar.gz
 test -f runtime-archives/macos/python-3.11-darwin-arm64.tar.gz
 ```
 
-这两个 archive 需要能在 USB 首次运行时解压成：
+USB 首次运行时会解压成：
 
 ```text
 runtimes/macos/node/darwin-arm64/bin/node
 runtimes/macos/python/darwin-arm64/bin/python3
 ```
 
-如果 archive 缺失，先不要交付最终包；需要补齐后再让 Windows 发布机打包。
+archive 缺失时不要交付最终包。
 
-## 构建后自检清单
+## 交回 Windows 发布机
 
-在仓库根目录执行：
-
-```bash
-test -d "launcher/electrobun/build/canary-macos-arm64/DTclaw Control-canary.app"
-test -d apps/hermes-agent/vendor/darwin-arm64
-test -f apps/hermes-web-ui/dist/server/index.js
-test -f apps/hermes-web-ui/node_modules/node-pty/prebuilds/darwin-arm64/pty.node
-test -f runtime-archives/macos/node-v24-darwin-arm64.tar.gz
-test -f runtime-archives/macos/python-3.11-darwin-arm64.tar.gz
-```
-
-全部通过后，把这些产物交回 Windows 发布机：
+把实际生成或更新过的产物交回 Windows 发布机：
 
 ```text
+apps/hermes-agent/vendor/darwin-arm64/
 launcher/electrobun/build/
 launcher/electrobun/artifacts/
-apps/hermes-agent/vendor/darwin-arm64/
 apps/hermes-web-ui/dist/
 apps/hermes-web-ui/node_modules/
 runtime-archives/macos/node-v24-darwin-arm64.tar.gz
 runtime-archives/macos/python-3.11-darwin-arm64.tar.gz
 ```
 
-不要把这些大产物提交到当前功能分支。推荐通过 USB、网盘或 CI artifact 传回；如果临时用 Git 传产物，请使用单独的临时 transfer 分支，Windows 侧取回后再清理。
+不要把这些大产物提交到当前功能分支。推荐通过 USB、网盘或 CI artifact 传回；如果临时用 Git 传产物，请使用单独 transfer 分支，Windows 侧取回后再清理。
 
-## Windows 发布机后续动作
-
-Windows 侧拿到 macOS 产物后，在仓库根目录执行：
+Windows 发布机拿到产物后执行：
 
 ```powershell
 npm run build
@@ -148,13 +169,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\release\Build-UsbRel
 dist-usb/ClawHermes/
 ```
 
-release 脚本会把 `.app` 复制为 `ClawHermes-Control-Mac.app`，并额外生成 `ClawHermes-Control-Mac.app.tar.gz`。两个文件都要保留在最终 `DTC` 目录里；部分 ISO/USB 写入工具可能会漏掉 `.app` 目录，macOS 启动脚本会用 `.tar.gz` 自动恢复。
+## macOS 真机验收
 
-再把 `dist-usb/ClawHermes` 作为 `DTC` 目录，和 ISO 根目录入口文件一起放到 U 盘或 ISO 根目录。
-
-## macOS 真机验证
-
-在 USB 或测试卷上执行：
+把 `dist-usb/ClawHermes` 作为 U 盘或 ISO 根目录里的 `DTC` 目录后，在 macOS 上执行：
 
 ```bash
 cd /Volumes/<卷名>/DTC
@@ -164,23 +181,32 @@ chmod +x Start-ClawHermes-Mac.command Stop-ClawHermes-Mac.command
 
 预期结果：
 
-- 优先弹出 `ClawHermes-Control-Mac.app` 的 Electrobun 原生 UI。
-- 服务启动后，`http://127.0.0.1:17000/` 也可以作为浏览器 Portal fallback 访问。
-- 如果没有弹出 Electrobun UI，需要查看 `data/logs/macos-launcher.log` 和 `data/logs/electrobun-control.log`。
+- 只保留当前 U 盘实例的 UI，标题路径应指向 `/Volumes/<卷名>/DTC`。
+- OpenClaw、Hermes Agent、Hermes Web UI、Portal 状态应进入 running/ready。
+- Hermes Web UI 中发送消息不应再出现 `No module named 'dotenv'`。
+- Hermes Agent 不应再出现 `API Server: aiohttp not installed`。
 
-常用日志：
+如果出现旧 UI 残留，先清理本机旧进程：
+
+```bash
+pkill -f "ClawHermes-Control-Mac|DTclaw Control|clawhermes.js|hermes_bridge.py" || true
+```
+
+常用排查日志：
 
 ```text
 data/logs/macos-launcher.log
 data/logs/electrobun-control.log
+data/logs/electrobun-app-process.log
 data/logs/launcher.log
-data/logs/portal.log
 data/logs/openclaw.log
 data/logs/hermes-agent.log
 data/logs/hermes-web-ui.log
+data/home/.hermes-web-ui/logs/server.log
+data/home/.hermes-web-ui/logs/bridge.log
 ```
 
-如果 macOS 提示拦截或无法打开，可以在 `DTC` 目录下先清理 quarantine：
+如果 macOS 拦截从 U 盘打开的文件，可以在 `DTC` 目录下清理 quarantine：
 
 ```bash
 xattr -rd com.apple.quarantine .
