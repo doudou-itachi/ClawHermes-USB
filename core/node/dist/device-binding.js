@@ -28,7 +28,7 @@ function getDeviceBindingStatus(usbRoot) {
             messages: ["This package has not been bound to a USB device yet."],
         };
     }
-    const matches = binding.fingerprint.hash === current.hash;
+    const matches = bindingFingerprints(binding).some((fingerprint) => fingerprint.hash === current.hash);
     return {
         root,
         bindingPath,
@@ -45,6 +45,10 @@ function ensureDeviceBinding(usbRoot) {
     const root = (0, portable_1.getRoot)(usbRoot);
     const status = getDeviceBindingStatus(root);
     if (status.state === "mismatch") {
+        if (status.binding && canAppendCrossPlatformFingerprint(status.binding, status.current)) {
+            writeDeviceBinding(status.bindingPath, appendFingerprint(status.binding, status.current, root));
+            return getDeviceBindingStatus(root);
+        }
         throw new Error("This ClawHermes package is bound to another USB device. Use the original bound USB device or rebuild a fresh delivery package.");
     }
     if (status.state === "bound")
@@ -54,10 +58,14 @@ function ensureDeviceBinding(usbRoot) {
         createdAt: new Date().toISOString(),
         rootAtBinding: root,
         fingerprint: status.current,
+        fingerprints: [status.current],
     };
-    (0, node_fs_1.mkdirSync)((0, node_path_1.dirname)(status.bindingPath), { recursive: true });
-    (0, node_fs_1.writeFileSync)(status.bindingPath, `${JSON.stringify(binding, null, 2)}\n`, "utf8");
+    writeDeviceBinding(status.bindingPath, binding);
     return getDeviceBindingStatus(root);
+}
+function writeDeviceBinding(path, binding) {
+    (0, node_fs_1.mkdirSync)((0, node_path_1.dirname)(path), { recursive: true });
+    (0, node_fs_1.writeFileSync)(path, `${JSON.stringify(binding, null, 2)}\n`, "utf8");
 }
 function readDeviceBinding(path) {
     if (!(0, node_fs_1.existsSync)(path))
@@ -71,6 +79,32 @@ function readDeviceBinding(path) {
     catch {
         return null;
     }
+}
+function bindingFingerprints(binding) {
+    return dedupeFingerprints([binding.fingerprint, ...(binding.fingerprints ?? [])].filter(Boolean));
+}
+function canAppendCrossPlatformFingerprint(binding, current) {
+    if (current.source === "env")
+        return false;
+    return bindingFingerprints(binding).some((fingerprint) => fingerprint.source !== "env" && fingerprint.source !== current.source);
+}
+function appendFingerprint(binding, current, root) {
+    return {
+        ...binding,
+        rootAtBinding: binding.rootAtBinding || root,
+        fingerprints: dedupeFingerprints([...bindingFingerprints(binding), current]),
+    };
+}
+function dedupeFingerprints(fingerprints) {
+    const seen = new Set();
+    const result = [];
+    for (const fingerprint of fingerprints) {
+        if (!fingerprint?.hash || seen.has(fingerprint.hash))
+            continue;
+        seen.add(fingerprint.hash);
+        result.push(fingerprint);
+    }
+    return result;
 }
 function currentDeviceFingerprint(root) {
     const envValue = process.env[FINGERPRINT_ENV];

@@ -25,6 +25,7 @@ type DeviceBindingFile = {
   createdAt: string;
   rootAtBinding: string;
   fingerprint: DeviceFingerprint;
+  fingerprints?: DeviceFingerprint[];
 };
 
 const FINGERPRINT_ENV = "CLAWHERMES_DEVICE_BINDING_FINGERPRINT";
@@ -49,7 +50,7 @@ export function getDeviceBindingStatus(usbRoot: string): DeviceBindingStatus {
       messages: ["This package has not been bound to a USB device yet."],
     };
   }
-  const matches = binding.fingerprint.hash === current.hash;
+  const matches = bindingFingerprints(binding).some((fingerprint) => fingerprint.hash === current.hash);
   return {
     root,
     bindingPath,
@@ -67,6 +68,10 @@ export function ensureDeviceBinding(usbRoot: string): DeviceBindingStatus {
   const root = getRoot(usbRoot);
   const status = getDeviceBindingStatus(root);
   if (status.state === "mismatch") {
+    if (status.binding && canAppendCrossPlatformFingerprint(status.binding, status.current)) {
+      writeDeviceBinding(status.bindingPath, appendFingerprint(status.binding, status.current, root));
+      return getDeviceBindingStatus(root);
+    }
     throw new Error("This ClawHermes package is bound to another USB device. Use the original bound USB device or rebuild a fresh delivery package.");
   }
   if (status.state === "bound") return status;
@@ -75,10 +80,15 @@ export function ensureDeviceBinding(usbRoot: string): DeviceBindingStatus {
     createdAt: new Date().toISOString(),
     rootAtBinding: root,
     fingerprint: status.current,
+    fingerprints: [status.current],
   };
-  mkdirSync(dirname(status.bindingPath), { recursive: true });
-  writeFileSync(status.bindingPath, `${JSON.stringify(binding, null, 2)}\n`, "utf8");
+  writeDeviceBinding(status.bindingPath, binding);
   return getDeviceBindingStatus(root);
+}
+
+function writeDeviceBinding(path: string, binding: DeviceBindingFile): void {
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, `${JSON.stringify(binding, null, 2)}\n`, "utf8");
 }
 
 function readDeviceBinding(path: string): DeviceBindingFile | null {
@@ -90,6 +100,34 @@ function readDeviceBinding(path: string): DeviceBindingFile | null {
   } catch {
     return null;
   }
+}
+
+function bindingFingerprints(binding: DeviceBindingFile): DeviceFingerprint[] {
+  return dedupeFingerprints([binding.fingerprint, ...(binding.fingerprints ?? [])].filter(Boolean));
+}
+
+function canAppendCrossPlatformFingerprint(binding: DeviceBindingFile, current: DeviceFingerprint): boolean {
+  if (current.source === "env") return false;
+  return bindingFingerprints(binding).some((fingerprint) => fingerprint.source !== "env" && fingerprint.source !== current.source);
+}
+
+function appendFingerprint(binding: DeviceBindingFile, current: DeviceFingerprint, root: string): DeviceBindingFile {
+  return {
+    ...binding,
+    rootAtBinding: binding.rootAtBinding || root,
+    fingerprints: dedupeFingerprints([...bindingFingerprints(binding), current]),
+  };
+}
+
+function dedupeFingerprints(fingerprints: DeviceFingerprint[]): DeviceFingerprint[] {
+  const seen = new Set<string>();
+  const result: DeviceFingerprint[] = [];
+  for (const fingerprint of fingerprints) {
+    if (!fingerprint?.hash || seen.has(fingerprint.hash)) continue;
+    seen.add(fingerprint.hash);
+    result.push(fingerprint);
+  }
+  return result;
 }
 
 function currentDeviceFingerprint(root: string): DeviceFingerprint {

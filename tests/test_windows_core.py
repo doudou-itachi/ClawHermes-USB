@@ -3828,6 +3828,11 @@ console.log(JSON.stringify(Object.fromEntries(adapters.map((adapter) => [adapter
                         "  upstream: process.env.UPSTREAM,",
                         "  hermesAgentApiBase: process.env.HERMES_AGENT_API_BASE,",
                         "  hermesBin: process.env.HERMES_BIN,",
+                        "  hermesAgentRoot: process.env.HERMES_AGENT_ROOT,",
+                        "  hermesBridgePython: process.env.HERMES_AGENT_BRIDGE_PYTHON,",
+                        "  pythonPath: process.env.PYTHONPATH,",
+                        "  pythonNoUserSite: process.env.PYTHONNOUSERSITE,",
+                        "  pythonUtf8: process.env.PYTHONUTF8,",
                         "  path: process.env.PATH",
                         "}, null, 2));",
                         "http.createServer((req, res) => { res.writeHead(200); res.end('ok'); }).listen(Number(process.env.PORT || 8648), '127.0.0.1');",
@@ -3890,6 +3895,12 @@ console.log(JSON.stringify(Object.fromEntries(adapters.map((adapter) => [adapter
             self.assertEqual(launched["upstream"], expected_upstream)
             self.assertEqual(launched["hermesAgentApiBase"], expected_upstream)
             self.assertTrue(launched["hermesBin"].lower().endswith("powershell.exe"))
+            self.assertEqual(Path(launched["hermesAgentRoot"]), temp_root / "apps" / "hermes-agent")
+            self.assertEqual(Path(launched["hermesBridgePython"]), temp_root / "runtimes" / "windows" / "python" / "python.exe")
+            self.assertIn(str(temp_root / "apps" / "hermes-agent"), launched["pythonPath"])
+            self.assertIn(str(temp_root / "apps" / "hermes-agent" / ".venv" / "Lib" / "site-packages"), launched["pythonPath"])
+            self.assertEqual(launched["pythonNoUserSite"], "1")
+            self.assertEqual(launched["pythonUtf8"], "1")
             shim_dir = temp_root / "data" / "tmp" / "bin" / "hermes-web-ui"
             self.assertTrue((shim_dir / "profile.ps1").exists())
             self.assertTrue((shim_dir / "logs.ps1").exists())
@@ -4011,6 +4022,81 @@ console.log(JSON.stringify(Object.fromEntries(adapters.map((adapter) => [adapter
             self.assertFalse(payload["allowed"])
         finally:
             run_dispatcher_for_root(temp_root, "stop", "-Json", env={"CLAWHERMES_DEVICE_BINDING_FINGERPRINT": "usb-device-a"})
+            temp_dir.cleanup()
+
+    def test_start_adapter_keeps_rejecting_same_source_device_binding_mismatch(self):
+        temp_dir, temp_root = make_temp_process_usb_root()
+        try:
+            mark_fake_service_candidate(temp_root)
+            status = run_dispatcher_for_root(temp_root, "device-binding", "-Json")
+            self.assertEqual(status.returncode, 0, status.stderr)
+            current = json.loads(status.stdout)["current"]
+            wrong_hash = hashlib.sha256(b"same-source-other-device").hexdigest()
+            binding_path = temp_root / "data" / "settings" / "device-binding.json"
+            binding_path.parent.mkdir(parents=True, exist_ok=True)
+            binding_path.write_text(
+                json.dumps(
+                    {
+                        "schemaVersion": 1,
+                        "createdAt": "2026-06-03T00:00:00.000Z",
+                        "rootAtBinding": str(temp_root),
+                        "fingerprint": {
+                            "hash": wrong_hash,
+                            "source": current["source"],
+                            "summary": "Same-source test fingerprint.",
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            result = run_dispatcher_for_root(temp_root, "start-adapter", "fake-service", "--confirm-start", "-Json")
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("bound to another USB device", result.stderr)
+            self.assertFalse((temp_root / "data" / "tmp" / "pids" / "fake-service.pid").exists())
+        finally:
+            run_dispatcher_for_root(temp_root, "stop", "-Json")
+            temp_dir.cleanup()
+
+    def test_start_adapter_appends_cross_platform_device_binding_fingerprint(self):
+        temp_dir, temp_root = make_temp_process_usb_root()
+        try:
+            mark_fake_service_candidate(temp_root)
+            status = run_dispatcher_for_root(temp_root, "device-binding", "-Json")
+            self.assertEqual(status.returncode, 0, status.stderr)
+            current = json.loads(status.stdout)["current"]
+            other_source = "fallback" if current["source"] == "windows" else "windows"
+            other_hash = hashlib.sha256(b"other-platform-same-usb").hexdigest()
+            binding_path = temp_root / "data" / "settings" / "device-binding.json"
+            binding_path.parent.mkdir(parents=True, exist_ok=True)
+            binding_path.write_text(
+                json.dumps(
+                    {
+                        "schemaVersion": 1,
+                        "createdAt": "2026-06-03T00:00:00.000Z",
+                        "rootAtBinding": str(temp_root),
+                        "fingerprint": {
+                            "hash": other_hash,
+                            "source": other_source,
+                            "summary": "Other platform test fingerprint.",
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            result = run_dispatcher_for_root(temp_root, "start-adapter", "fake-service", "--confirm-start", "-Json")
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            binding = json.loads(binding_path.read_text(encoding="utf-8"))
+            fingerprints = binding["fingerprints"]
+            hashes = {fingerprint["hash"] for fingerprint in fingerprints}
+            self.assertIn(other_hash, hashes)
+            self.assertIn(current["hash"], hashes)
+            self.assertEqual(binding["fingerprint"]["hash"], other_hash)
+        finally:
+            run_dispatcher_for_root(temp_root, "stop", "-Json")
             temp_dir.cleanup()
 
     def test_windows_device_binding_uses_stable_volume_serial_not_disk_metadata(self):
@@ -4551,6 +4637,57 @@ console.log(JSON.stringify(Object.fromEntries(adapters.map((adapter) => [adapter
             wait_for_no_process_command_line_fragment(temp_root)
             temp_dir.cleanup()
 
+    def test_start_openclaw_replaces_existing_portable_skills_dir_from_old_root(self):
+        temp_dir, temp_root = make_temp_skeleton_usb_root()
+        process_id = None
+        try:
+            app_dir = temp_root / "apps" / "openclaw"
+            (app_dir / "openclaw.mjs").write_text("setTimeout(() => {}, 60000)\n", encoding="utf-8")
+            skills_dir = temp_root / "skills"
+            skills_dir.mkdir(parents=True, exist_ok=True)
+            old_root = temp_root.parent / "OldClawHermes"
+            old_skills_dir = old_root / "skills"
+            old_skills_dir.mkdir(parents=True, exist_ok=True)
+            (old_root / "core" / "node" / "dist").mkdir(parents=True, exist_ok=True)
+            (old_root / "core" / "node" / "dist" / "clawhermes.js").write_text("console.log('old')\n", encoding="utf-8")
+            custom_skills_dir = temp_root.parent / "CustomSkills"
+            custom_skills_dir.mkdir(parents=True, exist_ok=True)
+            config_path = temp_root / "data" / "openclaw" / "openclaw.json"
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "skills": {
+                            "load": {
+                                "extraDirs": [
+                                    str(old_skills_dir),
+                                    str(custom_skills_dir),
+                                ],
+                            },
+                        },
+                    },
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
+            adapter_path = temp_root / "adapters" / "openclaw" / "adapter.json"
+            adapter = json.loads(adapter_path.read_text(encoding="utf-8"))
+            adapter["health"] = {"type": "process", "timeoutSeconds": 5}
+            adapter_path.write_text(json.dumps(adapter, indent=2), encoding="utf-8")
+
+            start = run_dispatcher_for_root(temp_root, "start-adapter", "openclaw", "--confirm-start", "-Json")
+
+            self.assertEqual(start.returncode, 0, start.stderr)
+            metadata = json.loads((temp_root / "data" / "tmp" / "pids" / "openclaw.pid").read_text(encoding="utf-8"))
+            process_id = metadata["processId"]
+            refreshed = json.loads(config_path.read_text(encoding="utf-8"))
+            self.assertEqual(refreshed["skills"]["load"]["extraDirs"], [str(custom_skills_dir), str(skills_dir)])
+        finally:
+            run_dispatcher_for_root(temp_root, "stop", "-Json")
+            if process_id:
+                wait_for_process_exit(process_id)
+            wait_for_no_process_command_line_fragment(temp_root)
+            temp_dir.cleanup()
+
     def test_status_removes_stale_managed_adapter_pid_file(self):
         temp_dir, temp_root = make_temp_process_usb_root()
         try:
@@ -5025,6 +5162,106 @@ console.log(JSON.stringify(Object.fromEntries(adapters.map((adapter) => [adapter
             self.assertEqual(manifest["entryPoint"], "ClawHermes-Control.exe")
             self.assertIn("PyQt", manifest["rootEntrypointPolicy"])
             self.assertTrue(manifest["build"]["skipped"])
+        finally:
+            temp_dir.cleanup()
+            output_dir.cleanup()
+
+    def test_usb_release_script_prefers_windows_electrobun_entrypoint_when_bundled(self):
+        release_script = ROOT / "scripts" / "release" / "Build-UsbRelease.ps1"
+        temp_dir = tempfile.TemporaryDirectory()
+        output_dir = tempfile.TemporaryDirectory()
+        try:
+            source_root = Path(temp_dir.name)
+            output_root = Path(output_dir.name) / "ClawHermes"
+            for relative_dir in [
+                "launcher/pyqt/dist/ClawHermes-Control/_internal",
+                "launcher/electrobun/build/canary-win-x64",
+                "core/node/dist",
+                "adapters/hermes-web-ui",
+                "config/env",
+                "portal",
+                "runtimes/windows/node",
+                "runtimes/windows/python",
+                "apps/hermes-web-ui/dist/server",
+            ]:
+                (source_root / relative_dir).mkdir(parents=True, exist_ok=True)
+
+            (source_root / "launcher" / "pyqt" / "dist" / "ClawHermes-Control" / "ClawHermes-Control.exe").write_text(
+                "pyqt exe\n",
+                encoding="utf-8",
+            )
+            (source_root / "launcher" / "pyqt" / "dist" / "ClawHermes-Control" / "_internal" / "python311.dll").write_text(
+                "python runtime\n",
+                encoding="utf-8",
+            )
+            electrobun_root = source_root / "launcher" / "electrobun" / "build" / "canary-win-x64"
+            (electrobun_root / "ClawHermes-Control-Electrobun.exe").write_text(
+                "portable electrobun launcher\n",
+                encoding="utf-8",
+            )
+            (electrobun_root / "DTclaw Control-Setup-canary.exe").write_text(
+                "electrobun setup\n",
+                encoding="utf-8",
+            )
+            (electrobun_root / "DTclaw Control-Setup-canary.tar.zst").write_text(
+                "electrobun archive\n",
+                encoding="utf-8",
+            )
+            (electrobun_root / "DTclaw Control-Setup-canary.metadata.json").write_text(
+                '{"hash":"abc123"}\n',
+                encoding="utf-8",
+            )
+            (source_root / "core" / "node" / "dist" / "clawhermes.js").write_text(
+                "console.log('core')\n",
+                encoding="utf-8",
+            )
+            (source_root / "adapters" / "hermes-web-ui" / "adapter.json").write_text(
+                '{"id":"hermes-web-ui"}\n',
+                encoding="utf-8",
+            )
+            (source_root / "apps" / "hermes-web-ui" / "dist" / "server" / "index.js").write_text(
+                "const shell = process.env.COMSPEC || 'cmd.exe'\n",
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    "powershell",
+                    "-NoProfile",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(release_script),
+                    "-UsbRoot",
+                    str(source_root),
+                    "-OutputRoot",
+                    str(output_root),
+                    "-Clean",
+                    "-SkipBuild",
+                    "-NoStop",
+                    "-NoBundleHostRuntimes",
+                ],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue((output_root / "ClawHermes-Control-Electrobun.exe").exists())
+            self.assertTrue((output_root / "ClawHermes-Control-Electrobun-Setup.exe").exists())
+            self.assertTrue((output_root / "ClawHermes-Control-Electrobun-Setup.tar.zst").exists())
+            self.assertTrue((output_root / "ClawHermes-Control-Electrobun-Setup.metadata.json").exists())
+            self.assertTrue((output_root / "ClawHermes-Control.exe").exists())
+
+            manifest = json.loads((output_root / "release-manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual(manifest["entryPoint"], "ClawHermes-Control-Electrobun.exe")
+            self.assertEqual(manifest["entryPoints"]["windows"], "ClawHermes-Control-Electrobun.exe")
+            self.assertIn("ClawHermes-Control-Electrobun.exe", manifest["platformPayloads"]["windows"])
+            self.assertIn("ClawHermes-Control-Electrobun-Setup.exe", manifest["platformPayloads"]["windows"])
+            self.assertIn("ClawHermes-Control-Electrobun-Setup.tar.zst", manifest["platformPayloads"]["windows"])
+            self.assertIn("Electrobun", manifest["rootEntrypointPolicy"])
+            self.assertIn("PyQt", manifest["rootEntrypointPolicy"])
         finally:
             temp_dir.cleanup()
             output_dir.cleanup()

@@ -230,7 +230,7 @@ function prepareOpenClawEnvironment(root, serviceEnv) {
             ...skills,
             load: {
                 ...skillsLoad,
-                extraDirs: appendUniquePathEntry(existingPathEntries(skillsLoad.extraDirs), portableSkillsDir),
+                extraDirs: appendUniquePathEntry(removeMatchingPathEntries(existingPathEntries(skillsLoad.extraDirs), isClawHermesPortableSkillsPath), portableSkillsDir),
             },
         },
         plugins: {
@@ -282,6 +282,20 @@ function removeMatchingPathEntries(value, predicate) {
 }
 function isWeixinPluginPath(pathValue) {
     return normalizePathForComparison(pathValue).endsWith(pathSuffixForComparison(WEIXIN_PLUGIN_RELATIVE_DIR));
+}
+function isClawHermesPortableSkillsPath(pathValue) {
+    const normalized = normalizePathForComparison(pathValue).replace(/[\\/]+/g, "\\");
+    if (!normalized.endsWith("\\skills"))
+        return false;
+    let rootCandidate;
+    try {
+        rootCandidate = (0, node_path_1.dirname)((0, node_path_1.resolve)(pathValue));
+    }
+    catch {
+        return false;
+    }
+    return (0, node_fs_1.existsSync)((0, node_path_1.join)(rootCandidate, "clawhermes-usb-root.txt")) ||
+        (0, node_fs_1.existsSync)((0, node_path_1.join)(rootCandidate, "core", "node", "dist", "clawhermes.js"));
 }
 function pathSuffixForComparison(pathValue) {
     return `${pathValue.replace(/[\\/]+/g, "\\").replace(/[\\/]+$/, "").toLowerCase()}`;
@@ -351,8 +365,16 @@ function prepareHermesWebUiEnvironment(root, serviceEnv) {
 function prepareHermesWebUiWindowsEnvironment(root, serviceEnv) {
     const shimDir = (0, node_path_1.join)(root, "data", "tmp", "bin", "hermes-web-ui");
     writeHermesWebUiShim(shimDir);
+    const agentRoot = (0, node_path_1.join)(root, "apps", "hermes-agent");
+    const portablePython = (0, node_path_1.join)(root, "runtimes", "windows", "python", "python.exe");
+    const agentSitePackages = (0, node_path_1.join)(agentRoot, ".venv", "Lib", "site-packages");
     const powershell = (0, node_path_1.join)(process.env.SystemRoot || "C:\\Windows", "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
     serviceEnv.env.HERMES_BIN = powershell;
+    serviceEnv.env.HERMES_AGENT_ROOT = serviceEnv.env.HERMES_AGENT_ROOT || agentRoot;
+    serviceEnv.env.HERMES_AGENT_BRIDGE_PYTHON = serviceEnv.env.HERMES_AGENT_BRIDGE_PYTHON || portablePython;
+    serviceEnv.env.PYTHONNOUSERSITE = "1";
+    serviceEnv.env.PYTHONUTF8 = "1";
+    serviceEnv.env.PYTHONPATH = [agentRoot, agentSitePackages, serviceEnv.env.PYTHONPATH || ""].filter(Boolean).join(";");
     serviceEnv.env.CLAWHERMES_HERMES_WSL_DISTRO = serviceEnv.env.CLAWHERMES_HERMES_WSL_DISTRO || "ClawHermes-Ubuntu";
     serviceEnv.env.PSExecutionPolicyPreference = "Bypass";
     serviceEnv.env.PATH = [shimDir, serviceEnv.env.PATH || process.env.PATH || ""].filter(Boolean).join(";");

@@ -237,6 +237,123 @@ function Copy-PyQtControlToRoot {
     }
 }
 
+function Get-FirstExistingFile {
+    param([Parameter(Mandatory = $true)][string[]] $Candidates)
+
+    foreach ($candidate in $Candidates) {
+        if (Test-Path -LiteralPath $candidate -PathType Leaf) {
+            return $candidate
+        }
+    }
+
+    return $null
+}
+
+function Copy-WindowsElectrobunControlIfPresent {
+    param([Parameter(Mandatory = $true)][string] $ReleaseRoot)
+
+    $buildRoot = Join-Path $script:SourceRoot "launcher\electrobun\build"
+    $artifactsRoot = Join-Path $script:SourceRoot "launcher\electrobun\artifacts"
+    if (-not (Test-Path -LiteralPath $buildRoot -PathType Container)) {
+        return
+    }
+
+    $launcher = Get-ChildItem -LiteralPath $buildRoot -File -Recurse -Filter "ClawHermes-Control-Electrobun.exe" -ErrorAction SilentlyContinue |
+        Sort-Object FullName |
+        Select-Object -First 1
+    if ($null -eq $launcher) {
+        return
+    }
+
+    $setupCandidates = @(
+        (Join-Path $launcher.DirectoryName "ClawHermes-Control-Electrobun-Setup.exe"),
+        (Join-Path $buildRoot "ClawHermes-Control-Electrobun-Setup.exe"),
+        (Join-Path $artifactsRoot "ClawHermes-Control-Electrobun-Setup.exe")
+    )
+    $setupCandidates += @(
+        Get-ChildItem -LiteralPath $buildRoot -File -Recurse -Filter "*Setup*.exe" -ErrorAction SilentlyContinue |
+            Sort-Object FullName |
+            ForEach-Object { $_.FullName }
+    )
+    if (Test-Path -LiteralPath $artifactsRoot -PathType Container) {
+        $setupCandidates += @(
+            Get-ChildItem -LiteralPath $artifactsRoot -File -Recurse -Filter "*Setup*.exe" -ErrorAction SilentlyContinue |
+                Sort-Object FullName |
+                ForEach-Object { $_.FullName }
+        )
+    }
+    $setupSource = Get-FirstExistingFile -Candidates $setupCandidates
+    if ([string]::IsNullOrWhiteSpace($setupSource)) {
+        $script:Warnings += "Skipped Windows Electrobun entrypoint because ClawHermes-Control-Electrobun-Setup.exe was not found. The release will use PyQt on Windows."
+        return
+    }
+
+    $archiveCandidates = @(
+        (Join-Path $launcher.DirectoryName "ClawHermes-Control-Electrobun-Setup.tar.zst"),
+        (Join-Path (Split-Path -Parent $setupSource) "ClawHermes-Control-Electrobun-Setup.tar.zst"),
+        ([System.IO.Path]::ChangeExtension($setupSource, ".tar.zst")),
+        (Join-Path $artifactsRoot "ClawHermes-Control-Electrobun-Setup.tar.zst")
+    )
+    $archiveCandidates += @(
+        Get-ChildItem -LiteralPath $buildRoot -File -Recurse -Filter "*Setup*.tar.zst" -ErrorAction SilentlyContinue |
+            Sort-Object FullName |
+            ForEach-Object { $_.FullName }
+    )
+    if (Test-Path -LiteralPath $artifactsRoot -PathType Container) {
+        $archiveCandidates += @(
+            Get-ChildItem -LiteralPath $artifactsRoot -File -Recurse -Filter "*Setup*.tar.zst" -ErrorAction SilentlyContinue |
+                Sort-Object FullName |
+                ForEach-Object { $_.FullName }
+        )
+    }
+    $archiveSource = Get-FirstExistingFile -Candidates $archiveCandidates
+    if ([string]::IsNullOrWhiteSpace($archiveSource)) {
+        $script:Warnings += "Skipped Windows Electrobun entrypoint because the adjacent setup archive (*.tar.zst) was not found. The release will use PyQt on Windows."
+        return
+    }
+
+    $files = @(
+        @{ Source = $launcher.FullName; Target = "ClawHermes-Control-Electrobun.exe" },
+        @{ Source = $setupSource; Target = "ClawHermes-Control-Electrobun-Setup.exe" },
+        @{ Source = $archiveSource; Target = "ClawHermes-Control-Electrobun-Setup.tar.zst" }
+    )
+
+    $metadataCandidates = @(
+        (Join-Path $launcher.DirectoryName "ClawHermes-Control-Electrobun-Setup.metadata.json"),
+        (Join-Path (Split-Path -Parent $setupSource) "ClawHermes-Control-Electrobun-Setup.metadata.json"),
+        ([System.IO.Path]::ChangeExtension($setupSource, ".metadata.json")),
+        (Join-Path $artifactsRoot "ClawHermes-Control-Electrobun-Setup.metadata.json")
+    )
+    $metadataCandidates += @(
+        Get-ChildItem -LiteralPath $buildRoot -File -Recurse -Filter "*metadata*.json" -ErrorAction SilentlyContinue |
+            Sort-Object FullName |
+            ForEach-Object { $_.FullName }
+    )
+    if (Test-Path -LiteralPath $artifactsRoot -PathType Container) {
+        $metadataCandidates += @(
+            Get-ChildItem -LiteralPath $artifactsRoot -File -Recurse -Filter "*metadata*.json" -ErrorAction SilentlyContinue |
+                Sort-Object FullName |
+                ForEach-Object { $_.FullName }
+        )
+    }
+    $metadataSource = Get-FirstExistingFile -Candidates $metadataCandidates
+    if (-not [string]::IsNullOrWhiteSpace($metadataSource)) {
+        $files += @{ Source = $metadataSource; Target = "ClawHermes-Control-Electrobun-Setup.metadata.json" }
+    } else {
+        $script:Warnings += "Windows Electrobun setup metadata was not found; installed-app update detection will rely on the setup package being absent/present."
+    }
+
+    foreach ($file in $files) {
+        $target = Join-Path $ReleaseRoot $file.Target
+        Copy-Item -LiteralPath $file.Source -Destination $target -Force
+        $script:CopiedPaths += [ordered]@{
+            path = $file.Target
+            source = $file.Source
+            target = $target
+        }
+    }
+}
+
 function Copy-MacLaunchersToRoot {
     param([Parameter(Mandatory = $true)][string] $ReleaseRoot)
 
@@ -354,9 +471,10 @@ ClawHermes-USB 交付包
 ClawHermes-USB portable release
 
 Windows:
-1. Double-click ClawHermes-Control.exe.
-2. Use the control panel to configure API URL, model, and API key.
-3. Click Start to launch the shared payload services.
+1. Double-click ClawHermes-Control-Electrobun.exe when it is present.
+2. If the Electrobun launcher is not present, double-click ClawHermes-Control.exe.
+3. Use the control panel to configure API URL, model, and API key.
+4. Click Start to launch the shared payload services.
 
 macOS:
 1. Double-click Start-ClawHermes-Mac.command.
@@ -442,6 +560,21 @@ function Invoke-ReleaseBuilds {
     $pyqtBuild = Join-Path $script:SourceRoot "launcher\pyqt\build.ps1"
     if (Test-Path -LiteralPath $pyqtBuild -PathType Leaf) {
         Invoke-ReleaseCommand -Title "Build PyQt control executable" -FilePath "powershell" -Arguments @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $pyqtBuild) -WorkingDirectory $script:SourceRoot
+    }
+
+    $electrobunBuild = Join-Path $script:SourceRoot "launcher\electrobun\build.ps1"
+    if (Test-Path -LiteralPath $electrobunBuild -PathType Leaf) {
+        $bunCommand = Get-Command bun -ErrorAction SilentlyContinue
+        if ($null -eq $bunCommand) {
+            $script:Warnings += "Bun was not found; skipped Windows Electrobun control UI build and will use PyQt fallback unless a prior Electrobun build exists."
+            return
+        }
+
+        try {
+            Invoke-ReleaseCommand -Title "Build Windows Electrobun control UI" -FilePath "powershell" -Arguments @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $electrobunBuild, "-SkipInstall") -WorkingDirectory $script:SourceRoot
+        } catch {
+            $script:Warnings += "Windows Electrobun control UI build failed: $($_.Exception.Message). The release will use PyQt fallback unless a prior complete Electrobun build exists."
+        }
     }
 }
 
@@ -755,10 +888,36 @@ if (-not $NoPayloads) {
 
 Copy-SkillsPayload
 Copy-PyQtControlToRoot -ReleaseRoot $script:TargetRoot
+Copy-WindowsElectrobunControlIfPresent -ReleaseRoot $script:TargetRoot
 Copy-MacLaunchersToRoot -ReleaseRoot $script:TargetRoot
 Copy-MacElectrobunAppIfPresent -ReleaseRoot $script:TargetRoot
 Copy-MacRuntimeArchives -ReleaseRoot $script:TargetRoot
 New-QuickStart -ReleaseRoot $script:TargetRoot
+
+$windowsEntrypoint = "ClawHermes-Control.exe"
+$windowsEntrypointPolicy = "The release root exposes the Windows PyQt control executable and macOS .command launcher. Legacy Windows VBS/PowerShell launchers are not exposed as root entrypoints."
+$windowsPlatformPayloads = @("ClawHermes-Control.exe", "runtimes/windows")
+if (Test-Path -LiteralPath (Join-Path $script:TargetRoot "ClawHermes-Control-Electrobun.exe") -PathType Leaf) {
+    $windowsEntrypoint = "ClawHermes-Control-Electrobun.exe"
+    $windowsEntrypointPolicy = "The release root exposes the Windows Electrobun control launcher when bundled, keeps the Windows PyQt control executable as fallback, and exposes the macOS .command launcher. Legacy Windows VBS/PowerShell launchers are not exposed as root entrypoints."
+    $windowsPlatformPayloads = @(
+        "ClawHermes-Control-Electrobun.exe",
+        "ClawHermes-Control-Electrobun-Setup.exe",
+        "ClawHermes-Control-Electrobun-Setup.tar.zst",
+        "ClawHermes-Control.exe",
+        "runtimes/windows"
+    )
+    if (Test-Path -LiteralPath (Join-Path $script:TargetRoot "ClawHermes-Control-Electrobun-Setup.metadata.json") -PathType Leaf) {
+        $windowsPlatformPayloads = @(
+            "ClawHermes-Control-Electrobun.exe",
+            "ClawHermes-Control-Electrobun-Setup.exe",
+            "ClawHermes-Control-Electrobun-Setup.tar.zst",
+            "ClawHermes-Control-Electrobun-Setup.metadata.json",
+            "ClawHermes-Control.exe",
+            "runtimes/windows"
+        )
+    }
+}
 
 $manifest = [ordered]@{
     schemaVersion = 1
@@ -768,16 +927,16 @@ $manifest = [ordered]@{
     outputRoot = $script:TargetRoot
     includeData = [bool] $IncludeData
     payloadsIncluded = -not [bool] $NoPayloads
-    entryPoint = "ClawHermes-Control.exe"
+    entryPoint = $windowsEntrypoint
     entryPoints = [ordered]@{
-        windows = "ClawHermes-Control.exe"
+        windows = $windowsEntrypoint
         macos = "Start-ClawHermes-Mac.command"
         macosUi = "ClawHermes-Control-Mac.app"
     }
-    rootEntrypointPolicy = "The release root exposes the Windows PyQt control executable and macOS .command launcher. Legacy Windows VBS/PowerShell launchers are not exposed as root entrypoints."
+    rootEntrypointPolicy = $windowsEntrypointPolicy
     sharedPayloads = @("core", "adapters", "apps", "portal", "config", "data", "skills")
     platformPayloads = [ordered]@{
-        windows = @("ClawHermes-Control.exe", "runtimes/windows")
+        windows = $windowsPlatformPayloads
         macos = @("Start-ClawHermes-Mac.command", "Stop-ClawHermes-Mac.command", "ClawHermes-Control-Mac.app", "ClawHermes-Control-Mac.app.tar.gz", "runtime-archives/macos", "runtimes/macos")
     }
     build = [ordered]@{
